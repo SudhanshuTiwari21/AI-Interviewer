@@ -87,11 +87,41 @@ const config: Config = {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        breathe: {
+          "0%,100%": { transform: "scale(1)" },
+          "50%": { transform: "scale(1.012)" },
+        },
+        "breathe-fast": {
+          "0%,100%": { transform: "scale(1.005)" },
+          "50%": { transform: "scale(1.02)" },
+        },
+        "wave-1": {
+          "0%,100%": { transform: "scaleY(0.4)" },
+          "50%": { transform: "scaleY(1)" },
+        },
+        "wave-2": {
+          "0%,100%": { transform: "scaleY(0.6)" },
+          "50%": { transform: "scaleY(1)" },
+        },
+        "wave-3": {
+          "0%,100%": { transform: "scaleY(0.8)" },
+          "50%": { transform: "scaleY(1)" },
+        },
+        glow: {
+          "0%,100%": { boxShadow: "0 0 0 0 rgba(148,163,184,0)" },
+          "50%": { boxShadow: "0 0 0 6px rgba(148,163,184,0.25)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.4s ease-out both",
         "pulse-ring": "pulse-ring 1.4s ease-out infinite",
         shimmer: "shimmer 2.4s linear infinite",
+        breathe: "breathe 5s ease-in-out infinite",
+        "breathe-fast": "breathe-fast 1.8s ease-in-out infinite",
+        "wave-1": "wave-1 0.9s ease-in-out infinite",
+        "wave-2": "wave-2 0.7s ease-in-out infinite",
+        "wave-3": "wave-3 0.5s ease-in-out infinite",
+        glow: "glow 1.8s ease-in-out infinite",
       },
     },
   },

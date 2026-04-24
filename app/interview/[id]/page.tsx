@@ -58,8 +58,11 @@ export default function InterviewSessionPage() {
   const [finishing, setFinishing] = useState(false);
   const [aiLive, setAiLive] = useState(false);
   const [planning, setPlanning] = useState(true);
+  const [hasStarted, setHasStarted] = useState(true);
+  const [candidateName, setCandidateName] = useState("Candidate");
   const [speaking, setSpeaking] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [acknowledgement, setAcknowledgement] = useState<string | null>(null);
   const sessionStart = useRef(Date.now());
   const spokenForId = useRef<string | null>(null);
 
@@ -75,6 +78,8 @@ export default function InterviewSessionPage() {
       router.replace("/interview/setup");
       return;
     }
+    const resumeName = cfg.resume?.candidateName?.trim();
+    setCandidateName(resumeName || user.name || "Candidate");
     setConfig(cfg);
     sessionStart.current = Date.now();
     setAiLive(Boolean(process.env.NEXT_PUBLIC_OPENAI_API_KEY));
@@ -106,7 +111,7 @@ export default function InterviewSessionPage() {
 
   const interviewer = useMemo(
     () => ({
-      name: "Avery Stone",
+      name: "Ava Reynolds",
       title: `${config?.role ?? "Senior"} Interviewer`,
     }),
     [config?.role],
@@ -115,24 +120,44 @@ export default function InterviewSessionPage() {
   // Speak the question whenever it changes
   useEffect(() => {
     if (!question) return;
+    if (!hasStarted) return;
     if (!ttsEnabled) return;
     if (!isTTSSupported()) return;
     if (spokenForId.current === question.id) return;
     spokenForId.current = question.id;
     setSpeaking(true);
-    speak(question.text, {
+    const spokenPrompt = acknowledgement
+      ? `${acknowledgement} ${question.text}`
+      : question.text;
+    speak(spokenPrompt, {
       onStart: () => setSpeaking(true),
       onEnd: () => setSpeaking(false),
       onError: () => setSpeaking(false),
     });
     return () => cancelSpeech();
-  }, [question, ttsEnabled]);
+  }, [acknowledgement, hasStarted, question, ttsEnabled]);
+
+  useEffect(() => {
+    if (!question) return;
+    if (!hasStarted) return;
+    if (!ttsEnabled) return;
+    if (!isTTSSupported()) return;
+    if (current !== 0) return;
+    if (spokenForId.current === question.id) return;
+    spokenForId.current = question.id;
+    void speakWithAwait(
+      `Good to meet you, ${candidateName}. Thank you for joining today. Let's begin. ${question.text}`,
+    );
+  }, [candidateName, current, hasStarted, question, ttsEnabled]);
 
   function replaySpeech() {
     if (!question) return;
     cancelSpeech();
     setSpeaking(true);
-    speak(question.text, {
+    const spokenPrompt = acknowledgement
+      ? `${acknowledgement} ${question.text}`
+      : question.text;
+    speak(spokenPrompt, {
       onStart: () => setSpeaking(true),
       onEnd: () => setSpeaking(false),
       onError: () => setSpeaking(false),
@@ -200,6 +225,7 @@ export default function InterviewSessionPage() {
     if (stopDecision.shouldEnd || nextIndex >= nextQueue.length) {
       await finalizeSession(nextAnswers);
     } else {
+      setAcknowledgement(buildProfessionalAcknowledgement(transcript));
       setCurrent(nextIndex);
     }
   }
@@ -209,6 +235,11 @@ export default function InterviewSessionPage() {
     cancelSpeech();
     setSpeaking(false);
     setFinishing(true);
+    if (ttsEnabled && isTTSSupported()) {
+      await speakWithAwait(
+        `Thank you for your time today, ${candidateName}. That concludes the interview. I'm now generating your report.`,
+      );
+    }
     const user = store.getUser();
     const report = await generateReportWithAI(
       config,
@@ -257,7 +288,7 @@ export default function InterviewSessionPage() {
             </Badge>
             <Badge tone={aiLive ? "success" : "warn"} dot>
               <BrainCircuit className="size-3" />
-              {aiLive ? "OpenAI connected" : "OpenAI fallback"}
+              {aiLive ? "Adaptive engine live" : "Adaptive engine fallback"}
             </Badge>
             {config.stressTest && (
               <Badge tone="warn" dot>
@@ -349,6 +380,11 @@ export default function InterviewSessionPage() {
                         : labelFor(question.category)}
                     </Badge>
                   </div>
+                  {hasStarted && acknowledgement && (
+                    <p className="rounded-lg border border-success-200 bg-success-50/50 px-3 py-2 text-sm text-ink-700">
+                      {acknowledgement}
+                    </p>
+                  )}
                   <p className="text-xl font-medium leading-8 text-ink-900 sm:text-2xl">
                     {question.text}
                   </p>
@@ -371,7 +407,10 @@ export default function InterviewSessionPage() {
               </div>
             </div>
 
-            <Recorder onSubmit={handleSubmit} disabled={generating || finishing} />
+            <Recorder
+              onSubmit={handleSubmit}
+              disabled={!hasStarted || generating || finishing}
+            />
 
             {(generating || finishing) && (
               <div className="flex items-center gap-3 rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm text-ink-600 animate-fade-in">
@@ -433,7 +472,7 @@ export default function InterviewSessionPage() {
               <ul className="space-y-2 text-xs leading-5 text-ink-600">
                 <li>Lead with a one-sentence headline before the context.</li>
                 <li>Use the STAR pattern for behavioral questions.</li>
-                <li>Name at least one trade-off — it shows seniority.</li>
+                <li>Name at least one trade-off - it shows seniority.</li>
                 <li>If you're stuck, say so out loud and reason through it.</li>
               </ul>
             </SidebarCard>
@@ -452,6 +491,56 @@ export default function InterviewSessionPage() {
       </main>
     </div>
   );
+}
+
+function buildProfessionalAcknowledgement(answer: string) {
+  const wordCount = answer.trim().split(/\s+/).filter(Boolean).length;
+  const lower = answer.toLowerCase();
+  const hasMetrics =
+    /\d/.test(lower) ||
+    lower.includes("percent") ||
+    lower.includes("kpi") ||
+    lower.includes("metric");
+
+  if (hasMetrics) {
+    const options = [
+      "Strong response. The quantified impact was clear.",
+      "Well articulated. The metrics strengthened your example.",
+      "Good framing. You backed your approach with measurable outcomes.",
+    ];
+    return options[Math.floor(Math.random() * options.length)];
+  }
+  if (wordCount >= 80) {
+    const options = [
+      "Good depth there. Thank you for walking through your reasoning.",
+      "Solid answer. Your ownership and thought process came through clearly.",
+      "Well explained. That was a comprehensive response.",
+    ];
+    return options[Math.floor(Math.random() * options.length)];
+  }
+  const options = [
+    "Thanks, that is helpful context.",
+    "Understood, that is a clear response.",
+    "Good answer. Let's build on that.",
+  ];
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+function speakWithAwait(text: string) {
+  return new Promise<void>((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      resolve();
+    };
+    speak(text, {
+      onStart: () => undefined,
+      onEnd: finish,
+      onError: finish,
+    });
+    setTimeout(finish, 6500);
+  });
 }
 
 function SidebarCard({

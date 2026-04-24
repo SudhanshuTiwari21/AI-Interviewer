@@ -45,7 +45,7 @@ export function AuthShell({
               questions."
             </p>
             <p className="mt-4 text-sm text-ink-300">
-              — Aisha P., Staff Engineer · Datadog
+              - Aisha P., Staff Engineer · Datadog
             </p>
           </div>
           <Link

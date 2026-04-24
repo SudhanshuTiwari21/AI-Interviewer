@@ -82,6 +82,28 @@ export async function downloadReportPdf(report: InterviewReport) {
   y += 18;
   y = drawBullets(doc, report.improvements, M, y, W - M * 2);
 
+  if (report.weakAreas?.length) {
+    y += 12;
+    sectionTitle(doc, "Score drop reasons", M, y);
+    y += 18;
+    report.weakAreas.forEach((w) => {
+      y = ensureSpace(doc, y, 72, M);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(14, 18, 32);
+      doc.text(`${w.title} (-${w.impact} pts)`, M, y);
+      y += 14;
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(80, 90, 110);
+      const reason = doc.splitTextToSize(`Reason: ${w.reason}`, W - M * 2);
+      doc.text(reason, M, y);
+      y += reason.length * 12;
+      const fix = doc.splitTextToSize(`Fix: ${w.fix}`, W - M * 2);
+      doc.text(fix, M, y);
+      y += fix.length * 12 + 6;
+    });
+  }
+
   y += 12;
   sectionTitle(doc, "Per-question feedback", M, y);
   y += 18;

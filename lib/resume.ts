@@ -3,6 +3,7 @@
 export type ParsedResume = {
   text: string;
   fileName?: string;
+  candidateName?: string;
   parsedAt: string;
   highlights: ResumeHighlights;
 };
@@ -69,6 +70,7 @@ function finalize(text: string, fileName?: string): ParsedResume {
   return {
     text: cleaned.slice(0, 16_000), // safety cap for prompt size
     fileName,
+    candidateName: extractCandidateName(cleaned, fileName),
     parsedAt: new Date().toISOString(),
     highlights: extractHighlights(cleaned),
   };
@@ -154,4 +156,40 @@ function collectSections(text: string, regex: RegExp): string[] {
     }
   }
   return out;
+}
+
+function extractCandidateName(text: string, fileName?: string) {
+  const lines = text
+    .split(/\n|\r/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  for (const line of lines.slice(0, 12)) {
+    if (line.length < 3 || line.length > 50) continue;
+    if (/\d|@|http|linkedin|github|resume|curriculum|vitae|phone|address/i.test(line)) {
+      continue;
+    }
+    // Heuristic: title-cased 2-4 word human name.
+    const words = line.split(/\s+/);
+    if (words.length < 2 || words.length > 4) continue;
+    const looksLikeName = words.every((w) => /^[A-Z][a-zA-Z'-]+$/.test(w));
+    if (looksLikeName) return line;
+  }
+
+  if (fileName) {
+    const fromFile = fileName
+      .replace(/\.[^.]+$/, "")
+      .replace(/[_-]+/g, " ")
+      .replace(/\bresume\b/gi, "")
+      .trim();
+    const words = fromFile.split(/\s+/).filter(Boolean);
+    if (words.length >= 2 && words.length <= 4) {
+      const title = words
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(" ");
+      if (!/\d/.test(title)) return title;
+    }
+  }
+
+  return undefined;
 }

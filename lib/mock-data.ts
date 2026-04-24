@@ -121,7 +121,7 @@ export const SCRIPTED_TECHNICAL: Record<Role, ScriptedQuestion[]> = {
   Designer: [
     {
       id: "de-1",
-      text: "Walk me through a recent project — focus on the problem, your process, and the trade-offs.",
+      text: "Walk me through a recent project - focus on the problem, your process, and the trade-offs.",
       category: "technical",
       expectedDurationSec: 240,
     },

@@ -112,7 +112,7 @@ export default function DashboardPage() {
         <div className="mt-5 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-700">
           <Crown className="size-3.5" />
           {planLabel(plan)} plan: premium interviewer styles, company packs,
-          OpenAI adaptive follow-ups, and advanced report insights.
+          Adaptive follow-ups, and advanced report insights.
         </div>
       )}
 
@@ -125,7 +125,7 @@ export default function DashboardPage() {
         />
         <Stat
           label="Average score"
-          value={reports.length ? `${avgScore}` : "—"}
+          value={reports.length ? `${avgScore}` : "-"}
           delta={reports.length ? "+6 vs last" : "Run your first"}
           icon={TrendingUp}
         />

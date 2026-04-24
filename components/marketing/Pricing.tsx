@@ -10,7 +10,7 @@ export function Pricing() {
       <SectionHeading
         eyebrow="Pricing"
         title="Simple plans, zero surprises."
-        description="Pay once for a single mock or subscribe for unlimited rehearsals — keep what works for you."
+        description="Pay once for a single mock or subscribe for unlimited rehearsals - keep what works for you."
       />
       <div className="mt-14 grid gap-6 lg:grid-cols-3">
         {PLANS.map((plan) => (

@@ -85,7 +85,7 @@ export function Recorder({
       // Stash stream stop on recorder cleanup
       (audioCtxRef.current as any)._stream = stream;
     } catch {
-      // ignore — we already have the recorder permission flow
+      // ignore - we already have the recorder permission flow
     }
   }
   function stopMeter() {

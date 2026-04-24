@@ -34,7 +34,14 @@ export function speak(text: string, handlers: SpeakHandlers = {}) {
 
   const voices = window.speechSynthesis.getVoices();
   const preferred =
-    voices.find((v) => /en-?US/i.test(v.lang) && /male|daniel|matthew|aria/i.test(v.name)) ??
+    voices.find(
+      (v) =>
+        /en-?US/i.test(v.lang) &&
+        /female|woman|samantha|victoria|karen|zira|ava|aria|alloy|nova|luna/i.test(
+          v.name,
+        ),
+    ) ??
+    voices.find((v) => /en-?US/i.test(v.lang) && /enhanced|premium|natural/i.test(v.name)) ??
     voices.find((v) => /en-?US/i.test(v.lang)) ??
     voices[0];
   if (preferred) utter.voice = preferred;

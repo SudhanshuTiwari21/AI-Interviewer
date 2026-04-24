@@ -27,6 +27,7 @@ import {
   Target,
   AlertTriangle,
   FileCheck2,
+  Lock,
 } from "lucide-react";
 
 export default function ReportPage() {
@@ -48,6 +49,7 @@ export default function ReportPage() {
   }, [params.id, router]);
 
   if (!report) return null;
+  const hasWeakAreaAccess = plan !== "free";
 
   return (
     <div className="min-h-screen bg-ink-50/40">
@@ -283,6 +285,54 @@ export default function ReportPage() {
                     <p className="mt-2 text-xs text-ink-500">{q.summary}</p>
                   </div>
                 ))}
+              </CardBody>
+            </Card>
+
+            <Card>
+              <div className="border-b border-ink-100 px-6 py-4">
+                <p className="inline-flex items-center gap-2 text-sm font-semibold text-ink-900">
+                  <AlertTriangle className="size-4 text-warn-500" />
+                  Score drop reasons
+                </p>
+              </div>
+              <CardBody>
+                {hasWeakAreaAccess ? (
+                  <div className="space-y-3">
+                    {report.weakAreas.map((w) => (
+                      <div
+                        key={`${w.area}-${w.title}`}
+                        className="rounded-xl border border-ink-100 bg-ink-50/40 p-4"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="text-sm font-semibold text-ink-900">{w.title}</p>
+                          <Badge tone="warn" dot>
+                            -{w.impact} pts
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-sm text-ink-700">{w.reason}</p>
+                        <p className="mt-2 text-xs text-ink-500">
+                          Current score in this area: <span className="font-medium">{w.score}</span>
+                        </p>
+                        <p className="mt-1 text-xs text-ink-600">
+                          Fix: {w.fix}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-ink-200 bg-ink-50/50 p-5">
+                    <p className="inline-flex items-center gap-2 text-sm font-semibold text-ink-900">
+                      <Lock className="size-4 text-ink-500" />
+                      Premium section locked
+                    </p>
+                    <p className="mt-2 text-sm text-ink-600">
+                      Upgrade to view detailed weak areas and exact reasons your score dropped.
+                    </p>
+                    <Button href="/checkout?plan=starter" size="sm" className="mt-3">
+                      Unlock full report
+                    </Button>
+                  </div>
+                )}
               </CardBody>
             </Card>
           </div>

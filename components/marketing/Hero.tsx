@@ -12,7 +12,7 @@ export function Hero() {
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700 shadow-soft">
             <Sparkles className="size-3.5 text-accent-500" />
-            Now with adaptive follow-ups powered by GPT-4o
+            Now with adaptive follow-ups that react in real time
           </span>
           <h1 className="mt-6 text-4xl font-semibold leading-[1.05] tracking-tight text-ink-900 sm:text-6xl">
             Practice the interview.
@@ -21,7 +21,7 @@ export function Hero() {
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-ink-500 sm:text-lg">
             Apex runs a fully autonomous, voice-enabled mock interview tailored
-            to your target role — then delivers a scored report and pairs you
+            to your target role - then delivers a scored report and pairs you
             with a human coach.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -70,7 +70,7 @@ function HeroPreview() {
             <span className="text-xs text-ink-400">02:14</span>
           </div>
           <p className="mt-4 text-lg font-medium leading-7 text-ink-900">
-            You mentioned reducing latency by 40% — can you walk me through the
+            You mentioned reducing latency by 40% - can you walk me through the
             trade-offs you considered there, especially around cache invalidation?
           </p>
           <div className="mt-6 rounded-xl border border-ink-100 bg-ink-50/60 p-4">
@@ -82,7 +82,7 @@ function HeroPreview() {
               <span>Voice</span>
             </div>
             <p className="mt-3 text-sm leading-6 text-ink-700">
-              Sure — the biggest trade-off was between consistency and freshness.
+              Sure - the biggest trade-off was between consistency and freshness.
               We chose a write-through cache for hot keys and accepted a 2-second
               staleness window for the long tail, which let us
               <span className="text-ink-400"> cut p95 latency from 380ms to 220ms…</span>

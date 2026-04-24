@@ -311,7 +311,7 @@ export default function SetupPage() {
                     hint="Bias prompts toward specific company-style interviews."
                   >
                     <div className="flex flex-wrap gap-2">
-                      {["Google", "Amazon", "Meta", "Stripe", "OpenAI"].map(
+                      {["Google", "Amazon", "Meta", "Stripe", "Anthropic"].map(
                         (c) => (
                           <Pill
                             key={c}
@@ -406,7 +406,7 @@ export default function SetupPage() {
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="size-1.5 rounded-full bg-success-500" />
-                    AI follow-ups: GPT-4o powered
+                    Adaptive follow-ups: enabled
                   </li>
                 </ul>
               </div>

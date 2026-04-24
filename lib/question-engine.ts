@@ -59,7 +59,7 @@ function systemPersona(config: InterviewConfig) {
   return [
     `You are an expert ${config.role} interviewer at ${company}.`,
     `Seniority bar: ${config.level}.`,
-    `Difficulty: ${difficulty.toUpperCase()} — ${DIFFICULTY_LABEL[difficulty]}.`,
+    `Difficulty: ${difficulty.toUpperCase()} - ${DIFFICULTY_LABEL[difficulty]}.`,
     `Interviewer style: ${style}.`,
     stress,
     "You tailor every question to the candidate's actual resume and previous answers.",
@@ -240,7 +240,7 @@ export async function shouldEndInterviewWithAI(args: {
 }
 
 const FOLLOW_UP_TEMPLATES = [
-  "You mentioned {keyword} — can you walk me through the trade-offs you considered there?",
+  "You mentioned {keyword} - can you walk me through the trade-offs you considered there?",
   "Interesting. What would you do differently next time, especially around {keyword}?",
   "Let's go deeper on {keyword}. How did you measure success?",
   "Could you give a concrete example of how {keyword} played out with stakeholders?",
@@ -437,6 +437,14 @@ export type InterviewReport = {
     redFlags: string[];
     resumeConsistency: string;
   };
+  weakAreas: Array<{
+    area: keyof ScoreBreakdown | "professionalCommunication";
+    title: string;
+    score: number;
+    impact: number;
+    reason: string;
+    fix: string;
+  }>;
 };
 
 export function generateReport(
@@ -474,9 +482,14 @@ export function generateReport(
   const baseline = 62;
   const difficulty = difficultyFromConfig(config);
   const difficultyAdj = difficulty === "hard" ? -5 : difficulty === "easy" ? 4 : 0;
+  const communicationToneAdj = communicationAdjustmentFromResponses(answers);
 
   const communication = clampScore(
-    baseline + (avgWords > 80 ? 14 : avgWords > 40 ? 8 : 0) + jitter() + difficultyAdj,
+    baseline +
+      (avgWords > 80 ? 14 : avgWords > 40 ? 8 : 0) +
+      communicationToneAdj +
+      jitter() +
+      difficultyAdj,
   );
   const technicalDepth = clampScore(
     baseline + (avgWords > 120 ? 18 : avgWords > 60 ? 10 : 4) + jitter() + difficultyAdj,
@@ -506,6 +519,8 @@ export function generateReport(
   const strengths: string[] = [];
   if (communication >= 75)
     strengths.push("Clear, well-paced communication with strong narrative structure.");
+  if (communicationToneAdj >= 4)
+    strengths.push("Professional tone and courteous interview etiquette were consistently strong.");
   if (technicalDepth >= 75)
     strengths.push(
       `Demonstrated ${config.level.toLowerCase()}-level depth in ${config.role.toLowerCase()} fundamentals.`,
@@ -518,7 +533,9 @@ export function generateReport(
 
   const improvements: string[] = [];
   if (communication < 75)
-    improvements.push("Tighten openings — lead with the headline before diving into context.");
+    improvements.push("Tighten openings - lead with the headline before diving into context.");
+  if (communicationToneAdj < 0)
+    improvements.push("Use a more professional interview tone: greeting, concise language, and explicit courtesy markers.");
   if (technicalDepth < 75)
     improvements.push(
       `Add more concrete metrics and second-order effects to ${config.role.toLowerCase()} examples.`,
@@ -526,8 +543,17 @@ export function generateReport(
   if (structure < 75)
     improvements.push("Use a STAR framework (Situation, Task, Action, Result) for behavioral answers.");
   if (problemSolving < 75)
-    improvements.push("Make trade-offs explicit — name what you chose against and why.");
+    improvements.push("Make trade-offs explicit - name what you chose against and why.");
   if (!improvements.length) improvements.push("Continue to push for executive-level brevity.");
+
+  const weakAreas = buildWeakAreas({
+    communication,
+    technicalDepth,
+    problemSolving,
+    structure,
+    ownership,
+    communicationToneAdj,
+  });
 
   return {
     id: uid("rep"),
@@ -569,6 +595,7 @@ export function generateReport(
       "Re-run the simulator focusing on system design depth in 5–7 days.",
       "Prepare two concrete metrics-driven stories before your next live loop.",
     ],
+    weakAreas,
   };
 }
 
@@ -640,6 +667,7 @@ export async function generateReportWithAI(
             resumeConsistency: parsed.jobReadiness.resumeConsistency ?? "",
           }
         : undefined,
+      weakAreas: base.weakAreas,
     };
   } catch {
     return base;
@@ -651,4 +679,148 @@ function clampScore(n: number) {
 }
 function jitter() {
   return Math.round((Math.random() - 0.5) * 6);
+}
+
+function communicationAdjustmentFromResponses(answers: AnswerRecord[]) {
+  if (!answers.length) return 0;
+  const first = answers[0]?.transcript.toLowerCase() ?? "";
+  const allText = answers.map((a) => a.transcript.toLowerCase()).join(" ");
+  const words = allText.split(/\s+/).filter(Boolean);
+  const totalWords = Math.max(words.length, 1);
+
+  const greetingSignals = [
+    "hello",
+    "hi",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "nice to meet",
+    "pleasure to meet",
+    "thank you for having me",
+  ];
+  const courtesySignals = ["thank you", "thanks", "please", "appreciate", "certainly", "happy to"];
+  const fillerSignals = ["um", "uh", "like", "you know", "sort of", "kind of"];
+
+  const greeted = greetingSignals.some((g) => first.includes(g));
+  const courtesyHits = courtesySignals.reduce(
+    (sum, signal) => sum + countPhrase(allText, signal),
+    0,
+  );
+  const fillerHits = fillerSignals.reduce(
+    (sum, signal) => sum + countPhrase(allText, signal),
+    0,
+  );
+  const fillerRatio = fillerHits / totalWords;
+
+  let score = 0;
+  if (greeted) score += 3;
+  score += Math.min(courtesyHits, 4);
+  if (fillerRatio > 0.03) score -= 3;
+  else if (fillerRatio > 0.02) score -= 2;
+
+  return Math.max(-6, Math.min(8, score));
+}
+
+function countPhrase(text: string, phrase: string) {
+  if (!phrase.trim()) return 0;
+  return text.split(phrase).length - 1;
+}
+
+function buildWeakAreas(args: {
+  communication: number;
+  technicalDepth: number;
+  problemSolving: number;
+  structure: number;
+  ownership: number;
+  communicationToneAdj: number;
+}) {
+  const items: InterviewReport["weakAreas"] = [];
+  const {
+    communication,
+    technicalDepth,
+    problemSolving,
+    structure,
+    ownership,
+    communicationToneAdj,
+  } = args;
+
+  if (communicationToneAdj < 0) {
+    items.push({
+      area: "professionalCommunication",
+      title: "Professional communication etiquette",
+      score: Math.max(40, communication + communicationToneAdj),
+      impact: Math.min(8, Math.abs(communicationToneAdj)),
+      reason:
+        "The responses had fewer professional greeting/courtesy markers and more filler language than expected.",
+      fix: "Open with a brief greeting, keep concise phrasing, and reduce filler words.",
+    });
+  }
+  if (communication < 72) {
+    items.push({
+      area: "communication",
+      title: "Communication clarity",
+      score: communication,
+      impact: Math.max(4, Math.round((75 - communication) / 2)),
+      reason:
+        "Some answers lacked a crisp top-line summary before details, reducing clarity.",
+      fix: "Use headline first, then 2-3 supporting points with outcomes.",
+    });
+  }
+  if (technicalDepth < 72) {
+    items.push({
+      area: "technicalDepth",
+      title: "Technical depth",
+      score: technicalDepth,
+      impact: Math.max(4, Math.round((75 - technicalDepth) / 2)),
+      reason:
+        "The discussion did not consistently include detailed system-level trade-offs and second-order effects.",
+      fix: "Add architecture decisions, constraints, and why alternatives were rejected.",
+    });
+  }
+  if (problemSolving < 72) {
+    items.push({
+      area: "problemSolving",
+      title: "Problem-solving rigor",
+      score: problemSolving,
+      impact: Math.max(4, Math.round((75 - problemSolving) / 2)),
+      reason:
+        "Reasoning steps were present but not always explicit about assumptions and decision criteria.",
+      fix: "State assumptions, options considered, and final decision criteria explicitly.",
+    });
+  }
+  if (structure < 72) {
+    items.push({
+      area: "structure",
+      title: "Answer structure",
+      score: structure,
+      impact: Math.max(4, Math.round((75 - structure) / 2)),
+      reason:
+        "Several responses could be better organized into situation, action, and measurable result.",
+      fix: "Apply STAR consistently and close each answer with concrete impact.",
+    });
+  }
+  if (ownership < 72) {
+    items.push({
+      area: "ownership",
+      title: "Ownership signal",
+      score: ownership,
+      impact: Math.max(4, Math.round((75 - ownership) / 2)),
+      reason:
+        "Examples did not always highlight personal decisions and direct accountability.",
+      fix: "Clarify what you personally owned, decided, and delivered.",
+    });
+  }
+
+  if (!items.length) {
+    items.push({
+      area: "communication",
+      title: "No major weak area detected",
+      score: 82,
+      impact: 2,
+      reason: "Scores were broadly balanced with no clear performance bottleneck.",
+      fix: "Keep practicing with higher-difficulty constraints to sharpen edge cases.",
+    });
+  }
+
+  return items.sort((a, b) => b.impact - a.impact).slice(0, 4);
 }

@@ -95,7 +95,7 @@ export default function AdminPage() {
           <Stat
             icon={TrendingUp}
             label="Avg score"
-            value={String(avgScore || "—")}
+            value={String(avgScore || "-")}
             delta="+3 pts"
           />
           <Stat
@@ -168,7 +168,7 @@ export default function AdminPage() {
                             {s.score}
                           </span>
                         ) : (
-                          <span className="text-ink-400">—</span>
+                          <span className="text-ink-400">-</span>
                         )}
                       </Td>
                       <Td className="text-xs text-ink-500">

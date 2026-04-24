@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const ITEMS = [
   {
     q: "Do I need to install anything?",
-    a: "No — Apex runs entirely in your browser. We use the Web Speech API for live transcription and the MediaRecorder API for voice capture, with a Whisper fallback on the server.",
+    a: "No - Apex runs entirely in your browser. We use the Web Speech API for live transcription and the MediaRecorder API for voice capture, with a Whisper fallback on the server.",
   },
   {
     q: "Which roles do you support?",
@@ -24,7 +24,7 @@ const ITEMS = [
   },
   {
     q: "Can I cancel anytime?",
-    a: "Yes — cancel from the dashboard with one click. No questions, no retention emails.",
+    a: "Yes - cancel from the dashboard with one click. No questions, no retention emails.",
   },
 ];
 

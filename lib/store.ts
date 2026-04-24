@@ -39,7 +39,7 @@ function safeSet(key: string, value: unknown) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
-    /* quota or serialization issue — ignore for MVP */
+    /* quota or serialization issue - ignore for MVP */
   }
 }
 

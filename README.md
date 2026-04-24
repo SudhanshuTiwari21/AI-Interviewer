@@ -1,8 +1,8 @@
-# Apex — AI Interview Platform (MVP)
+# Apex - AI Interview Platform (MVP)
 
 Apex is an end-to-end interview simulator. Candidates sign up, pay, complete a
 fully automated AI-driven interview tailored to a specific role, receive an
-instant scored report, and can book a one-hour human coaching session — all in
+instant scored report, and can book a one-hour human coaching session - all in
 one polished web app.
 
 This repository contains the **MVP** UI/flow built with **Next.js 14**,
@@ -15,18 +15,18 @@ boundary.
 
 ## Highlights
 
-- **Polished marketing site** — hero, features, pricing, testimonials, FAQ, CTA.
-- **Auth & checkout** — sign up / sign in / Stripe-style checkout (mock).
-- **Adaptive interview engine** — interleaves a curated rubric with AI-generated
+- **Polished marketing site** - hero, features, pricing, testimonials, FAQ, CTA.
+- **Auth & checkout** - sign up / sign in / Stripe-style checkout (mock).
+- **Adaptive interview engine** - interleaves a curated rubric with AI-generated
   follow-up questions based on the previous answer.
-- **Voice + text answers** — Web Speech API for live transcription,
+- **Voice + text answers** - Web Speech API for live transcription,
   MediaRecorder for capture; live audio meter; pause/resume.
-- **Instant scored report** — five-axis breakdown, per-question feedback,
+- **Instant scored report** - five-axis breakdown, per-question feedback,
   strengths, gaps, next steps. Downloadable as a branded **PDF**.
-- **Coaching scheduler** — coach picker, week navigator, time slots,
+- **Coaching scheduler** - coach picker, week navigator, time slots,
   Google Calendar-style confirmation.
-- **Admin dashboard** — sessions, score distribution, revenue, pipeline.
-- **Production-grade UI** — minimal, accessible, responsive, dark hero accents.
+- **Admin dashboard** - sessions, score distribution, revenue, pipeline.
+- **Production-grade UI** - minimal, accessible, responsive, dark hero accents.
 
 ---
 
@@ -86,7 +86,7 @@ npm run lint
 
 > Total runtime: **~3 minutes**.
 
-1. **Landing** (`/`) — show the hero, scroll through Features, How-it-works,
+1. **Landing** (`/`) - show the hero, scroll through Features, How-it-works,
    Pricing, FAQ.
 2. Click **Choose Pro** → sign up with the demo account.
 3. Land on **Checkout** (`/checkout?plan=pro`) → click **Pay $79**. Watch the
@@ -96,15 +96,15 @@ npm run lint
 5. Click **Start interview**.
 6. **Live interview** (`/interview/[id]`):
    - Toggle between **Voice** and **Type**.
-   - Hit **Start recording**, speak for ~10–15 seconds — watch the live
+   - Hit **Start recording**, speak for ~10–15 seconds - watch the live
      waveform + transcript stream.
    - Submit. Watch the AI-generated **follow-up** appear in the queue (badge:
      "AI follow-up").
    - Answer 2–3 more questions, then click **End early & generate report**.
 7. **Report** (`/interview/[id]/report`):
    - Show overall score, recommendation, breakdown, per-question feedback.
-   - Click **Download PDF** — a branded PDF is generated client-side.
-   - Click **Email a copy** — confirmation banner appears (candidate + admin).
+   - Click **Download PDF** - a branded PDF is generated client-side.
+   - Click **Email a copy** - confirmation banner appears (candidate + admin).
 8. Click **Schedule a session** → pick a coach, day, slot, **Confirm booking**
    → calendar confirmation card.
 9. Visit **Admin** (`/admin`) → show the operations dashboard.
@@ -206,7 +206,7 @@ SendGrid, or Postmark.
 ### 6. Persistent storage
 
 Replace `lib/store.ts` with a server-side store (Postgres + Prisma, Supabase,
-or Convex). The interface is intentionally tiny — `getReports`, `saveReport`,
+or Convex). The interface is intentionally tiny - `getReports`, `saveReport`,
 `getUser`, `setUser`, `saveBooking`.
 
 ---
@@ -215,7 +215,7 @@ or Convex). The interface is intentionally tiny — `getReports`, `saveReport`,
 
 Tokens live in `tailwind.config.ts` under `theme.extend.colors` (`ink.*`,
 `accent.*`, `success/warn/danger`). Primitives in `components/ui/*` are the only
-allowed surface for buttons, cards, badges, inputs, and progress meters — keep
+allowed surface for buttons, cards, badges, inputs, and progress meters - keep
 new screens consistent by composing these.
 
 Typography uses Inter via Google Fonts (loaded in `app/layout.tsx`).
@@ -242,11 +242,11 @@ Typography uses Inter via Google Fonts (loaded in `app/layout.tsx`).
 - AI follow-ups and report scoring are heuristic-based for offline demo; both
   are designed to be swapped for a server-side OpenAI call without UI changes.
 - Stripe checkout is visual-only; no real charge is made.
-- Auth is unverified — any email + 6-char password works.
+- Auth is unverified - any email + 6-char password works.
 
 These are deliberate trade-offs for the MVP. The integration boundaries above
 make production hardening straightforward.
 
 ---
 
-© Apex Labs, Inc. — MVP build.
+© Apex Labs, Inc. - MVP build.

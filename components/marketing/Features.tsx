@@ -12,12 +12,12 @@ const FEATURES = [
   {
     icon: Sparkles,
     title: "Adaptive question engine",
-    body: "Blends a curated rubric with GPT-4o follow-ups so every prompt builds on your last answer.",
+    body: "Blends a curated rubric with adaptive follow-ups so every prompt builds on your last answer.",
   },
   {
     icon: Mic,
     title: "Voice-first answering",
-    body: "Speak naturally — Whisper-grade transcription is rendered live so you can review as you go.",
+    body: "Speak naturally - Whisper-grade transcription is rendered live so you can review as you go.",
   },
   {
     icon: FileText,
@@ -47,7 +47,7 @@ export function Features() {
       <SectionHeading
         eyebrow="Why Apex"
         title="Everything you need to walk in calm and prepared."
-        description="An end-to-end loop: configure the role, run a realistic interview, receive a scored report, and book human coaching — all in one place."
+        description="An end-to-end loop: configure the role, run a realistic interview, receive a scored report, and book human coaching - all in one place."
       />
       <div className="mt-14 grid gap-px overflow-hidden rounded-2xl border border-ink-200 bg-ink-100 sm:grid-cols-2 lg:grid-cols-3">
         {FEATURES.map((f) => (

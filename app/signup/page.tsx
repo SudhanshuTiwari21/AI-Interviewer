@@ -61,7 +61,7 @@ function SignupInner() {
   return (
     <AuthShell
       title="Create your Apex account"
-      subtitle="Start with one free mock interview — no credit card required."
+      subtitle="Start with one free mock interview - no credit card required."
       footer={
         <>
           By signing up you agree to our{" "}

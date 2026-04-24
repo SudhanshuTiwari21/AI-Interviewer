@@ -132,7 +132,7 @@ function CheckoutInner() {
             <div className="mt-7 flex items-center gap-2 rounded-xl bg-ink-50 px-4 py-3 text-xs text-ink-600">
               <ShieldCheck className="size-4 text-success-500" />
               <span>
-                This is a demo flow. No real charge will be made — use any test
+                This is a demo flow. No real charge will be made - use any test
                 card.
               </span>
             </div>
@@ -200,7 +200,7 @@ function CheckoutInner() {
                 <a className="text-ink-900 underline" href="mailto:hi@apex.app">
                   hi@apex.app
                 </a>{" "}
-                — we typically respond within an hour during business hours.
+                - we typically respond within an hour during business hours.
               </p>
             </div>
           </aside>

@@ -176,8 +176,8 @@ export function ResumeUpload({ value, onChange }: Props) {
         <p className="text-xs text-danger-600">{error}</p>
       )}
       <p className="text-[11px] text-ink-500">
-        Your resume never leaves the browser in MVP mode — we only send a
-        trimmed summary to OpenAI when generating questions.
+        Your resume never leaves the browser in MVP mode - we only send a
+        trimmed summary to our adaptive engine when generating questions.
       </p>
     </div>
   );
