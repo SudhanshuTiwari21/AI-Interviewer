@@ -270,7 +270,7 @@ export default function ReportPage() {
                         Q{i + 1}. {q.question}
                       </p>
                       <Badge tone={q.source === "ai-generated" ? "accent" : "neutral"} dot>
-                        {q.source === "ai-generated" ? "AI follow-up" : "Scripted"}
+                        {q.source === "ai-generated" ? "Dynamic follow-up" : "Scripted"}
                       </Badge>
                     </div>
                     <div className="mt-3 grid grid-cols-[1fr,80px] items-center gap-3">

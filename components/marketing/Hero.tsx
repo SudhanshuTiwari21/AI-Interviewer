@@ -12,7 +12,7 @@ export function Hero() {
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700 shadow-soft">
             <Sparkles className="size-3.5 text-accent-500" />
-            Now with adaptive follow-ups that react in real time
+            Now with dynamic follow-ups that react in real time
           </span>
           <h1 className="mt-6 text-4xl font-semibold leading-[1.05] tracking-tight text-ink-900 sm:text-6xl">
             Practice the interview.
@@ -135,7 +135,7 @@ function HeroPreview() {
               System design deep-dive
             </p>
             <p className="mt-1 text-xs text-ink-500">
-              AI will probe based on your last answer.
+              Follow-up questions adapt to your last answer.
             </p>
           </div>
         </div>

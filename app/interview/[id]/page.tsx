@@ -288,7 +288,7 @@ export default function InterviewSessionPage() {
             </Badge>
             <Badge tone={aiLive ? "success" : "warn"} dot>
               <BrainCircuit className="size-3" />
-              {aiLive ? "Adaptive engine live" : "Adaptive engine fallback"}
+              {aiLive ? "Dynamic flow enabled" : "Interview flow enabled"}
             </Badge>
             {config.stressTest && (
               <Badge tone="warn" dot>
@@ -375,8 +375,8 @@ export default function InterviewSessionPage() {
                     >
                       {question.source === "ai-generated"
                         ? question.category === "follow-up"
-                          ? "AI follow-up"
-                          : "AI generated"
+                          ? "Dynamic follow-up"
+                          : "Dynamic question"
                         : labelFor(question.category)}
                     </Badge>
                   </div>

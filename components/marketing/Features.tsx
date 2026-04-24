@@ -17,7 +17,7 @@ const FEATURES = [
   {
     icon: Mic,
     title: "Voice-first answering",
-    body: "Speak naturally - Whisper-grade transcription is rendered live so you can review as you go.",
+    body: "Speak naturally - high-accuracy transcription is rendered live so you can review as you go.",
   },
   {
     icon: FileText,
@@ -27,7 +27,7 @@ const FEATURES = [
   {
     icon: CalendarClock,
     title: "Book a human coach",
-    body: "Pair the AI loop with a 1-hour coaching call. Bookings sync to Google Calendar instantly.",
+    body: "Pair interview practice with a 1-hour coaching call. Bookings sync to Google Calendar instantly.",
   },
   {
     icon: LineChart,

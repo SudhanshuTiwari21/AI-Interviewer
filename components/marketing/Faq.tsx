@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const ITEMS = [
   {
     q: "Do I need to install anything?",
-    a: "No - Apex runs entirely in your browser. We use the Web Speech API for live transcription and the MediaRecorder API for voice capture, with a Whisper fallback on the server.",
+    a: "No - Apex runs entirely in your browser. Voice responses are captured in real time, and transcripts are available instantly for review.",
   },
   {
     q: "Which roles do you support?",
@@ -16,7 +16,7 @@ const ITEMS = [
   },
   {
     q: "Is the AI replacing the human coach?",
-    a: "Not at all. The AI loop is great for unlimited reps; the coach is there for nuanced feedback, story crafting, and offer negotiation.",
+    a: "Not at all. Automated interview practice helps you get repetitions in, while the coach focuses on nuanced feedback, story crafting, and offer negotiation.",
   },
   {
     q: "How is my data handled?",
