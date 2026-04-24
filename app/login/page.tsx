@@ -28,6 +28,7 @@ export default function LoginPage() {
           name: email.split("@")[0]!.replace(/\W+/g, " "),
           email,
           createdAt: new Date().toISOString(),
+          plan: email.endsWith(".demo") ? "team" : undefined,
         },
       );
       router.push("/dashboard");

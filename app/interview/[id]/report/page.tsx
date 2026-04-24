@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Progress } from "@/components/ui/Progress";
 import { store } from "@/lib/store";
+import { canUsePremiumControls, normalizePlan, type DemoPlan } from "@/lib/plan-access";
 import type { InterviewReport } from "@/lib/question-engine";
 import { downloadReportPdf } from "@/lib/pdf";
 import { formatDate, formatTime } from "@/lib/utils";
@@ -22,12 +23,17 @@ import {
   TrendingUp,
   ListChecks,
   Lightbulb,
+  Crown,
+  Target,
+  AlertTriangle,
+  FileCheck2,
 } from "lucide-react";
 
 export default function ReportPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [report, setReport] = useState<InterviewReport | null>(null);
+  const [plan, setPlan] = useState<DemoPlan>("free");
   const [emailSent, setEmailSent] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -37,6 +43,7 @@ export default function ReportPage() {
       router.replace("/dashboard/reports");
       return;
     }
+    setPlan(normalizePlan(store.getUser()?.plan));
     setReport(r);
   }, [params.id, router]);
 
@@ -176,6 +183,50 @@ export default function ReportPage() {
               </CardBody>
             </Card>
 
+            {report.jobReadiness && (
+              <Card>
+                <div className="border-b border-ink-100 px-6 py-4">
+                  <p className="inline-flex items-center gap-2 text-sm font-semibold text-ink-900">
+                    <Target className="size-4 text-accent-600" /> Job readiness
+                  </p>
+                </div>
+                <CardBody className="space-y-4">
+                  {report.jobReadiness.summary && (
+                    <p className="text-sm leading-6 text-ink-700">
+                      {report.jobReadiness.summary}
+                    </p>
+                  )}
+                  {report.jobReadiness.resumeConsistency && (
+                    <div className="rounded-xl border border-ink-100 bg-ink-50/40 p-4">
+                      <p className="inline-flex items-center gap-2 text-xs font-semibold text-ink-900">
+                        <FileCheck2 className="size-3.5 text-success-500" />
+                        Resume consistency
+                      </p>
+                      <p className="mt-1.5 text-sm leading-6 text-ink-700">
+                        {report.jobReadiness.resumeConsistency}
+                      </p>
+                    </div>
+                  )}
+                  {report.jobReadiness.redFlags.length > 0 && (
+                    <div className="rounded-xl border border-warn-500/30 bg-warn-50/40 p-4">
+                      <p className="inline-flex items-center gap-2 text-xs font-semibold text-ink-900">
+                        <AlertTriangle className="size-3.5 text-warn-500" />
+                        Red flags to address
+                      </p>
+                      <ul className="mt-2 space-y-1.5 text-sm leading-6 text-ink-700">
+                        {report.jobReadiness.redFlags.map((r) => (
+                          <li key={r} className="flex items-start gap-2">
+                            <span className="mt-2 inline-block size-1.5 flex-none rounded-full bg-warn-500" />
+                            {r}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+            )}
+
             <Card>
               <div className="border-b border-ink-100 px-6 py-4">
                 <p className="text-sm font-semibold text-ink-900">
@@ -237,6 +288,34 @@ export default function ReportPage() {
           </div>
 
           <aside className="space-y-4">
+            {canUsePremiumControls(plan) && (
+              <Card>
+                <div className="border-b border-ink-100 px-5 py-3">
+                  <p className="inline-flex items-center gap-2 text-sm font-semibold text-ink-900">
+                    <Crown className="size-4 text-amber-500" />
+                    Premium insights
+                  </p>
+                </div>
+                <CardBody className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between rounded-lg bg-ink-50 px-3 py-2">
+                    <span className="text-ink-600">Estimated percentile</span>
+                    <span className="font-semibold text-ink-900">
+                      Top {Math.max(3, 100 - report.overall)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg bg-ink-50 px-3 py-2">
+                    <span className="text-ink-600">Company-pack readiness</span>
+                    <span className="font-semibold text-ink-900">
+                      {report.overall >= 80 ? "High" : report.overall >= 65 ? "Medium" : "Needs work"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-ink-500">
+                    {plan === "team" ? "Team" : "Pro"} plan includes benchmarked insights and advanced coaching
+                    recommendations.
+                  </p>
+                </CardBody>
+              </Card>
+            )}
             <Card>
               <div className="border-b border-ink-100 px-5 py-3">
                 <p className="text-sm font-semibold text-ink-900 inline-flex items-center gap-2">

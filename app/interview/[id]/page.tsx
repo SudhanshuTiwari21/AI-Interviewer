@@ -1,21 +1,24 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Avatar } from "@/components/ui/Avatar";
 import { Recorder } from "@/components/interview/Recorder";
 import { store } from "@/lib/store";
 import {
   buildInterviewPlan,
+  buildInterviewPlanWithAI,
   generateReportWithAI,
   maybeGenerateFollowUpWithAI,
+  shouldEndInterviewWithAI,
   type AnswerRecord,
   type InterviewConfig,
   type InterviewQuestion,
 } from "@/lib/question-engine";
+import { cancelSpeech, ensureVoicesLoaded, isTTSSupported, speak } from "@/lib/tts";
 import { cn, secondsToClock } from "@/lib/utils";
 import {
   Sparkles,
@@ -26,7 +29,21 @@ import {
   Lightbulb,
   ArrowLeft,
   BrainCircuit,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
+
+const InterviewerAvatar = dynamic(
+  () => import("@/components/interview/InterviewerAvatar").then((m) => m.InterviewerAvatar),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full w-full items-center justify-center bg-gradient-to-b from-[#ede9fe] to-[#c7d2fe] text-xs text-ink-500">
+        Loading interviewer…
+      </div>
+    ),
+  },
+);
 
 export default function InterviewSessionPage() {
   const router = useRouter();
@@ -40,9 +57,14 @@ export default function InterviewSessionPage() {
   const [generating, setGenerating] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [aiLive, setAiLive] = useState(false);
+  const [planning, setPlanning] = useState(true);
+  const [speaking, setSpeaking] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
   const sessionStart = useRef(Date.now());
+  const spokenForId = useRef<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     const user = store.getUser();
     if (!user) {
       router.replace("/login");
@@ -54,9 +76,21 @@ export default function InterviewSessionPage() {
       return;
     }
     setConfig(cfg);
-    setQueue(buildInterviewPlan(cfg));
     sessionStart.current = Date.now();
     setAiLive(Boolean(process.env.NEXT_PUBLIC_OPENAI_API_KEY));
+
+    (async () => {
+      await ensureVoicesLoaded();
+      const plan = await buildInterviewPlanWithAI(cfg);
+      if (cancelled) return;
+      setQueue(plan.length ? plan : buildInterviewPlan(cfg));
+      setPlanning(false);
+    })();
+
+    return () => {
+      cancelled = true;
+      cancelSpeech();
+    };
   }, [router]);
 
   useEffect(() => {
@@ -78,6 +112,41 @@ export default function InterviewSessionPage() {
     [config?.role],
   );
 
+  // Speak the question whenever it changes
+  useEffect(() => {
+    if (!question) return;
+    if (!ttsEnabled) return;
+    if (!isTTSSupported()) return;
+    if (spokenForId.current === question.id) return;
+    spokenForId.current = question.id;
+    setSpeaking(true);
+    speak(question.text, {
+      onStart: () => setSpeaking(true),
+      onEnd: () => setSpeaking(false),
+      onError: () => setSpeaking(false),
+    });
+    return () => cancelSpeech();
+  }, [question, ttsEnabled]);
+
+  function replaySpeech() {
+    if (!question) return;
+    cancelSpeech();
+    setSpeaking(true);
+    speak(question.text, {
+      onStart: () => setSpeaking(true),
+      onEnd: () => setSpeaking(false),
+      onError: () => setSpeaking(false),
+    });
+  }
+
+  function toggleTTS() {
+    if (ttsEnabled) {
+      cancelSpeech();
+      setSpeaking(false);
+    }
+    setTtsEnabled((v) => !v);
+  }
+
   async function handleSubmit({
     transcript,
     durationSec,
@@ -88,6 +157,9 @@ export default function InterviewSessionPage() {
     mode: "voice" | "text";
   }) {
     if (!question || !config) return;
+    cancelSpeech();
+    setSpeaking(false);
+
     const record: AnswerRecord = {
       questionId: question.id,
       question: question.text,
@@ -106,6 +178,7 @@ export default function InterviewSessionPage() {
       question,
       transcript,
       aiInserted,
+      answers,
     );
     let nextQueue = queue;
     if (follow) {
@@ -119,7 +192,12 @@ export default function InterviewSessionPage() {
     }
     setGenerating(false);
     const nextIndex = current + 1;
-    if (nextIndex >= nextQueue.length) {
+    const stopDecision = await shouldEndInterviewWithAI({
+      config,
+      answers: nextAnswers,
+      nextQuestionPreview: nextQueue[nextIndex]?.text,
+    });
+    if (stopDecision.shouldEnd || nextIndex >= nextQueue.length) {
       await finalizeSession(nextAnswers);
     } else {
       setCurrent(nextIndex);
@@ -128,6 +206,8 @@ export default function InterviewSessionPage() {
 
   async function finalizeSession(allAnswers: AnswerRecord[]) {
     if (!config) return;
+    cancelSpeech();
+    setSpeaking(false);
     setFinishing(true);
     const user = store.getUser();
     const report = await generateReportWithAI(
@@ -139,7 +219,23 @@ export default function InterviewSessionPage() {
     router.replace(`/interview/${report.id}/report`);
   }
 
-  if (!config || !question) return null;
+  if (!config) return null;
+
+  if (planning || !question) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-ink-50/50">
+        <div className="text-center">
+          <div className="mx-auto size-10 animate-spin rounded-full border-2 border-ink-200 border-t-ink-900" />
+          <p className="mt-4 text-sm font-medium text-ink-900">
+            Reading your resume and drafting the interview…
+          </p>
+          <p className="mt-1 text-xs text-ink-500">
+            This usually takes a few seconds.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-ink-50/40">
@@ -149,6 +245,7 @@ export default function InterviewSessionPage() {
             <Logo />
             <span className="hidden text-sm text-ink-500 sm:inline">
               {config.role} · {config.level}
+              {config.difficulty ? ` · ${config.difficulty}` : ""}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -162,6 +259,11 @@ export default function InterviewSessionPage() {
               <BrainCircuit className="size-3" />
               {aiLive ? "OpenAI connected" : "OpenAI fallback"}
             </Badge>
+            {config.stressTest && (
+              <Badge tone="warn" dot>
+                Stress test
+              </Badge>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -186,33 +288,85 @@ export default function InterviewSessionPage() {
       <main className="container max-w-6xl px-4 py-8">
         <div className="grid gap-6 lg:grid-cols-[1fr,320px]">
           <div className="space-y-6">
-            <div className="rounded-2xl border border-ink-200 bg-white p-6">
-              <div className="flex items-start gap-4">
-                <Avatar name={interviewer.name} />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-ink-900">
+            <div className="overflow-hidden rounded-2xl border border-ink-200 bg-white">
+              <div className="grid gap-0 md:grid-cols-[260px,1fr]">
+                <div className="relative h-[320px] bg-[#ede9fe] md:h-auto">
+                  <InterviewerAvatar
+                    speaking={speaking}
+                    mood={config.interviewerStyle ?? "balanced"}
+                    className="absolute inset-0"
+                  />
+                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 rounded-xl bg-white/85 px-3 py-2 text-[11px] backdrop-blur">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-ink-900">
                         {interviewer.name}
                       </p>
-                      <p className="text-xs text-ink-500">{interviewer.title}</p>
+                      <p className="truncate text-ink-500">
+                        {interviewer.title}
+                      </p>
                     </div>
+                    <button
+                      onClick={toggleTTS}
+                      className={cn(
+                        "inline-flex size-7 flex-none items-center justify-center rounded-full border",
+                        ttsEnabled
+                          ? "border-ink-900 bg-ink-900 text-white"
+                          : "border-ink-200 bg-white text-ink-500",
+                      )}
+                      title={ttsEnabled ? "Mute interviewer" : "Unmute interviewer"}
+                    >
+                      {ttsEnabled ? (
+                        <Volume2 className="size-3.5" />
+                      ) : (
+                        <VolumeX className="size-3.5" />
+                      )}
+                    </button>
+                  </div>
+                  {speaking && (
+                    <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-ink-900/90 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-white">
+                      <span className="size-1.5 animate-pulse rounded-full bg-success-400" />
+                      Speaking
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col gap-4 p-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-ink-500">
+                      {config.interviewerStyle
+                        ? `${config.interviewerStyle}`
+                        : "balanced"}
+                      {config.companyTarget ? ` · ${config.companyTarget}` : ""}
+                      {config.difficulty ? ` · ${config.difficulty}` : ""}
+                    </p>
                     <Badge
                       tone={question.source === "ai-generated" ? "accent" : "neutral"}
                       dot
                     >
                       {question.source === "ai-generated"
-                        ? "AI follow-up"
+                        ? question.category === "follow-up"
+                          ? "AI follow-up"
+                          : "AI generated"
                         : labelFor(question.category)}
                     </Badge>
                   </div>
-                  <p className="mt-5 text-xl font-medium leading-8 text-ink-900 sm:text-2xl">
+                  <p className="text-xl font-medium leading-8 text-ink-900 sm:text-2xl">
                     {question.text}
                   </p>
-                  <p className="mt-3 text-xs text-ink-500">
-                    Suggested length: ~
-                    {Math.round(question.expectedDurationSec / 60)} min
-                  </p>
+                  <div className="mt-auto flex items-center justify-between gap-3">
+                    <p className="text-xs text-ink-500">
+                      Suggested length: ~
+                      {Math.round(question.expectedDurationSec / 60)} min
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      leftIcon={<Volume2 className="size-3.5" />}
+                      onClick={replaySpeech}
+                      disabled={!ttsEnabled}
+                    >
+                      Replay
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -332,6 +486,8 @@ function labelFor(c: InterviewQuestion["category"]) {
       return "Technical";
     case "wrap":
       return "Wrap-up";
+    case "resume-deep-dive":
+      return "Resume";
     default:
       return "Question";
   }

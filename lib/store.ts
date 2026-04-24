@@ -14,7 +14,7 @@ export type User = {
   name: string;
   email: string;
   createdAt: string;
-  plan?: Plan["id"];
+  plan?: Plan["id"] | "free";
 };
 
 const KEYS = {

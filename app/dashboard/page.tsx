@@ -8,6 +8,16 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Progress } from "@/components/ui/Progress";
 import { store, type User } from "@/lib/store";
+import {
+  attemptsPerMonth,
+  canUsePremiumControls,
+  coachingCredits,
+  normalizePlan,
+  planLabel,
+  premiumPlanFeatures,
+  usedAttemptsThisMonth,
+  type DemoPlan,
+} from "@/lib/plan-access";
 import type { InterviewReport } from "@/lib/question-engine";
 import { formatDate } from "@/lib/utils";
 import {
@@ -16,14 +26,18 @@ import {
   Sparkles,
   CalendarClock,
   TrendingUp,
+  Crown,
 } from "lucide-react";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [reports, setReports] = useState<InterviewReport[]>([]);
+  const [plan, setPlan] = useState<DemoPlan>("free");
 
   useEffect(() => {
-    setUser(store.getUser());
+    const u = store.getUser();
+    setUser(u);
+    setPlan(normalizePlan(u?.plan));
     setReports(store.getReports());
   }, []);
 
@@ -31,6 +45,21 @@ export default function DashboardPage() {
   const avgScore = reports.length
     ? Math.round(reports.reduce((s, r) => s + r.overall, 0) / reports.length)
     : 0;
+
+  function switchDemoPlan(next: DemoPlan) {
+    if (!user) return;
+    const updated = { ...user, plan: next };
+    setUser(updated);
+    setPlan(next);
+    store.setUser(updated);
+  }
+
+  const planAttempts = attemptsPerMonth(plan);
+  const usedThisMonth = usedAttemptsThisMonth(reports.map((r) => r.generatedAt));
+  const remainingThisMonth =
+    planAttempts === Number.POSITIVE_INFINITY
+      ? "∞"
+      : String(Math.max(planAttempts - usedThisMonth, 0));
 
   return (
     <div className="container max-w-6xl px-4 py-8 sm:py-10">
@@ -51,12 +80,47 @@ export default function DashboardPage() {
           </>
         }
       />
+      {user?.email.endsWith(".demo") && (
+        <div className="mt-5 rounded-xl border border-ink-200 bg-white p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+              Demo plan switcher
+            </p>
+            <Badge tone="accent" dot>
+              Active: {planLabel(plan)}
+            </Badge>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(["free", "starter", "pro", "team"] as DemoPlan[]).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => switchDemoPlan(p)}
+                className={
+                  p === plan
+                    ? "rounded-full border border-ink-900 bg-ink-900 px-3 py-1.5 text-xs font-medium text-white"
+                    : "rounded-full border border-ink-200 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-ink-300"
+                }
+              >
+                {planLabel(p)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {canUsePremiumControls(plan) && (
+        <div className="mt-5 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-700">
+          <Crown className="size-3.5" />
+          {planLabel(plan)} plan: premium interviewer styles, company packs,
+          OpenAI adaptive follow-ups, and advanced report insights.
+        </div>
+      )}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <Stat
-          label="Mock interviews"
-          value={String(reports.length)}
-          delta="+1 this week"
+          label="Attempts left (monthly)"
+          value={remainingThisMonth}
+          delta={`${usedThisMonth} used this month`}
           icon={Mic}
         />
         <Stat
@@ -67,8 +131,8 @@ export default function DashboardPage() {
         />
         <Stat
           label="Coaching credits"
-          value={user?.plan === "pro" ? "1" : user?.plan === "team" ? "∞" : "0"}
-          delta="Pro plan"
+          value={coachingCredits(plan)}
+          delta={`${planLabel(plan)} plan`}
           icon={CalendarClock}
         />
       </div>
@@ -153,6 +217,18 @@ export default function DashboardPage() {
         </Card>
 
         <div className="space-y-6">
+          {canUsePremiumControls(plan) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Premium modules</CardTitle>
+              </CardHeader>
+              <CardBody className="space-y-2 text-xs text-ink-700">
+                {premiumPlanFeatures(plan).map((feature) => (
+                  <p key={feature}>• {feature}</p>
+                ))}
+              </CardBody>
+            </Card>
+          )}
           <Card>
             <CardHeader>
               <CardTitle>Last performance</CardTitle>

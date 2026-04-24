@@ -129,11 +129,12 @@ function SignupInner() {
               name: "Alex Morgan",
               email: "alex@apex.demo",
               createdAt: new Date().toISOString(),
+              plan: "team",
             });
-            router.push(plan ? `/checkout?plan=${plan}` : "/dashboard");
+            router.push("/dashboard");
           }}
         >
-          Continue with demo account
+          Continue with demo account (Team plan)
         </Button>
         <p className="text-center text-sm text-ink-500">
           Already have an account?{" "}

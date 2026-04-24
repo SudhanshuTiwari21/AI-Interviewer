@@ -6,8 +6,20 @@ import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { ResumeUpload } from "@/components/interview/ResumeUpload";
 import { store } from "@/lib/store";
 import { ROLES, LEVELS, FOCUS_AREAS, type Role, type Level } from "@/lib/mock-data";
+import type { ParsedResume } from "@/lib/resume";
+import type { Difficulty } from "@/lib/question-engine";
+import {
+  attemptsPerMonth,
+  canUsePremiumControls,
+  canUseStressTest,
+  normalizePlan,
+  planLabel,
+  usedAttemptsThisMonth,
+  type DemoPlan,
+} from "@/lib/plan-access";
 import { cn, uid } from "@/lib/utils";
 import { LiveTranscriber } from "@/lib/speech";
 import {
@@ -18,6 +30,9 @@ import {
   ArrowRight,
   Volume2,
   ArrowLeft,
+  Crown,
+  FileText,
+  Gauge,
 } from "lucide-react";
 
 export default function SetupPage() {
@@ -28,12 +43,26 @@ export default function SetupPage() {
     "System design",
     "Communication",
   ]);
-  const [questions, setQuestions] = useState(6);
+  const [resume, setResume] = useState<ParsedResume | null>(null);
+  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [attemptsUsed, setAttemptsUsed] = useState(0);
   const [micChecked, setMicChecked] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
+  const [interviewerStyle, setInterviewerStyle] = useState<
+    "balanced" | "bar-raiser" | "friendly"
+  >("bar-raiser");
+  const [companyTarget, setCompanyTarget] = useState("Google");
+  const [stressTest, setStressTest] = useState(true);
+  const [plan, setPlan] = useState<DemoPlan>("free");
 
   useEffect(() => {
-    if (!store.getUser()) router.replace("/login?next=/interview/setup");
+    const user = store.getUser();
+    if (!user) router.replace("/login?next=/interview/setup");
+    setPlan(normalizePlan(user?.plan));
+    const used = usedAttemptsThisMonth(
+      store.getReports().map((r) => r.generatedAt),
+    );
+    setAttemptsUsed(used);
   }, [router]);
 
   function toggleFocus(f: string) {
@@ -54,12 +83,32 @@ export default function SetupPage() {
   }
 
   function startInterview() {
-    store.setConfig({ role, level, focusAreas, totalQuestions: questions });
+    if (!resume) return;
+    store.setConfig({
+      role,
+      level,
+      focusAreas,
+      totalQuestions: 6,
+      difficulty,
+      resume,
+      interviewerStyle: canUsePremiumControls(plan) ? interviewerStyle : "balanced",
+      companyTarget: canUsePremiumControls(plan) ? companyTarget : undefined,
+      stressTest: canUseStressTest(plan) ? stressTest : false,
+    });
     const id = uid("ses");
     router.push(`/interview/${id}`);
   }
 
   const sttSupported = typeof window !== "undefined" && LiveTranscriber.isSupported();
+
+  const planAttempts = attemptsPerMonth(plan);
+  const attemptsRemaining =
+    planAttempts === Number.POSITIVE_INFINITY
+      ? "∞"
+      : String(Math.max(planAttempts - attemptsUsed, 0));
+  const blocked =
+    planAttempts !== Number.POSITIVE_INFINITY && attemptsUsed >= planAttempts;
+  const canStart = !blocked && !!resume;
 
   return (
     <div className="min-h-screen bg-ink-50/40">
@@ -82,16 +131,63 @@ export default function SetupPage() {
             Configure interview
           </Badge>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-            Tell us about the role you're targeting.
+            Drop your resume. We'll tailor every question.
           </h1>
           <p className="mt-3 text-sm text-ink-500">
-            We'll calibrate the rubric and warm up the AI interviewer.
+            Apex reads your experience, projects and achievements, then
+            calibrates difficulty to the role and target company.
           </p>
+          {(plan === "pro" || plan === "team") && (
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700">
+              <Crown className="size-3.5 text-amber-500" />
+              {planLabel(plan)} plan unlocked: premium interview controls enabled
+            </div>
+          )}
         </div>
 
         <div className="mt-10 space-y-6">
           <Card>
+            <CardBody className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="inline-flex items-center gap-2">
+                  <span className="inline-flex size-8 items-center justify-center rounded-xl bg-ink-900 text-white">
+                    <FileText className="size-4" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-ink-900">
+                      Step 1 · Upload resume
+                    </p>
+                    <p className="text-xs text-ink-500">
+                      Required. We'll drive the whole interview from this.
+                    </p>
+                  </div>
+                </div>
+                {resume && (
+                  <Badge tone="success" dot>
+                    Parsed
+                  </Badge>
+                )}
+              </div>
+              <ResumeUpload value={resume} onChange={setResume} />
+            </CardBody>
+          </Card>
+
+          <Card>
             <CardBody className="space-y-6">
+              <div className="inline-flex items-center gap-2">
+                <span className="inline-flex size-8 items-center justify-center rounded-xl bg-ink-900 text-white">
+                  <Gauge className="size-4" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-ink-900">
+                    Step 2 · Role & difficulty
+                  </p>
+                  <p className="text-xs text-ink-500">
+                    Shapes the question bar and counter-question aggressiveness.
+                  </p>
+                </div>
+              </div>
+
               <Field label="Role">
                 <div className="flex flex-wrap gap-2">
                   {ROLES.map((r) => (
@@ -119,6 +215,54 @@ export default function SetupPage() {
                 </div>
               </Field>
               <Field
+                label="Difficulty"
+                hint="Controls question bar; Hard also raises grading rigor."
+              >
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {(
+                    [
+                      {
+                        id: "easy",
+                        title: "Easy",
+                        sub: "Warm-up mode. Fundamentals and ramp questions.",
+                      },
+                      {
+                        id: "medium",
+                        title: "Medium",
+                        sub: "Realistic loop. Mix of depth and trade-off probes.",
+                      },
+                      {
+                        id: "hard",
+                        title: "Hard",
+                        sub: "Bar-raiser. Terse, demanding, metric-first.",
+                      },
+                    ] as Array<{ id: Difficulty; title: string; sub: string }>
+                  ).map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setDifficulty(d.id)}
+                      className={cn(
+                        "rounded-xl border p-3 text-left text-sm transition-all",
+                        difficulty === d.id
+                          ? "border-ink-900 bg-ink-900 text-white"
+                          : "border-ink-200 bg-white text-ink-700 hover:border-ink-300",
+                      )}
+                    >
+                      <p className="text-sm font-semibold">{d.title}</p>
+                      <p
+                        className={cn(
+                          "mt-1 text-xs",
+                          difficulty === d.id ? "text-white/80" : "text-ink-500",
+                        )}
+                      >
+                        {d.sub}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <Field
                 label="Focus areas"
                 hint="Pick the dimensions you want stressed during the mock."
               >
@@ -134,25 +278,77 @@ export default function SetupPage() {
                   ))}
                 </div>
               </Field>
-              <Field
-                label="Number of questions"
-                hint="A typical session lasts 25–45 minutes."
-              >
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min={3}
-                    max={8}
-                    step={1}
-                    value={questions}
-                    onChange={(e) => setQuestions(Number(e.target.value))}
-                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-ink-100 accent-ink-900"
-                  />
-                  <span className="w-10 text-sm font-medium text-ink-900">
-                    {questions}
-                  </span>
-                </div>
-              </Field>
+             
+              {canUsePremiumControls(plan) && (
+                <>
+                  <Field
+                    label="Interviewer style (Premium)"
+                    hint="Simulate strict or supportive interviewer behavior."
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      <Pill
+                        active={interviewerStyle === "bar-raiser"}
+                        onClick={() => setInterviewerStyle("bar-raiser")}
+                      >
+                        Bar-raiser
+                      </Pill>
+                      <Pill
+                        active={interviewerStyle === "balanced"}
+                        onClick={() => setInterviewerStyle("balanced")}
+                      >
+                        Balanced
+                      </Pill>
+                      <Pill
+                        active={interviewerStyle === "friendly"}
+                        onClick={() => setInterviewerStyle("friendly")}
+                      >
+                        Friendly
+                      </Pill>
+                    </div>
+                  </Field>
+                  <Field
+                    label="Company target (Premium)"
+                    hint="Bias prompts toward specific company-style interviews."
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      {["Google", "Amazon", "Meta", "Stripe", "OpenAI"].map(
+                        (c) => (
+                          <Pill
+                            key={c}
+                            active={companyTarget === c}
+                            onClick={() => setCompanyTarget(c)}
+                          >
+                            {c}
+                          </Pill>
+                        ),
+                      )}
+                    </div>
+                  </Field>
+                  <Field label="Stress test mode (Team)">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (canUseStressTest(plan)) setStressTest((v) => !v);
+                      }}
+                      className={cn(
+                        "inline-flex rounded-full border px-3 py-1.5 text-xs font-medium",
+                        stressTest
+                          ? "border-ink-900 bg-ink-900 text-white"
+                          : "border-ink-200 bg-white text-ink-700",
+                        !canUseStressTest(plan) && "cursor-not-allowed opacity-60",
+                      )}
+                      disabled={!canUseStressTest(plan)}
+                    >
+                      {stressTest ? "Enabled" : "Disabled"}
+                    </button>
+                    {!canUseStressTest(plan) && (
+                      <p className="mt-2 text-xs text-ink-500">
+                        Upgrade to Team to enable stress-test mode.
+                      </p>
+                    )}
+                  </Field>
+                </>
+              )}
             </CardBody>
           </Card>
 
@@ -163,8 +359,8 @@ export default function SetupPage() {
                   <Volume2 className="size-4 text-accent-600" /> Mic check
                 </p>
                 <p className="mt-1.5 text-xs leading-5 text-ink-500">
-                  We'll request browser permission to capture your voice. You
-                  can always answer by typing instead.
+                  The 3D interviewer will speak questions out loud. You can
+                  answer by typing or speaking back.
                 </p>
                 <div className="mt-4 flex items-center gap-3">
                   <Button
@@ -206,6 +402,10 @@ export default function SetupPage() {
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="size-1.5 rounded-full bg-success-500" />
+                    Speaking interviewer: Web Speech TTS
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="size-1.5 rounded-full bg-success-500" />
                     AI follow-ups: GPT-4o powered
                   </li>
                 </ul>
@@ -221,8 +421,7 @@ export default function SetupPage() {
               <div>
                 <p className="font-medium text-ink-900">Ready to begin?</p>
                 <p className="text-xs text-ink-500">
-                  {questions} questions · ~{Math.round(questions * 5)} min ·{" "}
-                  {role}
+                  Resume-driven · {difficulty} difficulty · ~25–45 min · {role}
                 </p>
               </div>
             </div>
@@ -230,8 +429,13 @@ export default function SetupPage() {
               size="lg"
               onClick={startInterview}
               rightIcon={<ArrowRight className="size-4" />}
+              disabled={!canStart}
             >
-              Start interview
+              {blocked
+                ? "No attempts left this month"
+                : !resume
+                  ? "Upload resume to start"
+                  : "Start interview"}
             </Button>
           </div>
         </div>

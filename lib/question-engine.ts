@@ -8,15 +8,18 @@ import {
   type ScriptedQuestion,
 } from "./mock-data";
 import { getOpenAIClient } from "./openai-client";
+import type { ParsedResume } from "./resume";
 import { uid } from "./utils";
 
 export type QuestionSource = "scripted" | "ai-generated";
+
+export type Difficulty = "easy" | "medium" | "hard";
 
 export type InterviewQuestion = {
   id: string;
   index: number;
   text: string;
-  category: ScriptedQuestion["category"] | "follow-up";
+  category: ScriptedQuestion["category"] | "follow-up" | "resume-deep-dive";
   source: QuestionSource;
   expectedDurationSec: number;
   rationale?: string;
@@ -26,12 +29,62 @@ export type InterviewConfig = {
   role: Role;
   level: Level;
   focusAreas: string[];
-  totalQuestions: number;
+  totalQuestions?: number;
+  interviewerStyle?: "balanced" | "bar-raiser" | "friendly";
+  companyTarget?: string;
+  stressTest?: boolean;
+  difficulty?: Difficulty;
+  resume?: ParsedResume;
 };
 
+const DIFFICULTY_LABEL: Record<Difficulty, string> = {
+  easy: "warm and supportive, fundamentals-focused",
+  medium: "balanced, probes real trade-offs without piling on",
+  hard: "rigorous bar-raiser, pushes edges and expects quantitative rigor",
+};
+
+function difficultyFromConfig(config: InterviewConfig): Difficulty {
+  if (config.difficulty) return config.difficulty;
+  if (config.stressTest) return "hard";
+  if (config.interviewerStyle === "bar-raiser") return "hard";
+  if (config.interviewerStyle === "friendly") return "easy";
+  return "medium";
+}
+
+function systemPersona(config: InterviewConfig) {
+  const difficulty = difficultyFromConfig(config);
+  const style = config.interviewerStyle ?? "balanced";
+  const company = config.companyTarget || "a top-tier tech company";
+  const stress = config.stressTest ? "Stress-test mode is ON. Push hard with terse, demanding prompts." : "";
+  return [
+    `You are an expert ${config.role} interviewer at ${company}.`,
+    `Seniority bar: ${config.level}.`,
+    `Difficulty: ${difficulty.toUpperCase()} — ${DIFFICULTY_LABEL[difficulty]}.`,
+    `Interviewer style: ${style}.`,
+    stress,
+    "You tailor every question to the candidate's actual resume and previous answers.",
+    "Ask counter-questions that verify claims and probe depth.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function resumeSnippet(config: InterviewConfig, maxChars = 3500): string {
+  if (!config.resume?.text) return "No resume provided.";
+  const { text, highlights } = config.resume;
+  const head = text.slice(0, maxChars);
+  return [
+    `--- Resume text (truncated) ---\n${head}`,
+    highlights?.skills?.length ? `Key skills detected: ${highlights.skills.join(", ")}` : "",
+    highlights?.projects?.length ? `Projects snippets: ${highlights.projects.slice(0, 4).join(" | ")}` : "",
+    highlights?.achievements?.length ? `Achievements: ${highlights.achievements.slice(0, 3).join(" | ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 /**
- * Build the initial scripted plan for an interview. The engine will
- * interleave AI-generated follow-ups based on candidate responses.
+ * Deterministic fallback plan (no OpenAI key). Still references focus areas.
  */
 export function buildInterviewPlan(
   config: InterviewConfig,
@@ -45,7 +98,8 @@ export function buildInterviewPlan(
     ...SCRIPTED_WRAP,
   ];
 
-  return ordered.slice(0, config.totalQuestions).map((q, i) => ({
+  const count = config.totalQuestions ?? 6;
+  return ordered.slice(0, count).map((q, i) => ({
     id: q.id,
     index: i,
     text: q.text,
@@ -53,6 +107,136 @@ export function buildInterviewPlan(
     source: "scripted",
     expectedDurationSec: q.expectedDurationSec,
   }));
+}
+
+/**
+ * Generate a resume-driven, difficulty-tuned interview plan via OpenAI.
+ * Returns the fallback scripted plan when no key / API failure.
+ */
+export async function buildInterviewPlanWithAI(
+  config: InterviewConfig,
+): Promise<InterviewQuestion[]> {
+  const fallback = buildInterviewPlan(config);
+  const client = getOpenAIClient();
+  if (!client) return fallback;
+
+  try {
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.55,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `${systemPersona(config)} Produce an opening interview plan tailored to the resume. Return strict JSON: {"questions":[{"text":string,"category":"intro"|"technical"|"behavioral"|"resume-deep-dive"|"wrap","rationale":string,"expectedDurationSec":number}]}. Include 5-7 opening questions: 1 warm intro, 2-3 resume-deep-dive (projects/achievements/skills from resume), 1 behavioral, 1 role-specific technical, 1 wrap. No markdown, no prose outside JSON.`,
+        },
+        {
+          role: "user",
+          content: [
+            `Role: ${config.role}`,
+            `Level: ${config.level}`,
+            `Focus areas: ${config.focusAreas.join(", ") || "general"}`,
+            `Difficulty: ${difficultyFromConfig(config)}`,
+            `Interviewer style: ${config.interviewerStyle ?? "balanced"}`,
+            `Company target: ${config.companyTarget || "generic"}`,
+            `Stress test mode: ${config.stressTest ? "on" : "off"}`,
+            "",
+            resumeSnippet(config),
+          ].join("\n"),
+        },
+      ],
+    });
+
+    const content = completion.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(content) as {
+      questions?: Array<{
+        text?: string;
+        category?: InterviewQuestion["category"];
+        rationale?: string;
+        expectedDurationSec?: number;
+      }>;
+    };
+
+    const items = (parsed.questions ?? []).filter((q) => q?.text?.trim());
+    if (!items.length) return fallback;
+
+    return items.slice(0, 8).map((q, i) => ({
+      id: uid("aiq"),
+      index: i,
+      text: q.text!.trim(),
+      category: (q.category as InterviewQuestion["category"]) ?? "technical",
+      source: "ai-generated",
+      expectedDurationSec:
+        typeof q.expectedDurationSec === "number" && q.expectedDurationSec > 0
+          ? Math.min(q.expectedDurationSec, 240)
+          : 150,
+      rationale: q.rationale,
+    }));
+  } catch {
+    return fallback;
+  }
+}
+
+export async function shouldEndInterviewWithAI(args: {
+  config: InterviewConfig;
+  answers: AnswerRecord[];
+  nextQuestionPreview?: string;
+}): Promise<{ shouldEnd: boolean; reason: string }> {
+  const { config, answers, nextQuestionPreview } = args;
+  const asked = answers.length;
+  if (asked <= 3) return { shouldEnd: false, reason: "Minimum depth not reached." };
+  if (asked >= 12) return { shouldEnd: true, reason: "Reached max interview depth." };
+
+  const client = getOpenAIClient();
+  if (!client) {
+    const lastWords =
+      answers[answers.length - 1]?.transcript.trim().split(/\s+/).length ?? 0;
+    if (asked >= 6 && lastWords > 50) {
+      return { shouldEnd: true, reason: "Sufficient signal captured for MVP." };
+    }
+    return { shouldEnd: false, reason: "Need one more answer for confidence." };
+  }
+
+  try {
+    const result = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+      messages: [
+        {
+          role: "system",
+          content: `${systemPersona(config)} Decide if the interview has enough signal to stop. Return JSON {shouldEnd:boolean, reason:string}. For harder difficulty, demand more data points before stopping.`,
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            role: config.role,
+            level: config.level,
+            focusAreas: config.focusAreas,
+            difficulty: difficultyFromConfig(config),
+            companyTarget: config.companyTarget,
+            asked,
+            answers: answers.slice(-4).map((a) => ({
+              q: a.question,
+              a: a.transcript,
+              durationSec: a.durationSec,
+            })),
+            nextQuestionPreview,
+          }),
+        },
+      ],
+    });
+    const payload = JSON.parse(result.choices[0]?.message?.content ?? "{}") as {
+      shouldEnd?: boolean;
+      reason?: string;
+    };
+    return {
+      shouldEnd: Boolean(payload.shouldEnd),
+      reason: payload.reason || "AI stop decision applied.",
+    };
+  } catch {
+    return { shouldEnd: false, reason: "Fallback decision: continue interview." };
+  }
 }
 
 const FOLLOW_UP_TEMPLATES = [
@@ -113,13 +297,6 @@ function extractKeyword(answer: string): string | null {
   return sorted[0]?.[0] ?? null;
 }
 
-/**
- * Decide whether to interleave an AI follow-up based on the answer length
- * and sequence position. Returns null if no follow-up should be inserted.
- *
- * In production this would hit OpenAI; for the MVP we synthesize a contextual
- * follow-up locally so the UX is fully demoable without an API key.
- */
 export function maybeGenerateFollowUp(
   config: InterviewConfig,
   previousQuestion: InterviewQuestion,
@@ -127,11 +304,11 @@ export function maybeGenerateFollowUp(
   alreadyInserted: number,
 ): InterviewQuestion | null {
   const wordCount = answer.trim().split(/\s+/).filter(Boolean).length;
-  // Skip follow-ups for the wrap-up question or if answer is too short.
   if (previousQuestion.category === "wrap") return null;
   if (wordCount < 12) return null;
-  // Limit to two AI follow-ups per session for pacing.
-  if (alreadyInserted >= 2) return null;
+  const difficulty = difficultyFromConfig(config);
+  const cap = difficulty === "hard" ? 4 : difficulty === "medium" ? 3 : 2;
+  if (alreadyInserted >= cap) return null;
 
   const keyword = extractKeyword(answer);
   const text = keyword
@@ -160,6 +337,7 @@ export async function maybeGenerateFollowUpWithAI(
   previousQuestion: InterviewQuestion,
   answer: string,
   alreadyInserted: number,
+  priorAnswers: AnswerRecord[] = [],
 ): Promise<InterviewQuestion | null> {
   const fallback = maybeGenerateFollowUp(
     config,
@@ -179,20 +357,28 @@ export async function maybeGenerateFollowUpWithAI(
       messages: [
         {
           role: "system",
-          content:
-            "You are a senior interviewer. Generate one concise follow-up interview question only. No preamble, no bullets, no quotes.",
+          content: `${systemPersona(config)} Generate exactly one concise counter-question. No preamble, no bullets, no quotes. Max 35 words. Reference a specific detail from resume or previous answers when possible.`,
         },
         {
           role: "user",
           content: [
-            `Role: ${config.role}`,
-            `Level: ${config.level}`,
-            `Focus areas: ${config.focusAreas.join(", ") || "general"}`,
             `Previous question: ${previousQuestion.text}`,
             `Candidate answer: ${answer}`,
-            "Write one sharp follow-up that probes trade-offs, metrics, ownership, or depth.",
-            "Max 35 words.",
-          ].join("\n"),
+            `Focus areas: ${config.focusAreas.join(", ") || "general"}`,
+            `Difficulty: ${difficultyFromConfig(config)}`,
+            priorAnswers.length
+              ? `Earlier in this interview: ${priorAnswers
+                  .slice(-3)
+                  .map((a) => `Q:${a.question} A:${a.transcript.slice(0, 220)}`)
+                  .join(" | ")}`
+              : "",
+            "",
+            resumeSnippet(config, 1600),
+            "",
+            "Write ONE sharp follow-up that verifies depth, metrics, ownership, or consistency with the resume.",
+          ]
+            .filter(Boolean)
+            .join("\n"),
         },
       ],
     });
@@ -201,7 +387,7 @@ export async function maybeGenerateFollowUpWithAI(
     return {
       ...fallback,
       text: aiText.replace(/^["']|["']$/g, ""),
-      rationale: "Generated by OpenAI based on candidate response context.",
+      rationale: "Generated by OpenAI from resume + answer context.",
     };
   } catch {
     return fallback;
@@ -246,12 +432,13 @@ export type InterviewReport = {
     source: QuestionSource;
   }>;
   nextSteps: string[];
+  jobReadiness?: {
+    summary: string;
+    redFlags: string[];
+    resumeConsistency: string;
+  };
 };
 
-/**
- * Mock scoring. Looks at answer length, keyword density, and structural
- * cues (e.g. STAR-style markers) to produce a deterministic-feeling score.
- */
 export function generateReport(
   config: InterviewConfig,
   candidate: { name: string; email: string },
@@ -285,19 +472,22 @@ export function generateReport(
   }, 0);
 
   const baseline = 62;
+  const difficulty = difficultyFromConfig(config);
+  const difficultyAdj = difficulty === "hard" ? -5 : difficulty === "easy" ? 4 : 0;
+
   const communication = clampScore(
-    baseline + (avgWords > 80 ? 14 : avgWords > 40 ? 8 : 0) + jitter(),
+    baseline + (avgWords > 80 ? 14 : avgWords > 40 ? 8 : 0) + jitter() + difficultyAdj,
   );
   const technicalDepth = clampScore(
-    baseline + (avgWords > 120 ? 18 : avgWords > 60 ? 10 : 4) + jitter(),
+    baseline + (avgWords > 120 ? 18 : avgWords > 60 ? 10 : 4) + jitter() + difficultyAdj,
   );
   const problemSolving = clampScore(
-    baseline + Math.min(structureHits * 2, 18) + jitter(),
+    baseline + Math.min(structureHits * 2, 18) + jitter() + difficultyAdj,
   );
   const structure = clampScore(
-    baseline + Math.min(structureHits * 2.5, 22) + jitter(),
+    baseline + Math.min(structureHits * 2.5, 22) + jitter() + difficultyAdj,
   );
-  const ownership = clampScore(baseline + (totalWords > 600 ? 16 : 8) + jitter());
+  const ownership = clampScore(baseline + (totalWords > 600 ? 16 : 8) + jitter() + difficultyAdj);
 
   const overall = Math.round(
     (communication + technicalDepth + problemSolving + structure + ownership) /
@@ -394,13 +584,12 @@ export async function generateReportWithAI(
   try {
     const response = await client.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.4,
+      temperature: 0.35,
       response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
-          content:
-            "You are an interview evaluator. Return strict JSON with keys: strengths (string[]), improvements (string[]), nextSteps (string[]). Keep each item concise and actionable.",
+          content: `${systemPersona(config)} You are now grading the candidate. Return strict JSON with keys: strengths (string[]), improvements (string[]), nextSteps (string[]), jobReadiness (object with keys summary: string, redFlags: string[], resumeConsistency: string). Each item concise, evidence-based, referencing specific answers or resume details when relevant.`,
         },
         {
           role: "user",
@@ -408,8 +597,11 @@ export async function generateReportWithAI(
             role: config.role,
             level: config.level,
             focusAreas: config.focusAreas,
+            difficulty: difficultyFromConfig(config),
+            companyTarget: config.companyTarget,
             overall: base.overall,
             breakdown: base.breakdown,
+            resumeSummary: resumeSnippet(config, 1800),
             answers: answers.map((a) => ({
               question: a.question,
               answer: a.transcript,
@@ -427,6 +619,11 @@ export async function generateReportWithAI(
       strengths?: string[];
       improvements?: string[];
       nextSteps?: string[];
+      jobReadiness?: {
+        summary?: string;
+        redFlags?: string[];
+        resumeConsistency?: string;
+      };
     };
 
     return {
@@ -436,6 +633,13 @@ export async function generateReportWithAI(
       improvements:
         parsed.improvements?.filter(Boolean).slice(0, 4) ?? base.improvements,
       nextSteps: parsed.nextSteps?.filter(Boolean).slice(0, 4) ?? base.nextSteps,
+      jobReadiness: parsed.jobReadiness
+        ? {
+            summary: parsed.jobReadiness.summary ?? "",
+            redFlags: parsed.jobReadiness.redFlags?.filter(Boolean).slice(0, 4) ?? [],
+            resumeConsistency: parsed.jobReadiness.resumeConsistency ?? "",
+          }
+        : undefined,
     };
   } catch {
     return base;
