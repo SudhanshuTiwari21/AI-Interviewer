@@ -100,7 +100,7 @@ export default function ReportPage() {
         {emailSent && (
           <div className="mb-6 flex items-center gap-2 rounded-xl border border-success-500/30 bg-success-50 px-4 py-3 text-sm text-success-600 animate-fade-in">
             <CheckCircle2 className="size-4" />
-            Report emailed to <strong>{report.email}</strong> and to the Apex
+            Report emailed to <strong>{report.email}</strong> and to the Hiro
             admin.
           </div>
         )}
@@ -114,7 +114,7 @@ export default function ReportPage() {
                   <div>
                     <div className="flex items-center gap-2 text-xs text-ink-300">
                       <Sparkles className="size-3.5 text-accent-400" />
-                      Apex Interview Report
+                      Hiro Interview Report
                     </div>
                     <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
                       {report.role} · {report.level}
@@ -414,7 +414,7 @@ export default function ReportPage() {
               <p className="font-medium text-ink-900">Shared with</p>
               <ul className="mt-2 space-y-1">
                 <li>• {report.email} (you)</li>
-                <li>• admin@apex.app</li>
+                <li>• admin@hiro.app</li>
               </ul>
               <p className="mt-3">
                 Report ID: <span className="font-mono">{report.id}</span>

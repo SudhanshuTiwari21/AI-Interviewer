@@ -9,7 +9,7 @@ export function SiteFooter() {
           <div className="md:col-span-2">
             <Logo />
             <p className="mt-4 max-w-xs text-sm leading-6 text-ink-500">
-              Apex helps candidates ace interviews with AI-led mock sessions,
+              Hiro helps candidates ace interviews with AI-led mock sessions,
               instant feedback, and human coaching.
             </p>
           </div>
@@ -60,7 +60,7 @@ export function SiteFooter() {
         </div>
         <div className="mt-12 flex flex-col-reverse items-center justify-between gap-4 border-t border-ink-100 pt-6 md:flex-row">
           <p className="text-xs text-ink-400">
-            © {new Date().getFullYear()} Apex Labs, Inc. All rights reserved.
+            © {new Date().getFullYear()} Hiro Labs, Inc. All rights reserved.
           </p>
           <div className="flex items-center gap-2 text-xs text-ink-400">
             <span className="size-2 rounded-full bg-success-500" />

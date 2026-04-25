@@ -40,7 +40,7 @@ export function AuthShell({
           </div>
           <div className="max-w-md">
             <p className="text-2xl font-semibold leading-snug tracking-tight">
-              "Apex felt like the interview before the interview. By the time I
+              "Hiro felt like the interview before the interview. By the time I
               walked into the real loop, I'd already heard the hardest
               questions."
             </p>

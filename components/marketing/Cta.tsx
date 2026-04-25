@@ -14,7 +14,7 @@ export function Cta() {
               Walk into your next interview already warmed up.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-ink-300">
-              Join thousands of candidates who used Apex to turn nerves into
+              Join thousands of candidates who used Hiro to turn nerves into
               signal. Your first mock is on us.
             </p>
             <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">

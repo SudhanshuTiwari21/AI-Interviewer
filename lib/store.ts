@@ -15,13 +15,14 @@ export type User = {
   email: string;
   createdAt: string;
   plan?: Plan["id"] | "free";
+  role?: "user" | "admin";
 };
 
 const KEYS = {
-  user: "apex.user",
-  reports: "apex.reports",
-  config: "apex.config",
-  bookings: "apex.bookings",
+  user: "hiro.user",
+  reports: "hiro.reports",
+  config: "hiro.config",
+  bookings: "hiro.bookings",
 } as const;
 
 function safeGet<T>(key: string, fallback: T): T {

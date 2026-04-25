@@ -591,7 +591,7 @@ export function generateReport(
       };
     }),
     nextSteps: [
-      "Book a 1-hour coaching session with an Apex coach to drill weak areas.",
+      "Book a 1-hour coaching session with an Hiro coach to drill weak areas.",
       "Re-run the simulator focusing on system design depth in 5–7 days.",
       "Prepare two concrete metrics-driven stories before your next live loop.",
     ],

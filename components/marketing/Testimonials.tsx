@@ -4,7 +4,7 @@ import { Avatar } from "@/components/ui/Avatar";
 const QUOTES = [
   {
     quote:
-      "I ran three Apex sessions before my Stripe loop and walked in unfazed. The follow-ups felt like a real interviewer.",
+      "I ran three Hiro sessions before my Stripe loop and walked in unfazed. The follow-ups felt like a real interviewer.",
     name: "Priya Sharma",
     role: "Senior Frontend Engineer · Stripe",
   },

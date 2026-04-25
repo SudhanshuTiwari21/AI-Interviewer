@@ -86,7 +86,7 @@ function CheckoutInner() {
           >
             <h1 className="text-xl font-semibold text-ink-900">Checkout</h1>
             <p className="mt-1 text-sm text-ink-500">
-              Secure payment processed by Apex (Stripe-compatible test mode).
+              Secure payment processed by Hiro (Stripe-compatible test mode).
             </p>
 
             <div className="mt-7 space-y-5">
@@ -162,7 +162,7 @@ function CheckoutInner() {
               <div className="mt-4 flex items-start justify-between">
                 <div>
                   <p className="text-base font-semibold text-ink-900">
-                    Apex {plan.name}
+                    Hiro {plan.name}
                   </p>
                   <p className="mt-1 text-xs text-ink-500">
                     Billed{" "}
@@ -197,8 +197,8 @@ function CheckoutInner() {
               </p>
               <p className="mt-2">
                 Email{" "}
-                <a className="text-ink-900 underline" href="mailto:hi@apex.app">
-                  hi@apex.app
+                <a className="text-ink-900 underline" href="mailto:hi@hiro.app">
+                  hi@hiro.app
                 </a>{" "}
                 - we typically respond within an hour during business hours.
               </p>

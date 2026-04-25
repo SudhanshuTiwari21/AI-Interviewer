@@ -243,7 +243,7 @@ export default function InterviewSessionPage() {
     const user = store.getUser();
     const report = await generateReportWithAI(
       config,
-      { name: user?.name ?? "Candidate", email: user?.email ?? "candidate@apex.demo" },
+      { name: user?.name ?? "Candidate", email: user?.email ?? "candidate@hiro.demo" },
       allAnswers,
     );
     store.saveReport(report);
@@ -417,7 +417,7 @@ export default function InterviewSessionPage() {
                 <span className="size-4 animate-spin rounded-full border-2 border-ink-300 border-t-ink-900" />
                 {finishing
                   ? "Generating your scored report…"
-                  : "Apex is preparing your next question…"}
+                  : "Hiro is preparing your next question…"}
               </div>
             )}
           </div>

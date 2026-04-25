@@ -134,7 +134,7 @@ export default function SetupPage() {
             Drop your resume. We'll tailor every question.
           </h1>
           <p className="mt-3 text-sm text-ink-500">
-            Apex reads your experience, projects and achievements, then
+            Hiro reads your experience, projects and achievements, then
             calibrates difficulty to the role and target company.
           </p>
           {(plan === "pro" || plan === "team") && (

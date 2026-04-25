@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 const ITEMS = [
   {
     q: "Do I need to install anything?",
-    a: "No - Apex runs entirely in your browser. Voice responses are captured in real time, and transcripts are available instantly for review.",
+    a: "No - Hiro runs entirely in your browser. Voice responses are captured in real time, and transcripts are available instantly for review.",
   },
   {
     q: "Which roles do you support?",

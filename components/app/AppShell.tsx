@@ -28,7 +28,6 @@ const NAV = [
 ];
 
 const SECONDARY = [
-  { href: "/admin", label: "Admin", icon: ShieldCheck },
   { href: "#", label: "Settings", icon: Settings },
   { href: "#", label: "Support", icon: LifeBuoy },
 ];
@@ -82,6 +81,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             />
           ))}
           <div className="my-4 h-px bg-ink-100" />
+          {user.role === "admin" && (
+            <NavLink
+              href="/admin"
+              label="Admin"
+              icon={ShieldCheck}
+              active={isActive(pathname, "/admin")}
+            />
+          )}
           {SECONDARY.map((item) => (
             <NavLink
               key={item.label}

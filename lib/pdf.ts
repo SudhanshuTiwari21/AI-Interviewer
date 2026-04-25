@@ -20,7 +20,7 @@ export async function downloadReportPdf(report: InterviewReport) {
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
-  doc.text("Apex Interview Report", M, 56);
+  doc.text("Hiro Interview Report", M, 56);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.text(
@@ -29,7 +29,7 @@ export async function downloadReportPdf(report: InterviewReport) {
     78,
   );
   doc.setTextColor(180, 200, 255);
-  doc.text("apex.app", W - M, 78, { align: "right" });
+  doc.text("hiro.app", W - M, 78, { align: "right" });
 
   // Score callout
   y = 150;
@@ -134,14 +134,14 @@ export async function downloadReportPdf(report: InterviewReport) {
     doc.setFontSize(9);
     doc.setTextColor(140, 150, 170);
     doc.text(
-      `Apex · Confidential · ${report.candidate}`,
+      `Hiro · Confidential · ${report.candidate}`,
       M,
       H - 24,
     );
     doc.text(`Page ${p} of ${pages}`, W - M, H - 24, { align: "right" });
   }
 
-  doc.save(`apex-report-${report.role.replace(/\s+/g, "-").toLowerCase()}-${report.id}.pdf`);
+  doc.save(`hiro-report-${report.role.replace(/\s+/g, "-").toLowerCase()}-${report.id}.pdf`);
 }
 
 function sectionTitle(doc: any, label: string, x: number, y: number) {

@@ -20,7 +20,7 @@ export function Hero() {
             <span className="gradient-text">Land the offer.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-ink-500 sm:text-lg">
-            Apex runs a fully autonomous, voice-enabled mock interview tailored
+            Hiro runs a fully autonomous, voice-enabled mock interview tailored
             to your target role - then delivers a scored report and pairs you
             with a human coach.
           </p>
@@ -58,7 +58,7 @@ function HeroPreview() {
         <span className="size-2.5 rounded-full bg-ink-200" />
         <span className="size-2.5 rounded-full bg-ink-200" />
         <span className="size-2.5 rounded-full bg-ink-200" />
-        <span className="ml-3 text-xs text-ink-400">apex.app/interview</span>
+        <span className="ml-3 text-xs text-ink-400">hiro.app/interview</span>
       </div>
       <div className="grid gap-0 lg:grid-cols-[1.4fr,1fr]">
         <div className="border-b border-ink-100 p-6 lg:border-b-0 lg:border-r">

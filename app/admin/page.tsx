@@ -26,7 +26,15 @@ export default function AdminPage() {
   const [reports, setReports] = useState<InterviewReport[]>([]);
 
   useEffect(() => {
-    if (!store.getUser()) router.replace("/login?next=/admin");
+    const user = store.getUser();
+    if (!user) {
+      router.replace("/login?next=/admin");
+      return;
+    }
+    if (user.role !== "admin") {
+      router.replace("/dashboard");
+      return;
+    }
     setReports(store.getReports());
   }, [router]);
 

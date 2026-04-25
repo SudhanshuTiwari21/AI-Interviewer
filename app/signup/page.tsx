@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { store } from "@/lib/store";
 import { uid } from "@/lib/utils";
-import { Mail, Lock, User } from "lucide-react";
+import { authClient } from "@/lib/auth/client";
+import { Mail, Lock, User, CheckCircle2 } from "lucide-react";
 
 export default function SignupPage() {
   return (
@@ -24,6 +25,11 @@ export default function SignupPage() {
   );
 }
 
+type Pending = {
+  email: string;
+  resent: boolean;
+};
+
 function SignupInner() {
   const router = useRouter();
   const search = useSearchParams();
@@ -35,32 +41,120 @@ function SignupInner() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [resending, setResending] = useState(false);
+  const [resendInfo, setResendInfo] = useState<string | null>(null);
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!name.trim() || !email.includes("@") || password.length < 6) {
-      setError("Please fill in your name, a valid email, and a 6+ char password.");
+
+    if (!name.trim() || !email.includes("@") || password.length < 8) {
+      setError("Please fill in your name, a valid email, and an 8+ char password.");
       return;
     }
+
     setLoading(true);
-    setTimeout(() => {
-      store.setUser({
-        id: uid("user"),
-        name: name.trim(),
-        email: email.trim(),
-        createdAt: new Date().toISOString(),
-      });
-      const target =
-        next ||
-        (plan ? `/checkout?plan=${plan}` : "/checkout?plan=pro");
-      router.push(target);
-    }, 600);
+    const res = await authClient.signup({
+      name: name.trim(),
+      email: email.trim(),
+      password,
+    });
+    setLoading(false);
+
+    if (!res.ok) {
+      if (res.code === "email_already_registered") {
+        setError(
+          "An account with this email already exists. Please sign in instead.",
+        );
+      } else {
+        setError(res.message);
+      }
+      return;
+    }
+
+    setPending({
+      email: res.email,
+      resent: res.status === "verification_resent",
+    });
+  }
+
+  async function onResend() {
+    if (!pending) return;
+    setResending(true);
+    setResendInfo(null);
+    const res = await authClient.resendVerification(pending.email);
+    setResending(false);
+    setResendInfo(
+      res.ok
+        ? "Verification email re-sent. Check your inbox (and spam folder)."
+        : "Could not resend right now. Please try again in a moment.",
+    );
+  }
+
+  if (pending) {
+    return (
+      <AuthShell
+        title="Check your email"
+        subtitle={`We sent a verification link to ${pending.email}. Click it to activate your account.`}
+        footer={
+          <>
+            Wrong email?{" "}
+            <button
+              className="underline"
+              onClick={() => {
+                setPending(null);
+                setResendInfo(null);
+              }}
+            >
+              Use a different one
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-5">
+          <div className="flex items-start gap-3 rounded-xl border border-success-500/30 bg-success-500/10 p-4 text-sm text-ink-800">
+            <CheckCircle2 className="mt-0.5 size-5 text-success-500" />
+            <div>
+              <div className="font-medium text-ink-900">
+                {pending.resent
+                  ? "Account already pending — verification re-sent"
+                  : "Verification email sent"}
+              </div>
+              <div className="mt-0.5 text-ink-500">
+                Open the link from your inbox to verify and continue.
+              </div>
+            </div>
+          </div>
+
+          <Button
+            variant="outline"
+            className="w-full"
+            size="lg"
+            onClick={onResend}
+            loading={resending}
+          >
+            Resend verification email
+          </Button>
+
+          {resendInfo && (
+            <p className="text-center text-xs text-ink-600">{resendInfo}</p>
+          )}
+
+          <p className="text-center text-sm text-ink-500">
+            Already verified?{" "}
+            <Link href="/login" className="font-medium text-ink-900 underline">
+              Sign in
+            </Link>
+          </p>
+        </div>
+      </AuthShell>
+    );
   }
 
   return (
     <AuthShell
-      title="Create your Apex account"
+      title="Create your Hiro account"
       subtitle="Start with one free mock interview - no credit card required."
       footer={
         <>
@@ -101,7 +195,7 @@ function SignupInner() {
           name="password"
           type="password"
           autoComplete="new-password"
-          placeholder="At least 6 characters"
+          placeholder="At least 8 characters"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           leftIcon={<Lock className="size-4" />}
@@ -127,11 +221,13 @@ function SignupInner() {
             store.setUser({
               id: uid("user"),
               name: "Alex Morgan",
-              email: "alex@apex.demo",
+              email: "alex@hiro.demo",
               createdAt: new Date().toISOString(),
               plan: "team",
             });
-            router.push("/dashboard");
+            const target =
+              next || (plan ? `/checkout?plan=${plan}` : "/dashboard");
+            router.push(target);
           }}
         >
           Continue with demo account (Team plan)
