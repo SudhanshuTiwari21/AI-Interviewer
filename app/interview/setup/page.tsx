@@ -99,13 +99,10 @@ export default function SetupPage() {
     router.push(`/interview/${id}`);
   }
 
-  const sttSupported = typeof window !== "undefined" && LiveTranscriber.isSupported();
+  const sttSupported =
+    globalThis.window !== undefined && LiveTranscriber.isSupported();
 
   const planAttempts = attemptsPerMonth(plan);
-  const attemptsRemaining =
-    planAttempts === Number.POSITIVE_INFINITY
-      ? "∞"
-      : String(Math.max(planAttempts - attemptsUsed, 0));
   const blocked =
     planAttempts !== Number.POSITIVE_INFINITY && attemptsUsed >= planAttempts;
   const canStart = !blocked && !!resume;
@@ -114,14 +111,16 @@ export default function SetupPage() {
     <div className="min-h-screen bg-ink-50/40">
       <header className="sticky top-0 z-30 border-b border-ink-100 bg-white">
         <div className="container flex h-16 max-w-5xl items-center justify-between">
-          <Logo />
+          <Logo size={24} />
           <Button
             href="/dashboard"
             variant="ghost"
             size="sm"
             leftIcon={<ArrowLeft className="size-4" />}
+            className="px-2 sm:px-3"
           >
-            Back to dashboard
+            <span className="hidden sm:inline">Back to dashboard</span>
+            <span className="sm:hidden">Back</span>
           </Button>
         </div>
       </header>
@@ -148,7 +147,7 @@ export default function SetupPage() {
         <div className="mt-10 space-y-6">
           <Card>
             <CardBody className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="inline-flex items-center gap-2">
                   <span className="inline-flex size-8 items-center justify-center rounded-xl bg-ink-900 text-white">
                     <FileText className="size-4" />
@@ -362,7 +361,7 @@ export default function SetupPage() {
                   The 3D interviewer will speak questions out loud. You can
                   answer by typing or speaking back.
                 </p>
-                <div className="mt-4 flex items-center gap-3">
+                <div className="mt-4 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
                   <Button
                     variant={micChecked ? "outline" : "primary"}
                     size="sm"
@@ -373,9 +372,7 @@ export default function SetupPage() {
                   >
                     {micChecked ? "Microphone ready" : "Test microphone"}
                   </Button>
-                  {micError && (
-                    <span className="text-xs text-danger-600">{micError}</span>
-                  )}
+                  {micError && <span className="text-xs text-danger-600">{micError}</span>}
                 </div>
               </div>
               <div className="rounded-xl bg-ink-50 p-4 text-xs text-ink-700">
@@ -413,8 +410,8 @@ export default function SetupPage() {
             </CardBody>
           </Card>
 
-          <div className="flex flex-col items-center justify-between gap-3 rounded-2xl border border-ink-200 bg-white p-5 sm:flex-row">
-            <div className="flex items-center gap-3 text-sm text-ink-700">
+          <div className="flex flex-col items-stretch justify-between gap-3 rounded-2xl border border-ink-200 bg-white p-4 sm:flex-row sm:items-center sm:p-5">
+            <div className="flex items-start gap-3 text-sm text-ink-700">
               <span className="inline-flex size-9 items-center justify-center rounded-xl bg-ink-900 text-white">
                 <Sparkles className="size-4" />
               </span>
@@ -430,6 +427,7 @@ export default function SetupPage() {
               onClick={startInterview}
               rightIcon={<ArrowRight className="size-4" />}
               disabled={!canStart}
+              className="w-full sm:w-auto"
             >
               {blocked
                 ? "No attempts left this month"
@@ -448,14 +446,14 @@ function Field({
   label,
   hint,
   children,
-}: {
+}: Readonly<{
   label: string;
   hint?: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div>
-      <div className="mb-2.5 flex items-baseline justify-between">
+      <div className="mb-2.5 flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
         <p className="text-sm font-semibold text-ink-900">{label}</p>
         {hint && <p className="text-xs text-ink-500">{hint}</p>}
       </div>
@@ -468,11 +466,11 @@ function Pill({
   active,
   children,
   onClick,
-}: {
+}: Readonly<{
   active?: boolean;
   children: React.ReactNode;
   onClick: () => void;
-}) {
+}>) {
   return (
     <button
       type="button"

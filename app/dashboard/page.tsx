@@ -156,7 +156,7 @@ export default function DashboardPage() {
                 {reports.slice(0, 5).map((r) => (
                   <li
                     key={r.id}
-                    className="flex items-center gap-4 px-6 py-4 hover:bg-ink-50/60"
+                    className="flex items-center gap-3 px-4 py-4 hover:bg-ink-50/60 sm:gap-4 sm:px-6"
                   >
                     <div className="hidden size-10 flex-none items-center justify-center rounded-xl bg-ink-100 text-ink-700 sm:flex">
                       <Sparkles className="size-4" />
@@ -188,20 +188,25 @@ export default function DashboardPage() {
                         }
                       />
                     </div>
-                    <Badge
-                      tone={
-                        r.rating === "Strong hire"
-                          ? "success"
-                          : r.rating === "Hire"
-                            ? "accent"
-                            : r.rating === "Lean hire"
-                              ? "warn"
-                              : "danger"
-                      }
-                      dot
-                    >
-                      {r.rating}
-                    </Badge>
+                    <div className="hidden sm:block">
+                      <Badge
+                        tone={
+                          r.rating === "Strong hire"
+                            ? "success"
+                            : r.rating === "Hire"
+                              ? "accent"
+                              : r.rating === "Lean hire"
+                                ? "warn"
+                                : "danger"
+                        }
+                        dot
+                      >
+                        {r.rating}
+                      </Badge>
+                    </div>
+                    <span className="text-xs font-medium text-ink-700 sm:hidden">
+                      {r.overall}
+                    </span>
                     <Link
                       href={`/interview/${r.id}/report`}
                       className="ml-2 inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
@@ -288,12 +293,12 @@ function Stat({
   value,
   delta,
   icon: Icon,
-}: {
+}: Readonly<{
   label: string;
   value: string;
   delta: string;
   icon: any;
-}) {
+}>) {
   return (
     <Card>
       <CardBody className="flex items-center gap-4">

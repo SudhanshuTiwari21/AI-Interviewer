@@ -8,23 +8,23 @@ export function Hero() {
       <div className="pointer-events-none absolute -left-40 top-0 size-[520px] rounded-full bg-accent-500/20 blur-3xl" />
       <div className="pointer-events-none absolute -right-32 top-24 size-[380px] rounded-full bg-ink-900/5 blur-3xl" />
 
-      <div className="container relative max-w-6xl px-4 pb-20 pt-16 sm:pt-24">
+      <div className="container relative max-w-6xl px-4 pb-14 pt-12 sm:pb-20 sm:pt-24">
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700 shadow-soft">
             <Sparkles className="size-3.5 text-accent-500" />
             Now with dynamic follow-ups that react in real time
           </span>
-          <h1 className="mt-6 text-4xl font-semibold leading-[1.05] tracking-tight text-ink-900 sm:text-6xl">
+          <h1 className="mt-6 text-3xl font-semibold leading-[1.05] tracking-tight text-ink-900 sm:text-6xl">
             Practice the interview.
             <br />
             <span className="gradient-text">Land the offer.</span>
           </h1>
-          <p className="mx-auto mt-6 max-w-xl text-base leading-7 text-ink-500 sm:text-lg">
+          <p className="mx-auto mt-5 max-w-xl text-sm leading-6 text-ink-500 sm:mt-6 sm:text-lg sm:leading-7">
             Hiro runs a fully autonomous, voice-enabled mock interview tailored
             to your target role - then delivers a scored report and pairs you
             with a human coach.
           </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <div className="mt-7 flex w-full flex-col items-stretch justify-center gap-3 sm:mt-8 sm:w-auto sm:flex-row sm:items-center">
             <Button href="/signup" size="lg" rightIcon={<ArrowRight className="size-4" />}>
               Start a mock interview
             </Button>
@@ -54,14 +54,14 @@ export function Hero() {
 function HeroPreview() {
   return (
     <div className="relative rounded-2xl border border-ink-200/80 bg-white shadow-card">
-      <div className="flex items-center gap-1.5 border-b border-ink-100 px-4 py-3">
+      <div className="flex items-center gap-1.5 border-b border-ink-100 px-3 py-2.5 sm:px-4 sm:py-3">
         <span className="size-2.5 rounded-full bg-ink-200" />
         <span className="size-2.5 rounded-full bg-ink-200" />
         <span className="size-2.5 rounded-full bg-ink-200" />
         <span className="ml-3 text-xs text-ink-400">hiro.app/interview</span>
       </div>
       <div className="grid gap-0 lg:grid-cols-[1.4fr,1fr]">
-        <div className="border-b border-ink-100 p-6 lg:border-b-0 lg:border-r">
+        <div className="border-b border-ink-100 p-4 sm:p-6 lg:border-b-0 lg:border-r">
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-2 rounded-full bg-accent-50 px-2.5 py-1 text-xs font-medium text-accent-700">
               <span className="size-1.5 animate-pulse rounded-full bg-accent-500" />
@@ -69,7 +69,7 @@ function HeroPreview() {
             </span>
             <span className="text-xs text-ink-400">02:14</span>
           </div>
-          <p className="mt-4 text-lg font-medium leading-7 text-ink-900">
+          <p className="mt-4 text-base font-medium leading-6 text-ink-900 sm:text-lg sm:leading-7">
             You mentioned reducing latency by 40% - can you walk me through the
             trade-offs you considered there, especially around cache invalidation?
           </p>
@@ -101,7 +101,7 @@ function HeroPreview() {
             </button>
           </div>
         </div>
-        <div className="space-y-4 p-6">
+        <div className="space-y-4 p-4 sm:p-6">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
               Live signals

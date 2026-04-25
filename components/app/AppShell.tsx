@@ -32,7 +32,9 @@ const SECONDARY = [
   { href: "#", label: "Support", icon: LifeBuoy },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -55,6 +57,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
+
+  const mobileNav = [
+    ...NAV,
+    ...(user.role === "admin"
+      ? [{ href: "/admin", label: "Admin", icon: ShieldCheck }]
+      : []),
+  ];
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[260px,1fr]">
@@ -121,7 +130,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
       <div className="flex min-h-screen flex-col bg-ink-50/40">
         <MobileTopBar user={user} />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 pb-20 lg:pb-0">{children}</main>
+        <MobileBottomNav pathname={pathname} items={mobileNav} />
       </div>
     </div>
   );
@@ -132,12 +142,12 @@ function NavLink({
   label,
   icon: Icon,
   active,
-}: {
+}: Readonly<{
   href: string;
   label: string;
   icon: any;
   active: boolean;
-}) {
+}>) {
   return (
     <Link
       href={href}
@@ -159,12 +169,47 @@ function isActive(pathname: string, href: string) {
   return pathname.startsWith(href);
 }
 
-function MobileTopBar({ user }: { user: User }) {
+function MobileTopBar({ user }: Readonly<{ user: User }>) {
   return (
     <div className="flex h-14 items-center justify-between border-b border-ink-100 bg-white px-4 lg:hidden">
-      <Logo />
+      <Logo size={24} />
       <Avatar name={user.name} size="sm" />
     </div>
+  );
+}
+
+function MobileBottomNav({
+  pathname,
+  items,
+}: Readonly<{
+  pathname: string;
+  items: Array<{ href: string; label: string; icon: any }>;
+}>) {
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
+      <ul className="mx-auto grid max-w-lg grid-cols-4 gap-1">
+        {items.slice(0, 4).map((item) => {
+          const active = isActive(pathname, item.href);
+          const Icon = item.icon;
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium",
+                  active
+                    ? "bg-ink-900 text-white"
+                    : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
+                )}
+              >
+                <Icon className="size-4" />
+                <span className="truncate">{item.label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }
 
@@ -172,11 +217,11 @@ export function PageHeader({
   title,
   description,
   actions,
-}: {
+}: Readonly<{
   title: string;
   description?: string;
   actions?: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
