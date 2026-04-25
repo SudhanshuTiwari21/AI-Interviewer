@@ -1,12 +1,12 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { PLANS, type Plan } from "@/lib/mock-data";
+import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
 import { store } from "@/lib/store";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
@@ -34,9 +34,7 @@ export default function CheckoutPage() {
 
 function CheckoutInner() {
   const router = useRouter();
-  const search = useSearchParams();
-  const planId = (search.get("plan") as Plan["id"]) || "pro";
-  const plan = useMemo(() => PLANS.find((p) => p.id === planId) ?? PLANS[1]!, [planId]);
+  const interviewPrice = useMemo(() => INTERVIEW_PRICE_INR, []);
 
   const [cardName, setCardName] = useState("");
   const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
@@ -54,16 +52,13 @@ function CheckoutInner() {
     e.preventDefault();
     setLoading(true);
     setTimeout(() => {
-      const u = store.getUser();
-      if (u) store.setUser({ ...u, plan: plan.id });
       setLoading(false);
       setDone(true);
       setTimeout(() => router.push("/interview/setup"), 1200);
     }, 1100);
   }
 
-  const tax = Math.round(plan.price * 0.08);
-  const total = plan.price + tax;
+  const total = interviewPrice;
 
   return (
     <div className="min-h-screen bg-ink-50/40">
@@ -74,7 +69,7 @@ function CheckoutInner() {
             href="/#pricing"
             className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-900"
           >
-            <ArrowLeft className="size-4" /> Change plan
+            <ArrowLeft className="size-4" /> Back to pricing
           </Link>
         </div>
       </header>
@@ -86,7 +81,7 @@ function CheckoutInner() {
           >
             <h1 className="text-xl font-semibold text-ink-900">Checkout</h1>
             <p className="mt-1 text-sm text-ink-500">
-              Secure payment processed by Hiro (Stripe-compatible test mode).
+              Secure payment processed by Selectwise (Stripe-compatible test mode).
             </p>
 
             <div className="mt-7 space-y-5">
@@ -149,7 +144,7 @@ function CheckoutInner() {
                   <Check className="size-4" /> Payment successful
                 </>
               ) : (
-                <>Pay {formatCurrency(total)}</>
+                <>Pay {formatCurrency(total, "INR")}</>
               )}
             </Button>
           </form>
@@ -162,19 +157,24 @@ function CheckoutInner() {
               <div className="mt-4 flex items-start justify-between">
                 <div>
                   <p className="text-base font-semibold text-ink-900">
-                    Hiro {plan.name}
+                    Selectwise interview
                   </p>
                   <p className="mt-1 text-xs text-ink-500">
-                    Billed{" "}
-                    {plan.cadence === "monthly" ? "monthly" : "one-time"}
+                    Billed per interview
                   </p>
                 </div>
                 <p className="text-sm font-medium text-ink-900">
-                  {formatCurrency(plan.price)}
+                  {formatCurrency(interviewPrice, "INR")}
                 </p>
               </div>
               <ul className="mt-5 space-y-2 border-t border-ink-100 pt-5 text-xs text-ink-700">
-                {plan.features.map((f) => (
+                {[
+                  "Resume-driven interview flow",
+                  "Dynamic follow-up questions",
+                  "Premium interviewer controls included",
+                  "Detailed report with weak-area reasons",
+                  "Coaching session booking support",
+                ].map((f) => (
                   <li key={f} className="flex items-start gap-2">
                     <Check className="mt-0.5 size-3.5 flex-none text-accent-600" />
                     {f}
@@ -182,11 +182,10 @@ function CheckoutInner() {
                 ))}
               </ul>
               <dl className="mt-5 space-y-1.5 border-t border-ink-100 pt-5 text-sm">
-                <Row label="Subtotal" value={formatCurrency(plan.price)} />
-                <Row label="Tax (est.)" value={formatCurrency(tax)} />
+                <Row label="Subtotal" value={formatCurrency(interviewPrice, "INR")} />
                 <Row
                   label="Total due today"
-                  value={formatCurrency(total)}
+                  value={formatCurrency(total, "INR")}
                   bold
                 />
               </dl>
@@ -197,8 +196,8 @@ function CheckoutInner() {
               </p>
               <p className="mt-2">
                 Email{" "}
-                <a className="text-ink-900 underline" href="mailto:hi@hiro.app">
-                  hi@hiro.app
+                <a className="text-ink-900 underline" href="mailto:hi@selectwise.app">
+                  hi@selectwise.app
                 </a>{" "}
                 - we typically respond within an hour during business hours.
               </p>
@@ -214,11 +213,11 @@ function Row({
   label,
   value,
   bold,
-}: {
+}: Readonly<{
   label: string;
   value: string;
   bold?: boolean;
-}) {
+}>) {
   return (
     <div
       className={cn(

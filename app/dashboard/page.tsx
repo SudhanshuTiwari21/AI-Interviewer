@@ -9,14 +9,9 @@ import { Badge } from "@/components/ui/Badge";
 import { Progress } from "@/components/ui/Progress";
 import { store, type User } from "@/lib/store";
 import {
-  attemptsPerMonth,
-  canUsePremiumControls,
   coachingCredits,
-  normalizePlan,
-  planLabel,
   premiumPlanFeatures,
-  usedAttemptsThisMonth,
-  type DemoPlan,
+  INTERVIEW_PRICE_INR,
 } from "@/lib/plan-access";
 import type { InterviewReport } from "@/lib/question-engine";
 import { formatDate } from "@/lib/utils";
@@ -32,12 +27,10 @@ import {
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [reports, setReports] = useState<InterviewReport[]>([]);
-  const [plan, setPlan] = useState<DemoPlan>("free");
 
   useEffect(() => {
     const u = store.getUser();
     setUser(u);
-    setPlan(normalizePlan(u?.plan));
     setReports(store.getReports());
   }, []);
 
@@ -45,26 +38,12 @@ export default function DashboardPage() {
   const avgScore = reports.length
     ? Math.round(reports.reduce((s, r) => s + r.overall, 0) / reports.length)
     : 0;
-
-  function switchDemoPlan(next: DemoPlan) {
-    if (!user) return;
-    const updated = { ...user, plan: next };
-    setUser(updated);
-    setPlan(next);
-    store.setUser(updated);
-  }
-
-  const planAttempts = attemptsPerMonth(plan);
-  const usedThisMonth = usedAttemptsThisMonth(reports.map((r) => r.generatedAt));
-  const remainingThisMonth =
-    planAttempts === Number.POSITIVE_INFINITY
-      ? "∞"
-      : String(Math.max(planAttempts - usedThisMonth, 0));
+  const userFirstName = user ? user.name.split(" ")[0] : null;
 
   return (
     <div className="container max-w-6xl px-4 py-8 sm:py-10">
       <PageHeader
-        title={`Welcome back${user ? `, ${user.name.split(" ")[0]}` : ""}.`}
+        title={userFirstName ? `Welcome back, ${userFirstName}.` : "Welcome back."}
         description="Pick up where you left off or run a new mock interview."
         actions={
           <>
@@ -80,47 +59,16 @@ export default function DashboardPage() {
           </>
         }
       />
-      {user?.email.endsWith(".demo") && (
-        <div className="mt-5 rounded-xl border border-ink-200 bg-white p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
-              Demo plan switcher
-            </p>
-            <Badge tone="accent" dot>
-              Active: {planLabel(plan)}
-            </Badge>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {(["free", "starter", "pro", "team"] as DemoPlan[]).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => switchDemoPlan(p)}
-                className={
-                  p === plan
-                    ? "rounded-full border border-ink-900 bg-ink-900 px-3 py-1.5 text-xs font-medium text-white"
-                    : "rounded-full border border-ink-200 bg-white px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-ink-300"
-                }
-              >
-                {planLabel(p)}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {canUsePremiumControls(plan) && (
-        <div className="mt-5 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-700">
-          <Crown className="size-3.5" />
-          {planLabel(plan)} plan: premium interviewer styles, company packs,
-          Adaptive follow-ups, and advanced report insights.
-        </div>
-      )}
+      <div className="mt-5 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-medium text-amber-700">
+        <Crown className="size-3.5" />
+        All premium interview features are enabled for every interview.
+      </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <Stat
-          label="Attempts left (monthly)"
-          value={remainingThisMonth}
-          delta={`${usedThisMonth} used this month`}
+          label="Price per interview"
+          value={`₹${INTERVIEW_PRICE_INR}`}
+          delta="Flat fee, no subscription plans"
           icon={Mic}
         />
         <Stat
@@ -131,8 +79,8 @@ export default function DashboardPage() {
         />
         <Stat
           label="Coaching credits"
-          value={coachingCredits(plan)}
-          delta={`${planLabel(plan)} plan`}
+          value={coachingCredits()}
+          delta="Included per completed interview"
           icon={CalendarClock}
         />
       </div>
@@ -222,18 +170,16 @@ export default function DashboardPage() {
         </Card>
 
         <div className="space-y-6">
-          {canUsePremiumControls(plan) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Premium modules</CardTitle>
-              </CardHeader>
-              <CardBody className="space-y-2 text-xs text-ink-700">
-                {premiumPlanFeatures(plan).map((feature) => (
-                  <p key={feature}>• {feature}</p>
-                ))}
-              </CardBody>
-            </Card>
-          )}
+          <Card>
+            <CardHeader>
+              <CardTitle>Included capabilities</CardTitle>
+            </CardHeader>
+            <CardBody className="space-y-2 text-xs text-ink-700">
+              {premiumPlanFeatures().map((feature) => (
+                <p key={feature}>• {feature}</p>
+              ))}
+            </CardBody>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle>Last performance</CardTitle>

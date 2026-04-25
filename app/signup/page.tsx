@@ -34,7 +34,6 @@ function SignupInner() {
   const router = useRouter();
   const search = useSearchParams();
   const next = search.get("next");
-  const plan = search.get("plan");
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -154,8 +153,8 @@ function SignupInner() {
 
   return (
     <AuthShell
-      title="Create your Hiro account"
-      subtitle="Start with one free mock interview - no credit card required."
+      title="Create your Selectwise account"
+      subtitle="Create your account and start interview practice."
       footer={
         <>
           By signing up you agree to our{" "}
@@ -223,14 +222,12 @@ function SignupInner() {
               name: "Alex Morgan",
               email: "alex@hiro.demo",
               createdAt: new Date().toISOString(),
-              plan: "team",
             });
-            const target =
-              next || (plan ? `/checkout?plan=${plan}` : "/dashboard");
+            const target = next || "/dashboard";
             router.push(target);
           }}
         >
-          Continue with demo account (Team plan)
+          Continue with demo account
         </Button>
         <p className="text-center text-sm text-ink-500">
           Already have an account?{" "}

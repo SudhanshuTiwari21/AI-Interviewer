@@ -30,7 +30,7 @@ export function Logo({
       )}
       style={{ gap: Math.round(size * 0.32) }}
     >
-      <HiroMark size={size} />
+      <SelectwiseMark size={size} />
       {withWordmark && (
         <span
           className={cn(
@@ -39,14 +39,14 @@ export function Logo({
           )}
           style={{ fontSize: wordmarkSize, letterSpacing: "-0.02em" }}
         >
-          Hiro
+          Selectwise
         </span>
       )}
     </span>
   );
 
   return href ? (
-    <Link href={href} aria-label="Hiro home" className="inline-flex">
+    <Link href={href} aria-label="Selectwise home" className="inline-flex">
       {inner}
     </Link>
   ) : (
@@ -54,7 +54,7 @@ export function Logo({
   );
 }
 
-function HiroMark({ size }: { readonly size: number }) {
+function SelectwiseMark({ size }: { readonly size: number }) {
   return (
     <svg
       width={size}
@@ -65,14 +65,16 @@ function HiroMark({ size }: { readonly size: number }) {
       className="block flex-none"
     >
       <rect width="32" height="32" rx="8" fill="#0E1220" />
-      {/* H — left + right vertical strokes */}
-      <rect x="8" y="8" width="3.6" height="16" rx="1" fill="#FFFFFF" />
-      <rect x="20.4" y="8" width="3.6" height="16" rx="1" fill="#FFFFFF" />
-      {/* H — horizontal crossbar */}
-      <rect x="8" y="14.4" width="16" height="3.2" rx="1" fill="#FFFFFF" />
-      {/* Accent diagonal slash through the crossbar */}
+      {/* Stylized S with two smooth bands */}
       <path
-        d="M19.4 9.8L12.6 22.2 16.2 22.2 23 9.8z"
+        d="M23.4 10.4C22.2 8.7 20.1 8 16.9 8C13.1 8 10.4 9.8 10.4 12.8c0 2.7 2 4 6.1 4.5 2.6.3 3.6.9 3.6 2.1 0 1.5-1.4 2.3-3.8 2.3-2.5 0-4.5-.8-5.9-2.2"
+        stroke="#FFFFFF"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M20.8 9.7L12.2 22.6h3.5l8.6-12.9h-3.5z"
         fill="#3A66F5"
       />
     </svg>

@@ -8,11 +8,11 @@ import { cn } from "@/lib/utils";
 const ITEMS = [
   {
     q: "Do I need to install anything?",
-    a: "No - Hiro runs entirely in your browser. Voice responses are captured in real time, and transcripts are available instantly for review.",
+    a: "No - Selectwise runs entirely in your browser with Hiro as your AI interviewer. Voice responses are captured in real time, and transcripts are available instantly for review.",
   },
   {
     q: "Which roles do you support?",
-    a: "Frontend, Backend, Full-Stack, Product Manager, Data Scientist, and Designer roles across Junior to Staff levels. Custom rubrics are available on the Team plan.",
+    a: "Frontend, Backend, Full-Stack, Product Manager, Data Scientist, and Designer roles across Junior to Staff levels. Custom rubrics and advanced controls are available for every interview.",
   },
   {
     q: "Is the AI replacing the human coach?",

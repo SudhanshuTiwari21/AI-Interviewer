@@ -2,23 +2,23 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Hiro - AI Interview Platform",
+  title: "Selectwise - AI Interview Platform",
   description:
-    "Hiro is an AI-driven interview simulator. Practice job-specific interviews, get instant feedback, and book one-on-one coaching.",
-  metadataBase: new URL("https://hiro.example.com"),
+    "Selectwise is an AI-driven interview simulator featuring Hiro, your AI interviewer. Practice job-specific interviews, get instant feedback, and book one-on-one coaching.",
+  metadataBase: new URL("https://selectwise.example.com"),
   openGraph: {
-    title: "Hiro - AI Interview Platform",
+    title: "Selectwise - AI Interview Platform",
     description:
-      "Practice job-specific interviews with AI. Voice-enabled, scored, and coached.",
+      "Practice job-specific interviews with Hiro, your AI interviewer. Voice-enabled, scored, and coached.",
     type: "website",
   },
 };
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <html lang="en">
       <head>

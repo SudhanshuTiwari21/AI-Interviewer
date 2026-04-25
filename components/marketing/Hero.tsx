@@ -20,9 +20,9 @@ export function Hero() {
             <span className="gradient-text">Land the offer.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-sm leading-6 text-ink-500 sm:mt-6 sm:text-lg sm:leading-7">
-            Hiro runs a fully autonomous, voice-enabled mock interview tailored
-            to your target role - then delivers a scored report and pairs you
-            with a human coach.
+            Selectwise helps you prepare with Hiro, your AI interviewer. Run a
+            voice-enabled mock tailored to your role, get a scored report, and
+            book follow-up coaching in one flow.
           </p>
           <div className="mt-7 flex w-full flex-col items-stretch justify-center gap-3 sm:mt-8 sm:w-auto sm:flex-row sm:items-center">
             <Button href="/signup" size="lg" rightIcon={<ArrowRight className="size-4" />}>
@@ -39,7 +39,7 @@ export function Hero() {
             <span className="inline-flex items-center gap-1.5">
               <Mic className="size-3.5 text-accent-500" /> Real-time speech-to-text
             </span>
-            <span>No credit card required</span>
+            <span>Flat ₹299 per interview</span>
           </div>
         </div>
 
@@ -58,7 +58,7 @@ function HeroPreview() {
         <span className="size-2.5 rounded-full bg-ink-200" />
         <span className="size-2.5 rounded-full bg-ink-200" />
         <span className="size-2.5 rounded-full bg-ink-200" />
-        <span className="ml-3 text-xs text-ink-400">hiro.app/interview</span>
+        <span className="ml-3 text-xs text-ink-400">selectwise.app/interview</span>
       </div>
       <div className="grid gap-0 lg:grid-cols-[1.4fr,1fr]">
         <div className="border-b border-ink-100 p-4 sm:p-6 lg:border-b-0 lg:border-r">

@@ -1,4 +1,4 @@
--- Hiro auth schema (initial)
+-- Selectwise auth schema (initial)
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 

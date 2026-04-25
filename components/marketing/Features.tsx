@@ -45,7 +45,7 @@ export function Features() {
   return (
     <Section id="features" className="bg-white">
       <SectionHeading
-        eyebrow="Why Hiro"
+        eyebrow="Why Selectwise"
         title="Everything you need to walk in calm and prepared."
         description="An end-to-end loop: configure the role, run a realistic interview, receive a scored report, and book human coaching - all in one place."
       />

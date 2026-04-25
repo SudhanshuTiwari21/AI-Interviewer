@@ -20,14 +20,14 @@ export function verificationEmail({ name, verificationUrl, ttlHours }: Args) {
             <table role="presentation" width="560" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:16px;border:1px solid #e7eaf0;overflow:hidden;">
               <tr>
                 <td style="padding:28px 32px 8px 32px;">
-                  <div style="font-size:18px;font-weight:700;letter-spacing:-0.01em;color:${BRAND_COLOR};">Hiro Interview</div>
+                  <div style="font-size:18px;font-weight:700;letter-spacing:-0.01em;color:${BRAND_COLOR};">Selectwise</div>
                 </td>
               </tr>
               <tr>
                 <td style="padding:8px 32px 0 32px;">
                   <h1 style="margin:16px 0 8px;font-size:22px;line-height:1.3;color:${BRAND_COLOR};">Verify your email, ${safeName}</h1>
                   <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#3e4658;">
-                    Welcome to Hiro. Please confirm this email address so we can secure your account and start your first interview.
+                    Welcome to Selectwise. Please confirm this email address so we can secure your account and start your first interview with Hiro.
                   </p>
                 </td>
               </tr>
@@ -49,14 +49,14 @@ export function verificationEmail({ name, verificationUrl, ttlHours }: Args) {
                     This link expires in ${ttlHours} hour${ttlHours === 1 ? "" : "s"}.
                   </p>
                   <p style="margin:0 0 24px;font-size:12px;color:#8a93a6;">
-                    If you didn't create an Hiro account, you can safely ignore this email.
+                    If you didn't create a Selectwise account, you can safely ignore this email.
                   </p>
                 </td>
               </tr>
               <tr>
                 <td style="padding:0 32px 28px 32px;border-top:1px solid #eef0f4;">
                   <p style="margin:18px 0 0;font-size:11px;color:#8a93a6;">
-                    Hiro Interview · automated message · please do not reply.
+                    Selectwise · automated message · please do not reply.
                   </p>
                 </td>
               </tr>
@@ -69,18 +69,18 @@ export function verificationEmail({ name, verificationUrl, ttlHours }: Args) {
 
   const text = `Hi ${safeName},
 
-Welcome to Hiro. Please verify your email by opening this link:
+Welcome to Selectwise. Please verify your email by opening this link:
 
 ${verificationUrl}
 
 This link expires in ${ttlHours} hour${ttlHours === 1 ? "" : "s"}.
 
-If you didn't create an Hiro account, you can ignore this message.
+If you didn't create a Selectwise account, you can ignore this message.
 
-— Hiro Interview`;
+— Selectwise`;
 
   return {
-    subject: "Verify your email · Hiro Interview",
+    subject: "Verify your email · Selectwise",
     html,
     text,
   };

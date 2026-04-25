@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/Badge";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Progress } from "@/components/ui/Progress";
 import { store } from "@/lib/store";
-import { canUsePremiumControls, normalizePlan, type DemoPlan } from "@/lib/plan-access";
 import type { InterviewReport } from "@/lib/question-engine";
 import { downloadReportPdf } from "@/lib/pdf";
 import { formatDate, formatTime } from "@/lib/utils";
@@ -27,14 +26,12 @@ import {
   Target,
   AlertTriangle,
   FileCheck2,
-  Lock,
 } from "lucide-react";
 
 export default function ReportPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [report, setReport] = useState<InterviewReport | null>(null);
-  const [plan, setPlan] = useState<DemoPlan>("free");
   const [emailSent, setEmailSent] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -44,12 +41,10 @@ export default function ReportPage() {
       router.replace("/dashboard/reports");
       return;
     }
-    setPlan(normalizePlan(store.getUser()?.plan));
     setReport(r);
   }, [params.id, router]);
 
   if (!report) return null;
-  const hasWeakAreaAccess = plan !== "free";
 
   return (
     <div className="min-h-screen bg-ink-50/40">
@@ -68,7 +63,7 @@ export default function ReportPage() {
             <Button
               variant="outline"
               size="sm"
-              loading={emailSent === false && false}
+              loading={false}
               onClick={() => {
                 setEmailSent(true);
                 setTimeout(() => setEmailSent(false), 4000);
@@ -100,7 +95,7 @@ export default function ReportPage() {
         {emailSent && (
           <div className="mb-6 flex items-center gap-2 rounded-xl border border-success-500/30 bg-success-50 px-4 py-3 text-sm text-success-600 animate-fade-in">
             <CheckCircle2 className="size-4" />
-            Report emailed to <strong>{report.email}</strong> and to the Hiro
+            Report emailed to <strong>{report.email}</strong> and to the Selectwise
             admin.
           </div>
         )}
@@ -114,7 +109,7 @@ export default function ReportPage() {
                   <div>
                     <div className="flex items-center gap-2 text-xs text-ink-300">
                       <Sparkles className="size-3.5 text-accent-400" />
-                      Hiro Interview Report
+                      Selectwise Interview Report
                     </div>
                     <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
                       {report.role} · {report.level}
@@ -296,76 +291,58 @@ export default function ReportPage() {
                 </p>
               </div>
               <CardBody>
-                {hasWeakAreaAccess ? (
-                  <div className="space-y-3">
-                    {report.weakAreas.map((w) => (
-                      <div
-                        key={`${w.area}-${w.title}`}
-                        className="rounded-xl border border-ink-100 bg-ink-50/40 p-4"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-sm font-semibold text-ink-900">{w.title}</p>
-                          <Badge tone="warn" dot>
-                            -{w.impact} pts
-                          </Badge>
-                        </div>
-                        <p className="mt-2 text-sm text-ink-700">{w.reason}</p>
-                        <p className="mt-2 text-xs text-ink-500">
-                          Current score in this area: <span className="font-medium">{w.score}</span>
-                        </p>
-                        <p className="mt-1 text-xs text-ink-600">
-                          Fix: {w.fix}
-                        </p>
+                <div className="space-y-3">
+                  {report.weakAreas.map((w) => (
+                    <div
+                      key={`${w.area}-${w.title}`}
+                      className="rounded-xl border border-ink-100 bg-ink-50/40 p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-sm font-semibold text-ink-900">{w.title}</p>
+                        <Badge tone="warn" dot>
+                          -{w.impact} pts
+                        </Badge>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-ink-200 bg-ink-50/50 p-5">
-                    <p className="inline-flex items-center gap-2 text-sm font-semibold text-ink-900">
-                      <Lock className="size-4 text-ink-500" />
-                      Premium section locked
-                    </p>
-                    <p className="mt-2 text-sm text-ink-600">
-                      Upgrade to view detailed weak areas and exact reasons your score dropped.
-                    </p>
-                    <Button href="/checkout?plan=starter" size="sm" className="mt-3">
-                      Unlock full report
-                    </Button>
-                  </div>
-                )}
+                      <p className="mt-2 text-sm text-ink-700">{w.reason}</p>
+                      <p className="mt-2 text-xs text-ink-500">
+                        Current score in this area: <span className="font-medium">{w.score}</span>
+                      </p>
+                      <p className="mt-1 text-xs text-ink-600">
+                        Fix: {w.fix}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </CardBody>
             </Card>
           </div>
 
           <aside className="space-y-4">
-            {canUsePremiumControls(plan) && (
-              <Card>
-                <div className="border-b border-ink-100 px-5 py-3">
-                  <p className="inline-flex items-center gap-2 text-sm font-semibold text-ink-900">
-                    <Crown className="size-4 text-amber-500" />
-                    Premium insights
-                  </p>
+            <Card>
+              <div className="border-b border-ink-100 px-5 py-3">
+                <p className="inline-flex items-center gap-2 text-sm font-semibold text-ink-900">
+                  <Crown className="size-4 text-amber-500" />
+                  Premium insights
+                </p>
+              </div>
+              <CardBody className="space-y-3 text-sm">
+                <div className="flex items-center justify-between rounded-lg bg-ink-50 px-3 py-2">
+                  <span className="text-ink-600">Estimated percentile</span>
+                  <span className="font-semibold text-ink-900">
+                    Top {Math.max(3, 100 - report.overall)}%
+                  </span>
                 </div>
-                <CardBody className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between rounded-lg bg-ink-50 px-3 py-2">
-                    <span className="text-ink-600">Estimated percentile</span>
-                    <span className="font-semibold text-ink-900">
-                      Top {Math.max(3, 100 - report.overall)}%
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg bg-ink-50 px-3 py-2">
-                    <span className="text-ink-600">Company-pack readiness</span>
-                    <span className="font-semibold text-ink-900">
-                      {report.overall >= 80 ? "High" : report.overall >= 65 ? "Medium" : "Needs work"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-ink-500">
-                    {plan === "team" ? "Team" : "Pro"} plan includes benchmarked insights and advanced coaching
-                    recommendations.
-                  </p>
-                </CardBody>
-              </Card>
-            )}
+                <div className="flex items-center justify-between rounded-lg bg-ink-50 px-3 py-2">
+                  <span className="text-ink-600">Company-pack readiness</span>
+                  <span className="font-semibold text-ink-900">
+                    {report.overall >= 80 ? "High" : report.overall >= 65 ? "Medium" : "Needs work"}
+                  </span>
+                </div>
+                <p className="text-xs text-ink-500">
+                  Included with every interview.
+                </p>
+              </CardBody>
+            </Card>
             <Card>
               <div className="border-b border-ink-100 px-5 py-3">
                 <p className="text-sm font-semibold text-ink-900 inline-flex items-center gap-2">
@@ -437,11 +414,11 @@ function Section({
   title,
   icon,
   children,
-}: {
+}: Readonly<{
   title: string;
   icon: React.ReactNode;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div>
       <p className="inline-flex items-center gap-2 text-sm font-semibold text-ink-900">

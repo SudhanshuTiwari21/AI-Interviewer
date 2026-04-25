@@ -1,6 +1,6 @@
-# Hiro - AI Interview Platform (MVP)
+# Selectwise - AI Interview Platform (MVP)
 
-Hiro is an end-to-end interview simulator. Candidates sign up, pay, complete a
+Selectwise is an end-to-end interview simulator powered by Hiro, your AI interviewer. Candidates sign up, pay, complete a
 fully automated AI-driven interview tailored to a specific role, receive an
 instant scored report, and can book a one-hour human coaching session - all in
 one polished web app.
@@ -131,8 +131,8 @@ npm run lint
 
 1. **Landing** (`/`) - show the hero, scroll through Features, How-it-works,
    Pricing, FAQ.
-2. Click **Choose Pro** → sign up with the demo account.
-3. Land on **Checkout** (`/checkout?plan=pro`) → click **Pay $79**. Watch the
+2. Click **Continue to checkout** → sign up with the demo account.
+3. Land on **Checkout** (`/checkout`) → click **Pay ₹299**. Watch the
    success state.
 4. Auto-redirected to **Interview setup** (`/interview/setup`) →
    pick *Frontend Engineer*, *Senior*, focus areas, and *Test microphone*.
@@ -367,4 +367,4 @@ make production hardening straightforward.
 
 ---
 
-© Hiro Labs, Inc. - MVP build.
+© Selectwise Labs, Inc. - MVP build.

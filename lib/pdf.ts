@@ -20,7 +20,7 @@ export async function downloadReportPdf(report: InterviewReport) {
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
-  doc.text("Hiro Interview Report", M, 56);
+  doc.text("Selectwise Interview Report", M, 56);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.text(
@@ -134,7 +134,7 @@ export async function downloadReportPdf(report: InterviewReport) {
     doc.setFontSize(9);
     doc.setTextColor(140, 150, 170);
     doc.text(
-      `Hiro · Confidential · ${report.candidate}`,
+      `Selectwise · Confidential · ${report.candidate}`,
       M,
       H - 24,
     );

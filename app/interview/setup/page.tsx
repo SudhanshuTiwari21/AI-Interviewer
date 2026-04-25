@@ -11,15 +11,7 @@ import { store } from "@/lib/store";
 import { ROLES, LEVELS, FOCUS_AREAS, type Role, type Level } from "@/lib/mock-data";
 import type { ParsedResume } from "@/lib/resume";
 import type { Difficulty } from "@/lib/question-engine";
-import {
-  attemptsPerMonth,
-  canUsePremiumControls,
-  canUseStressTest,
-  normalizePlan,
-  planLabel,
-  usedAttemptsThisMonth,
-  type DemoPlan,
-} from "@/lib/plan-access";
+import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
 import { cn, uid } from "@/lib/utils";
 import { LiveTranscriber } from "@/lib/speech";
 import {
@@ -45,7 +37,6 @@ export default function SetupPage() {
   ]);
   const [resume, setResume] = useState<ParsedResume | null>(null);
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
-  const [attemptsUsed, setAttemptsUsed] = useState(0);
   const [micChecked, setMicChecked] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
   const [interviewerStyle, setInterviewerStyle] = useState<
@@ -53,16 +44,10 @@ export default function SetupPage() {
   >("bar-raiser");
   const [companyTarget, setCompanyTarget] = useState("Google");
   const [stressTest, setStressTest] = useState(true);
-  const [plan, setPlan] = useState<DemoPlan>("free");
 
   useEffect(() => {
     const user = store.getUser();
     if (!user) router.replace("/login?next=/interview/setup");
-    setPlan(normalizePlan(user?.plan));
-    const used = usedAttemptsThisMonth(
-      store.getReports().map((r) => r.generatedAt),
-    );
-    setAttemptsUsed(used);
   }, [router]);
 
   function toggleFocus(f: string) {
@@ -91,9 +76,9 @@ export default function SetupPage() {
       totalQuestions: 6,
       difficulty,
       resume,
-      interviewerStyle: canUsePremiumControls(plan) ? interviewerStyle : "balanced",
-      companyTarget: canUsePremiumControls(plan) ? companyTarget : undefined,
-      stressTest: canUseStressTest(plan) ? stressTest : false,
+      interviewerStyle,
+      companyTarget,
+      stressTest,
     });
     const id = uid("ses");
     router.push(`/interview/${id}`);
@@ -102,10 +87,7 @@ export default function SetupPage() {
   const sttSupported =
     globalThis.window !== undefined && LiveTranscriber.isSupported();
 
-  const planAttempts = attemptsPerMonth(plan);
-  const blocked =
-    planAttempts !== Number.POSITIVE_INFINITY && attemptsUsed >= planAttempts;
-  const canStart = !blocked && !!resume;
+  const canStart = !!resume;
 
   return (
     <div className="min-h-screen bg-ink-50/40">
@@ -133,15 +115,13 @@ export default function SetupPage() {
             Drop your resume. We'll tailor every question.
           </h1>
           <p className="mt-3 text-sm text-ink-500">
-            Hiro reads your experience, projects and achievements, then
-            calibrates difficulty to the role and target company.
+            Selectwise uses your experience, projects and achievements to brief
+            Hiro, then calibrates difficulty to your role and target company.
           </p>
-          {(plan === "pro" || plan === "team") && (
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700">
-              <Crown className="size-3.5 text-amber-500" />
-              {planLabel(plan)} plan unlocked: premium interview controls enabled
-            </div>
-          )}
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-ink-200 bg-white px-3 py-1 text-xs font-medium text-ink-700">
+            <Crown className="size-3.5 text-amber-500" />
+            All premium interview controls are enabled for everyone.
+          </div>
         </div>
 
         <div className="mt-10 space-y-6">
@@ -278,76 +258,61 @@ export default function SetupPage() {
                 </div>
               </Field>
              
-              {canUsePremiumControls(plan) && (
-                <>
-                  <Field
-                    label="Interviewer style (Premium)"
-                    hint="Simulate strict or supportive interviewer behavior."
+              <Field
+                label="Interviewer style"
+                hint="Simulate strict or supportive interviewer behavior."
+              >
+                <div className="flex flex-wrap gap-2">
+                  <Pill
+                    active={interviewerStyle === "bar-raiser"}
+                    onClick={() => setInterviewerStyle("bar-raiser")}
                   >
-                    <div className="flex flex-wrap gap-2">
-                      <Pill
-                        active={interviewerStyle === "bar-raiser"}
-                        onClick={() => setInterviewerStyle("bar-raiser")}
-                      >
-                        Bar-raiser
-                      </Pill>
-                      <Pill
-                        active={interviewerStyle === "balanced"}
-                        onClick={() => setInterviewerStyle("balanced")}
-                      >
-                        Balanced
-                      </Pill>
-                      <Pill
-                        active={interviewerStyle === "friendly"}
-                        onClick={() => setInterviewerStyle("friendly")}
-                      >
-                        Friendly
-                      </Pill>
-                    </div>
-                  </Field>
-                  <Field
-                    label="Company target (Premium)"
-                    hint="Bias prompts toward specific company-style interviews."
+                    Bar-raiser
+                  </Pill>
+                  <Pill
+                    active={interviewerStyle === "balanced"}
+                    onClick={() => setInterviewerStyle("balanced")}
                   >
-                    <div className="flex flex-wrap gap-2">
-                      {["Google", "Amazon", "Meta", "Stripe", "Anthropic"].map(
-                        (c) => (
-                          <Pill
-                            key={c}
-                            active={companyTarget === c}
-                            onClick={() => setCompanyTarget(c)}
-                          >
-                            {c}
-                          </Pill>
-                        ),
-                      )}
-                    </div>
-                  </Field>
-                  <Field label="Stress test mode (Team)">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (canUseStressTest(plan)) setStressTest((v) => !v);
-                      }}
-                      className={cn(
-                        "inline-flex rounded-full border px-3 py-1.5 text-xs font-medium",
-                        stressTest
-                          ? "border-ink-900 bg-ink-900 text-white"
-                          : "border-ink-200 bg-white text-ink-700",
-                        !canUseStressTest(plan) && "cursor-not-allowed opacity-60",
-                      )}
-                      disabled={!canUseStressTest(plan)}
+                    Balanced
+                  </Pill>
+                  <Pill
+                    active={interviewerStyle === "friendly"}
+                    onClick={() => setInterviewerStyle("friendly")}
+                  >
+                    Friendly
+                  </Pill>
+                </div>
+              </Field>
+              <Field
+                label="Company target"
+                hint="Bias prompts toward specific company-style interviews."
+              >
+                <div className="flex flex-wrap gap-2">
+                  {["Google", "Amazon", "Meta", "Stripe", "Anthropic"].map((c) => (
+                    <Pill
+                      key={c}
+                      active={companyTarget === c}
+                      onClick={() => setCompanyTarget(c)}
                     >
-                      {stressTest ? "Enabled" : "Disabled"}
-                    </button>
-                    {!canUseStressTest(plan) && (
-                      <p className="mt-2 text-xs text-ink-500">
-                        Upgrade to Team to enable stress-test mode.
-                      </p>
-                    )}
-                  </Field>
-                </>
-              )}
+                      {c}
+                    </Pill>
+                  ))}
+                </div>
+              </Field>
+              <Field label="Stress test mode">
+                <button
+                  type="button"
+                  onClick={() => setStressTest((v) => !v)}
+                  className={cn(
+                    "inline-flex rounded-full border px-3 py-1.5 text-xs font-medium",
+                    stressTest
+                      ? "border-ink-900 bg-ink-900 text-white"
+                      : "border-ink-200 bg-white text-ink-700",
+                  )}
+                >
+                  {stressTest ? "Enabled" : "Disabled"}
+                </button>
+              </Field>
             </CardBody>
           </Card>
 
@@ -418,7 +383,7 @@ export default function SetupPage() {
               <div>
                 <p className="font-medium text-ink-900">Ready to begin?</p>
                 <p className="text-xs text-ink-500">
-                  Resume-driven · {difficulty} difficulty · ~25–45 min · {role}
+                  Resume-driven · {difficulty} difficulty · ~25–45 min · {role} · ₹{INTERVIEW_PRICE_INR} per interview
                 </p>
               </div>
             </div>
@@ -429,11 +394,7 @@ export default function SetupPage() {
               disabled={!canStart}
               className="w-full sm:w-auto"
             >
-              {blocked
-                ? "No attempts left this month"
-                : !resume
-                  ? "Upload resume to start"
-                  : "Start interview"}
+              {resume ? "Start interview" : "Upload resume to start"}
             </Button>
           </div>
         </div>

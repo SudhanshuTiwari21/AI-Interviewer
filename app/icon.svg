@@ -6,8 +6,12 @@
   xmlns="http://www.w3.org/2000/svg"
 >
   <rect width="32" height="32" rx="8" fill="#0E1220" />
-  <rect x="8" y="8" width="3.6" height="16" rx="1" fill="#FFFFFF" />
-  <rect x="20.4" y="8" width="3.6" height="16" rx="1" fill="#FFFFFF" />
-  <rect x="8" y="14.4" width="16" height="3.2" rx="1" fill="#FFFFFF" />
-  <path d="M19.4 9.8L12.6 22.2H16.2L23 9.8H19.4Z" fill="#3A66F5" />
+  <path
+    d="M23.4 10.4C22.2 8.7 20.1 8 16.9 8C13.1 8 10.4 9.8 10.4 12.8c0 2.7 2 4 6.1 4.5 2.6.3 3.6.9 3.6 2.1 0 1.5-1.4 2.3-3.8 2.3-2.5 0-4.5-.8-5.9-2.2"
+    stroke="#FFFFFF"
+    stroke-width="3.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path d="M20.8 9.7L12.2 22.6H15.7L24.3 9.7H20.8Z" fill="#3A66F5" />
 </svg>

@@ -4,7 +4,7 @@ const STEPS = [
   {
     n: "01",
     title: "Configure your role",
-    body: "Pick the role, level, and focus areas. Hiro calibrates the rubric and question pool.",
+    body: "Pick the role, level, and focus areas. Selectwise calibrates the rubric and briefs Hiro for your interview loop.",
   },
   {
     n: "02",

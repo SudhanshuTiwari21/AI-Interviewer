@@ -42,7 +42,7 @@ export type SendMailArgs = {
 export async function sendMail({ to, subject, html, text }: SendMailArgs) {
   const from =
     process.env.EMAIL_FROM ??
-    `Hiro Interview <${process.env.SMTP_USER ?? "no-reply@hiro.app"}>`;
+    `Selectwise <${process.env.SMTP_USER ?? "no-reply@selectwise.app"}>`;
   const transporter = getTransporter();
   return transporter.sendMail({ from, to, subject, html, text });
 }
