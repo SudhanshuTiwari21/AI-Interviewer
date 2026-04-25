@@ -35,6 +35,7 @@ export default function CheckoutPage() {
 function CheckoutInner() {
   const router = useRouter();
   const interviewPrice = useMemo(() => INTERVIEW_PRICE_INR, []);
+  const [checkedAuth, setCheckedAuth] = useState(false);
 
   const [cardName, setCardName] = useState("");
   const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
@@ -45,8 +46,21 @@ function CheckoutInner() {
 
   useEffect(() => {
     const u = store.getUser();
-    if (u && !cardName) setCardName(u.name);
-  }, [cardName]);
+    if (!u) {
+      router.replace("/login?next=/checkout");
+      return;
+    }
+    if (!cardName) setCardName(u.name);
+    setCheckedAuth(true);
+  }, [cardName, router]);
+
+  if (!checkedAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-sm text-ink-500">
+        Redirecting to login…
+      </div>
+    );
+  }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
