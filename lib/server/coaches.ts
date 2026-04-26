@@ -32,7 +32,6 @@ function rowToCoach(row: typeof schema.coaches.$inferSelect): Coach {
     availability: {
       weekdays: availability.weekdays ?? [1, 2, 3, 4, 5],
       windows: normalizedWindows,
-      intervalMin: availability.intervalMin ?? 30,
     },
   };
 }

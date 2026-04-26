@@ -22,7 +22,6 @@ type CoachForm = {
   timezone: string;
   weekdays: number[];
   windows: Array<{ startHour: string; endHour: string }>;
-  intervalMin: string;
   active: boolean;
 };
 
@@ -48,7 +47,6 @@ const DEFAULT_FORM: CoachForm = {
   timezone: "Asia/Kolkata",
   weekdays: [1, 2, 3, 4, 5],
   windows: [{ startHour: "9", endHour: "10" }, { startHour: "18", endHour: "19" }],
-  intervalMin: "30",
   active: true,
 };
 
@@ -132,9 +130,7 @@ export default function AdminCoachesPage() {
                 </div>
                 <p className="mt-2 text-xs text-ink-500">
                   {coach.techAreas.join(", ")} ·{" "}
-                  {weekdaysLabel(coach.availability.weekdays)} ·{" "}
-                  {windowsLabel(coach.availability.windows)} · every{" "}
-                  {coach.availability.intervalMin}m
+                  {weekdaysLabel(coach.availability.weekdays)} · {windowsLabel(coach.availability.windows)}
                 </p>
                 {canMutate && (
                   <div className="mt-3 flex gap-2">
@@ -160,7 +156,6 @@ export default function AdminCoachesPage() {
                               startHour: String(w.startHour),
                               endHour: String(w.endHour),
                             })) ?? [{ startHour: "9", endHour: "10" }],
-                          intervalMin: String(coach.availability.intervalMin),
                           active: coach.active,
                         });
                       }}
@@ -404,21 +399,6 @@ export default function AdminCoachesPage() {
                   </Button>
                 </div>
               </Field>
-              <div className="grid grid-cols-1 gap-2">
-                <Field label="Every">
-                  <select
-                    className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
-                    value={form.intervalMin}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, intervalMin: e.target.value }))
-                    }
-                  >
-                    <option value="15">15m</option>
-                    <option value="30">30m</option>
-                    <option value="60">60m</option>
-                  </select>
-                </Field>
-              </div>
               <label className="inline-flex items-center gap-2 text-sm text-ink-700">
                 <input
                   type="checkbox"
@@ -483,10 +463,8 @@ function toHourLabel(hour: number) {
 }
 
 function toCoach(form: CoachForm, editingId: string | null): Coach | null {
-  const intervalMin = Number(form.intervalMin);
   if (!form.name.trim() || !form.title.trim() || form.weekdays.length === 0) return null;
   if (!form.email.trim()) return null;
-  if (![15, 30, 60].includes(intervalMin)) return null;
   const windows = form.windows
     .map((w) => ({ startHour: Number(w.startHour), endHour: Number(w.endHour) }))
     .filter(
@@ -521,7 +499,6 @@ function toCoach(form: CoachForm, editingId: string | null): Coach | null {
     availability: {
       weekdays: [...form.weekdays].sort((a, b) => a - b),
       windows,
-      intervalMin: intervalMin as 15 | 30 | 60,
     },
   };
 }

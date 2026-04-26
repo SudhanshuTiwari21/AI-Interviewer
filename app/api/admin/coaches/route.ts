@@ -32,7 +32,6 @@ const CoachSchema = z.object({
         endHour: z.number().int(),
       }),
     ),
-    intervalMin: z.union([z.literal(15), z.literal(30), z.literal(60)]),
   }),
 });
 
