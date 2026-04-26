@@ -1,0 +1,80 @@
+import "server-only";
+
+import { desc, eq } from "drizzle-orm";
+import { db, schema } from "@/lib/db/client";
+import { DEFAULT_COACHES, type Coach } from "@/lib/coaches";
+
+function rowToCoach(row: typeof schema.coaches.$inferSelect): Coach {
+  const availability = (row.availability ?? {}) as Coach["availability"];
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    title: row.title,
+    rating: Number((row.rating ?? 48) / 10),
+    sessions: row.sessions,
+    focus: (row.focus as string[]) ?? [],
+    techAreas: (row.techAreas as string[]) ?? [],
+    hourlyRateInr: row.hourlyRateInr,
+    active: row.active,
+    timezone: row.timezone,
+    availability: {
+      weekdays: availability.weekdays ?? [1, 2, 3, 4, 5],
+      startHour: availability.startHour ?? 9,
+      endHour: availability.endHour ?? 18,
+      intervalMin: availability.intervalMin ?? 30,
+    },
+  };
+}
+
+function coachToInsert(coach: Coach): typeof schema.coaches.$inferInsert {
+  return {
+    id: coach.id,
+    name: coach.name,
+    email: coach.email,
+    title: coach.title,
+    rating: Math.round(coach.rating * 10),
+    sessions: coach.sessions,
+    focus: coach.focus as unknown as Record<string, unknown>,
+    techAreas: coach.techAreas as unknown as Record<string, unknown>,
+    hourlyRateInr: coach.hourlyRateInr,
+    active: coach.active,
+    timezone: coach.timezone,
+    availability: coach.availability as unknown as Record<string, unknown>,
+    updatedAt: new Date(),
+  };
+}
+
+export async function ensureDefaultCoaches() {
+  const rows = await db.select({ id: schema.coaches.id }).from(schema.coaches).limit(1);
+  if (rows.length > 0) return;
+  for (const c of DEFAULT_COACHES) {
+    await db.insert(schema.coaches).values(coachToInsert(c)).onConflictDoNothing();
+  }
+}
+
+export async function listCoaches(options?: { activeOnly?: boolean }): Promise<Coach[]> {
+  await ensureDefaultCoaches();
+  const q = db.select().from(schema.coaches).orderBy(desc(schema.coaches.createdAt));
+  const rows = options?.activeOnly
+    ? await q.where(eq(schema.coaches.active, true))
+    : await q;
+  return rows.map(rowToCoach);
+}
+
+export async function upsertCoach(coach: Coach): Promise<void> {
+  await db
+    .insert(schema.coaches)
+    .values(coachToInsert(coach))
+    .onConflictDoUpdate({
+      target: schema.coaches.id,
+      set: {
+        ...coachToInsert(coach),
+        updatedAt: new Date(),
+      },
+    });
+}
+
+export async function deleteCoach(id: string): Promise<void> {
+  await db.delete(schema.coaches).where(eq(schema.coaches.id, id));
+}

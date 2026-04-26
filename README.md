@@ -7,16 +7,16 @@ one polished web app.
 
 This repository contains the **MVP** UI/flow built with **Next.js 14**,
 **TypeScript**, and **Tailwind CSS**. OpenAI is integrated client-side for
-adaptive follow-ups and report enrichment (demo mode). Coaching bookings now
-create Google Calendar events on approval with attendee invites, while Stripe
-payments remain stubbed at the integration boundary.
+adaptive follow-ups and report enrichment (demo mode). Coaching bookings create
+Google Calendar events on approval with attendee invites, and one-time payments
+are processed via Razorpay order + signature verification + webhook sync.
 
 ---
 
 ## Highlights
 
 - **Polished marketing site** - hero, features, pricing, testimonials, FAQ, CTA.
-- **Auth & checkout** - sign up / sign in / Stripe-style checkout (mock).
+- **Auth & checkout** - sign up / sign in / Razorpay checkout.
 - **Adaptive interview engine** - interleaves a curated rubric with AI-generated
   follow-up questions based on the previous answer.
 - **Voice + text answers** - Web Speech API for live transcription,
@@ -43,9 +43,9 @@ payments remain stubbed at the integration boundary.
 | Voice capture | MediaRecorder API |
 | State/persistence (MVP) | localStorage via `lib/store.ts` |
 
-> The MVP runs **without backend APIs**. OpenAI can be enabled by setting
-> `NEXT_PUBLIC_OPENAI_API_KEY` in `.env.local` (frontend demo mode). Stripe,
-> Stripe and some optional integrations are isolated behind simple integration points. See
+> OpenAI can be enabled by setting `NEXT_PUBLIC_OPENAI_API_KEY` in `.env.local`
+> (frontend demo mode). Some optional integrations are isolated behind simple
+> integration points. See
 > [Wiring real backends](#wiring-real-backends) below.
 
 ---
@@ -82,6 +82,9 @@ Fill in `.env.local`:
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | Nodemailer SMTP credentials |
 | `EMAIL_FROM` | The "From" header on outgoing emails |
 | `ADMIN_EMAIL` | Where the admin copy of reports should land |
+| `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Razorpay server keys for order creation + signature verification |
+| `NEXT_PUBLIC_RAZORPAY_KEY_ID` | Optional client key id override (falls back to `RAZORPAY_KEY_ID`) |
+| `RAZORPAY_WEBHOOK_SECRET` | Razorpay webhook signing secret used by `/api/payments/razorpay/webhook` |
 | `NEXT_PUBLIC_OPENAI_API_KEY` | Optional – enables dynamic follow-ups in demo mode |
 
 ### 3. Spin up Postgres (one option: Docker)
@@ -162,7 +165,7 @@ app/
   page.tsx                Marketing landing
   login/                  Sign in
   signup/                 Sign up
-  checkout/               Stripe-style payment
+  checkout/               Razorpay payment
   dashboard/              Authenticated user dashboard
     layout.tsx            Sidebar shell (AppShell)
     page.tsx              Overview (stats, recent reports)

@@ -23,6 +23,9 @@ const Body = z.object({
   coachTimezone: z.string().trim().min(2).max(100),
   startsAt: z.string().datetime(),
   amountInr: z.number().int().positive(),
+  paymentTransactionId: z.string().uuid(),
+  razorpayOrderId: z.string().min(1),
+  razorpayPaymentId: z.string().min(1),
 });
 
 function hashToken(token: string) {
@@ -75,6 +78,34 @@ export async function POST(req: Request) {
     );
   }
   const body = parsed.data;
+  const tx = await db
+    .select()
+    .from(schema.paymentTransactions)
+    .where(
+      and(
+        eq(schema.paymentTransactions.id, body.paymentTransactionId),
+        eq(schema.paymentTransactions.userId, me.id),
+      ),
+    )
+    .limit(1);
+  const paymentTx = tx[0];
+  if (!paymentTx || paymentTx.status !== "paid") {
+    return fail(
+      "validation_error",
+      "Verified payment is required before booking.",
+      400,
+    );
+  }
+  if (paymentTx.productType !== "coaching") {
+    return fail("validation_error", "Invalid payment type for coaching.", 400);
+  }
+  if (
+    paymentTx.amountInr !== body.amountInr ||
+    paymentTx.razorpayOrderId !== body.razorpayOrderId ||
+    paymentTx.razorpayPaymentId !== body.razorpayPaymentId
+  ) {
+    return fail("validation_error", "Payment details mismatch.", 400);
+  }
   const startsAt = new Date(body.startsAt);
   if (startsAt.getTime() <= Date.now()) {
     return fail("validation_error", "Please select a future slot.", 400);
@@ -111,6 +142,9 @@ export async function POST(req: Request) {
       startsAt,
       amountInr: body.amountInr,
       paymentStatus: "paid",
+      paymentTransactionId: body.paymentTransactionId,
+      razorpayOrderId: body.razorpayOrderId,
+      razorpayPaymentId: body.razorpayPaymentId,
       status: "pending",
       coachApprovalTokenHash: tokenHash,
     })

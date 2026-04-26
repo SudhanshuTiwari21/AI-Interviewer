@@ -7,8 +7,6 @@ import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { Progress } from "@/components/ui/Progress";
 import { useAdmin, AdminPageHeader } from "@/components/admin/AdminShell";
-import { store, type Booking } from "@/lib/store";
-import { RECENT_SESSIONS } from "@/lib/mock-data";
 import type { InterviewReport } from "@/lib/question-engine";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import {
@@ -26,18 +24,32 @@ import {
 
 const PRICE = 299;
 
+type CoachingBooking = {
+  id: string;
+  coachName: string;
+  techArea: string;
+  startsAt: string;
+};
+
 export default function AdminOverviewPage() {
   const { user, has } = useAdmin();
   const [reports, setReports] = useState<InterviewReport[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookings, setBookings] = useState<CoachingBooking[]>([]);
 
   useEffect(() => {
-    setReports(store.getReports());
-    setBookings(store.getBookings());
+    void fetch("/api/reports", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setReports(d.reports);
+      });
+    void fetch("/api/coaching/bookings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setBookings(d.bookings);
+      });
   }, []);
 
-  const allSessions = [
-    ...reports.map((r) => ({
+  const allSessions = reports.map((r) => ({
       id: r.id,
       role: r.role,
       level: r.level,
@@ -46,9 +58,7 @@ export default function AdminOverviewPage() {
       score: r.overall,
       durationMin: r.durationMin,
       startedAt: r.generatedAt,
-    })),
-    ...RECENT_SESSIONS,
-  ];
+    }));
 
   const completed = allSessions.filter((s) => s.status === "completed");
   const avgScore = completed.length
@@ -262,7 +272,7 @@ export default function AdminOverviewPage() {
                         <p className="truncate font-medium text-ink-900">
                           {b.coachName}
                         </p>
-                        <p className="truncate text-xs text-ink-500">{b.topic}</p>
+                        <p className="truncate text-xs text-ink-500">{b.techArea} coaching</p>
                       </div>
                       <span className="shrink-0 text-xs text-ink-500">
                         {formatDate(b.startsAt)}

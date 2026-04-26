@@ -36,12 +36,29 @@ export default function ReportPage() {
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    const r = store.getReport(params.id);
-    if (!r) {
-      router.replace("/dashboard/reports");
-      return;
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await fetch(`/api/reports/${params.id}`, { cache: "no-store" });
+        const data = await res.json();
+        if (!cancelled && data.ok && data.report) {
+          setReport(data.report);
+          return;
+        }
+      } catch {
+        // fallback below
+      }
+      const local = store.getReport(params.id);
+      if (!local) {
+        router.replace("/dashboard/reports");
+        return;
+      }
+      setReport(local);
     }
-    setReport(r);
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [params.id, router]);
 
   if (!report) return null;

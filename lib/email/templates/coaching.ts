@@ -20,6 +20,24 @@ type ApprovedArgs = {
   meetingUrl?: string | null;
 };
 
+type RefundApprovedArgs = {
+  bookingId: string;
+  candidateName: string;
+  techArea: string;
+  refundAmountInr: number;
+  remainingAmountInr: number;
+  adminNote?: string | null;
+  status: "refund_pending" | "partially_refunded" | "refunded";
+};
+
+type RefundRejectedArgs = {
+  bookingId: string;
+  candidateName: string;
+  techArea: string;
+  amountInr: number;
+  adminNote?: string | null;
+};
+
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleString("en-IN", {
     dateStyle: "medium",
@@ -100,5 +118,58 @@ export function coachingApprovedEmail(args: ApprovedArgs) {
 - Amount paid: ₹${args.amountInr}
 - Meeting link: ${args.meetingUrl ?? "Will be shared shortly"}
 - Booking ID: ${args.bookingId}`,
+  };
+}
+
+export function coachingRefundApprovedEmail(args: RefundApprovedArgs) {
+  const statusLabel =
+    args.status === "refunded"
+      ? "Refund completed"
+      : args.status === "partially_refunded"
+        ? "Partial refund completed"
+        : "Refund initiated";
+  return {
+    subject: `${statusLabel} (${args.techArea})`,
+    html: `<p>Hi ${args.candidateName},</p>
+<p>Your refund request has been approved.</p>
+<ul>
+  <li><strong>Booking ID:</strong> ${args.bookingId}</li>
+  <li><strong>Track:</strong> ${args.techArea}</li>
+  <li><strong>Refund amount:</strong> ₹${args.refundAmountInr}</li>
+  <li><strong>Status:</strong> ${statusLabel}</li>
+  <li><strong>Remaining paid amount:</strong> ₹${args.remainingAmountInr}</li>
+  ${args.adminNote ? `<li><strong>Admin note:</strong> ${args.adminNote}</li>` : ""}
+</ul>
+<p>Thanks,<br/>SelectWise</p>`,
+    text: `Hi ${args.candidateName},
+Your refund request is approved.
+- Booking ID: ${args.bookingId}
+- Track: ${args.techArea}
+- Refund amount: ₹${args.refundAmountInr}
+- Status: ${statusLabel}
+- Remaining paid amount: ₹${args.remainingAmountInr}
+- Admin note: ${args.adminNote ?? "N/A"}`,
+  };
+}
+
+export function coachingRefundRejectedEmail(args: RefundRejectedArgs) {
+  return {
+    subject: `Refund request update (${args.techArea})`,
+    html: `<p>Hi ${args.candidateName},</p>
+<p>Your refund request has been reviewed and could not be approved at this time.</p>
+<ul>
+  <li><strong>Booking ID:</strong> ${args.bookingId}</li>
+  <li><strong>Track:</strong> ${args.techArea}</li>
+  <li><strong>Paid amount:</strong> ₹${args.amountInr}</li>
+  ${args.adminNote ? `<li><strong>Admin note:</strong> ${args.adminNote}</li>` : ""}
+</ul>
+<p>If you need more help, please contact support.</p>
+<p>Thanks,<br/>SelectWise</p>`,
+    text: `Hi ${args.candidateName},
+Your refund request has been reviewed and was not approved.
+- Booking ID: ${args.bookingId}
+- Track: ${args.techArea}
+- Paid amount: ₹${args.amountInr}
+- Admin note: ${args.adminNote ?? "N/A"}`,
   };
 }

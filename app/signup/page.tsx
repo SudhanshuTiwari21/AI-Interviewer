@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AuthShell } from "@/components/auth/AuthShell";
@@ -30,6 +30,11 @@ type Pending = {
   resent: boolean;
 };
 
+type PublicSettings = {
+  allowSignups: boolean;
+  maintenanceMode: boolean;
+};
+
 function SignupInner() {
   const router = useRouter();
   const search = useSearchParams();
@@ -45,6 +50,22 @@ function SignupInner() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [resending, setResending] = useState(false);
   const [resendInfo, setResendInfo] = useState<string | null>(null);
+  const [settings, setSettings] = useState<PublicSettings>({
+    allowSignups: true,
+    maintenanceMode: false,
+  });
+
+  useEffect(() => {
+    void fetch("/api/settings/public", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.ok) return;
+        setSettings({
+          allowSignups: Boolean(d.settings?.allowSignups ?? true),
+          maintenanceMode: Boolean(d.settings?.maintenanceMode ?? false),
+        });
+      });
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -52,6 +73,10 @@ function SignupInner() {
 
     if (!name.trim() || !email.includes("@") || password.length < 8) {
       setError("Please fill in your name, a valid email, and an 8+ char password.");
+      return;
+    }
+    if (!settings.allowSignups || settings.maintenanceMode) {
+      setError("Signups are temporarily paused. Please try again later.");
       return;
     }
 
@@ -203,7 +228,13 @@ function SignupInner() {
           leftIcon={<Lock className="size-4" />}
           error={error || undefined}
         />
-        <Button type="submit" loading={loading} className="w-full" size="lg">
+        <Button
+          type="submit"
+          loading={loading}
+          className="w-full"
+          size="lg"
+          disabled={!settings.allowSignups || settings.maintenanceMode}
+        >
           Create account
         </Button>
         <div className="relative py-1">

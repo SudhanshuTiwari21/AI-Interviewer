@@ -84,7 +84,15 @@ export const coachingBookings = pgTable(
     durationMin: integer("duration_min").notNull().default(60),
     amountInr: integer("amount_inr").notNull(),
     paymentStatus: text("payment_status").notNull().default("paid"),
+    paymentTransactionId: uuid("payment_transaction_id"),
+    razorpayOrderId: text("razorpay_order_id"),
+    razorpayPaymentId: text("razorpay_payment_id"),
+    razorpayRefundId: text("razorpay_refund_id"),
     status: text("status").notNull().default("pending"),
+    refundReason: text("refund_reason"),
+    refundRequestedAt: timestamp("refund_requested_at", { withTimezone: true }),
+    refundReviewedAt: timestamp("refund_reviewed_at", { withTimezone: true }),
+    refundProcessedAt: timestamp("refund_processed_at", { withTimezone: true }),
     coachApprovalTokenHash: text("coach_approval_token_hash"),
     coachApprovedAt: timestamp("coach_approved_at", { withTimezone: true }),
     calendarEventId: text("calendar_event_id"),
@@ -106,6 +114,132 @@ export const coachingBookings = pgTable(
     tokenIdx: uniqueIndex("coaching_bookings_coach_approval_token_hash_idx").on(
       t.coachApprovalTokenHash,
     ),
+  }),
+);
+
+export const paymentTransactions = pgTable(
+  "payment_transactions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    productType: text("product_type").notNull(), // interview | coaching
+    referenceId: text("reference_id"),
+    amountInr: integer("amount_inr").notNull(),
+    currency: text("currency").notNull().default("INR"),
+    status: text("status").notNull().default("created"), // created | paid | failed
+    razorpayOrderId: text("razorpay_order_id").notNull().unique(),
+    razorpayPaymentId: text("razorpay_payment_id"),
+    razorpaySignature: text("razorpay_signature"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("payment_transactions_user_id_idx").on(t.userId),
+    statusIdx: index("payment_transactions_status_idx").on(t.status),
+    productIdx: index("payment_transactions_product_type_idx").on(t.productType),
+  }),
+);
+
+export const razorpayWebhookEvents = pgTable(
+  "razorpay_webhook_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    eventId: text("event_id").notNull().unique(),
+    eventType: text("event_type").notNull(),
+    payload: jsonb("payload").notNull().default(sql`'{}'::jsonb`),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    processingStatus: text("processing_status").notNull().default("received"), // received | processed | ignored | failed
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    eventTypeIdx: index("razorpay_webhook_events_event_type_idx").on(t.eventType),
+    statusIdx: index("razorpay_webhook_events_status_idx").on(t.processingStatus),
+  }),
+);
+
+export const refundEvents = pgTable(
+  "refund_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => coachingBookings.id, { onDelete: "cascade" }),
+    eventType: text("event_type").notNull(), // requested | approved | rejected | webhook_update
+    actorEmail: text("actor_email"),
+    actorRole: text("actor_role"),
+    note: text("note"),
+    amountInr: integer("amount_inr"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    bookingIdx: index("refund_events_booking_id_idx").on(t.bookingId),
+    typeIdx: index("refund_events_event_type_idx").on(t.eventType),
+  }),
+);
+
+export const coaches = pgTable(
+  "coaches",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    title: text("title").notNull(),
+    rating: integer("rating").notNull().default(48), // stored as x10
+    sessions: integer("sessions").notNull().default(0),
+    focus: jsonb("focus").notNull().default(sql`'[]'::jsonb`),
+    techAreas: jsonb("tech_areas").notNull().default(sql`'[]'::jsonb`),
+    hourlyRateInr: integer("hourly_rate_inr").notNull().default(999),
+    active: boolean("active").notNull().default(true),
+    timezone: text("timezone").notNull().default("Asia/Kolkata"),
+    availability: jsonb("availability").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    activeIdx: index("coaches_active_idx").on(t.active),
+  }),
+);
+
+export const interviewReports = pgTable(
+  "interview_reports",
+  {
+    id: text("id").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    candidate: text("candidate").notNull(),
+    email: text("email").notNull(),
+    role: text("role").notNull(),
+    level: text("level").notNull(),
+    overall: integer("overall").notNull(),
+    rating: text("rating").notNull(),
+    durationMin: integer("duration_min").notNull(),
+    generatedAt: timestamp("generated_at", { withTimezone: true }).notNull(),
+    reportData: jsonb("report_data").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("interview_reports_user_id_idx").on(t.userId),
+    generatedIdx: index("interview_reports_generated_at_idx").on(t.generatedAt),
   }),
 );
 
@@ -137,3 +271,8 @@ export type AuditLogRow = typeof auditLogs.$inferSelect;
 export type NewAuditLogRow = typeof auditLogs.$inferInsert;
 export type AdminSettingsRow = typeof adminSettings.$inferSelect;
 export type CoachingBookingRow = typeof coachingBookings.$inferSelect;
+export type CoachRow = typeof coaches.$inferSelect;
+export type InterviewReportRow = typeof interviewReports.$inferSelect;
+export type PaymentTransactionRow = typeof paymentTransactions.$inferSelect;
+export type RazorpayWebhookEventRow = typeof razorpayWebhookEvents.$inferSelect;
+export type RefundEventRow = typeof refundEvents.$inferSelect;

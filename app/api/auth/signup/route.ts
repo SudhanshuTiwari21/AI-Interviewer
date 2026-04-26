@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db/client";
 import { hashPassword } from "@/lib/auth/password";
+import { getAdminSettings } from "@/lib/admin-settings";
 import {
   findUserByEmail,
   issueVerificationEmail,
@@ -20,6 +21,15 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
+  const settings = await getAdminSettings();
+  if (!settings.allowSignups) {
+    return fail(
+      "validation_error",
+      "Signups are temporarily paused. Please try again later.",
+      403,
+    );
+  }
+
   let json: unknown;
   try {
     json = await req.json();

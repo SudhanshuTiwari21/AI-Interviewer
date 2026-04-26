@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Section, SectionHeading } from "@/components/ui/Section";
 import { Button } from "@/components/ui/Button";
 import { Check } from "lucide-react";
@@ -5,6 +8,18 @@ import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
 import { formatCurrency } from "@/lib/utils";
 
 export function Pricing() {
+  const [price, setPrice] = useState(INTERVIEW_PRICE_INR);
+
+  useEffect(() => {
+    void fetch("/api/settings/public", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok && typeof d.settings?.pricePerInterviewInr === "number") {
+          setPrice(d.settings.pricePerInterviewInr);
+        }
+      });
+  }, []);
+
   return (
     <Section id="pricing" className="bg-white">
       <SectionHeading
@@ -19,7 +34,7 @@ export function Pricing() {
         <h3 className="mt-4 text-lg font-semibold text-ink-900">Per interview</h3>
         <div className="mt-3 flex items-baseline gap-1">
           <span className="text-4xl font-semibold tracking-tight text-ink-900">
-            {formatCurrency(INTERVIEW_PRICE_INR, "INR")}
+            {formatCurrency(price, "INR")}
           </span>
           <span className="text-sm text-ink-500">/interview</span>
         </div>

@@ -65,7 +65,13 @@ export default function AdminCoachesPage() {
   const [form, setForm] = useState<CoachForm>(DEFAULT_FORM);
 
   useEffect(() => {
-    setCoaches(store.getCoaches());
+    void fetch("/api/admin/coaches", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setCoaches(d.coaches);
+        else setCoaches(store.getCoaches());
+      })
+      .catch(() => setCoaches(store.getCoaches()));
   }, []);
 
   return (
@@ -170,8 +176,10 @@ export default function AdminCoachesPage() {
                         className="text-danger-600 hover:bg-danger-50 hover:text-danger-700"
                         onClick={() => {
                           if (!confirm(`Delete ${coach.name}?`)) return;
-                          store.deleteCoach(coach.id);
-                          setCoaches(store.getCoaches());
+                          void fetch(`/api/admin/coaches?id=${encodeURIComponent(coach.id)}`, {
+                            method: "DELETE",
+                          });
+                          setCoaches((prev) => prev.filter((x) => x.id !== coach.id));
                           if (editingId === coach.id) {
                             setEditingId(null);
                             setForm(DEFAULT_FORM);
@@ -193,8 +201,18 @@ export default function AdminCoachesPage() {
                 e.preventDefault();
                 const next = toCoach(form, editingId);
                 if (!next) return;
-                store.upsertCoach(next);
-                setCoaches(store.getCoaches());
+                void fetch("/api/admin/coaches", {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify(next),
+                });
+                setCoaches((prev) => {
+                  const idx = prev.findIndex((c) => c.id === next.id);
+                  if (idx === -1) return [next, ...prev];
+                  const copy = [...prev];
+                  copy[idx] = next;
+                  return copy;
+                });
                 setEditingId(next.id);
               }}
               className="space-y-3 rounded-xl border border-ink-200 bg-ink-50/40 p-4"

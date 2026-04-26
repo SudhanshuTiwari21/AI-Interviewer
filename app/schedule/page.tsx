@@ -9,6 +9,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { store } from "@/lib/store";
 import { buildSlotsForCoach, type Coach } from "@/lib/coaches";
+import { ensureRazorpayScriptLoaded } from "@/lib/payments/client";
 import { cn, formatDate, uid } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -67,9 +68,18 @@ function ScheduleInner() {
       router.replace("/login?next=/schedule");
       return;
     }
-    const all = store.getCoaches().filter((c) => c.active);
-    setCoaches(all);
-    if (!coachId && all[0]) setCoachId(all[0].id);
+    void fetch("/api/coaches", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        const all = (d.ok ? d.coaches : []).filter((c: Coach) => c.active);
+        setCoaches(all);
+        if (!coachId && all[0]) setCoachId(all[0].id);
+      })
+      .catch(() => {
+        const all = store.getCoaches().filter((c) => c.active);
+        setCoaches(all);
+        if (!coachId && all[0]) setCoachId(all[0].id);
+      });
   }, [coachId, router]);
 
   const days = useMemo(() => {
@@ -136,6 +146,76 @@ function ScheduleInner() {
     setError(null);
     setIsSubmitting(true);
     try {
+      const user = store.getUser();
+      if (!user) {
+        router.replace("/login?next=/schedule");
+        return;
+      }
+      const scriptReady = await ensureRazorpayScriptLoaded();
+      if (!scriptReady || !globalThis.window?.Razorpay) {
+        setError("Could not load payment gateway. Please refresh and try again.");
+        return;
+      }
+      const orderRes = await fetch("/api/payments/razorpay/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          productType: "coaching",
+          amountInr: coach.hourlyRateInr,
+          metadata: {
+            coachId: coach.id,
+            techArea: selectedTechArea,
+            startsAt: selectedSlot,
+          },
+        }),
+      });
+      const orderData = await orderRes.json();
+      if (!orderData.ok) {
+        setError(orderData.message ?? "Could not start payment.");
+        return;
+      }
+      const paymentResult = await new Promise<{
+        razorpay_payment_id: string;
+        razorpay_order_id: string;
+        razorpay_signature: string;
+      } | null>((resolve) => {
+        const rz = new globalThis.window.Razorpay({
+          key: orderData.razorpayKeyId,
+          amount: orderData.order.amount,
+          currency: orderData.order.currency,
+          name: "SelectWise",
+          description: `${selectedTechArea} coaching session`,
+          order_id: orderData.order.id,
+          prefill: {
+            name: user.name,
+            email: user.email,
+          },
+          notes: { productType: "coaching" },
+          theme: { color: "#111827" },
+          handler: (response) => resolve(response),
+          modal: { ondismiss: () => resolve(null) },
+        });
+        rz.open();
+      });
+      if (!paymentResult) {
+        setError("Payment was cancelled.");
+        return;
+      }
+      const verifyRes = await fetch("/api/payments/razorpay/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          razorpayOrderId: paymentResult.razorpay_order_id,
+          razorpayPaymentId: paymentResult.razorpay_payment_id,
+          razorpaySignature: paymentResult.razorpay_signature,
+          transactionId: orderData.transactionId,
+        }),
+      });
+      const verifyData = await verifyRes.json();
+      if (!verifyData.ok) {
+        setError(verifyData.message ?? "Payment verification failed.");
+        return;
+      }
       const res = await fetch("/api/coaching/bookings", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -147,6 +227,9 @@ function ScheduleInner() {
           coachTimezone: coach.timezone,
           startsAt: selectedSlot,
           amountInr: coach.hourlyRateInr,
+          paymentTransactionId: verifyData.transaction.id,
+          razorpayOrderId: paymentResult.razorpay_order_id,
+          razorpayPaymentId: paymentResult.razorpay_payment_id,
         }),
       });
       const data = await res.json();

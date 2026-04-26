@@ -15,7 +15,13 @@ export default function ReportsPage() {
   const [reports, setReports] = useState<InterviewReport[]>([]);
 
   useEffect(() => {
-    setReports(store.getReports());
+    void fetch("/api/reports", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setReports(d.reports);
+        else setReports(store.getReports());
+      })
+      .catch(() => setReports(store.getReports()));
   }, []);
 
   return (

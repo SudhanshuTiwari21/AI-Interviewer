@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Progress } from "@/components/ui/Progress";
-import { store } from "@/lib/store";
 import type { InterviewReport } from "@/lib/question-engine";
 
 const FRESHER_LEVELS = new Set(["Junior", "Mid"]);
@@ -13,7 +12,11 @@ export default function AdminFreshersProsPage() {
   const [reports, setReports] = useState<InterviewReport[]>([]);
 
   useEffect(() => {
-    setReports(store.getReports());
+    void fetch("/api/reports", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setReports(d.reports);
+      });
   }, []);
 
   const stats = useMemo(() => {

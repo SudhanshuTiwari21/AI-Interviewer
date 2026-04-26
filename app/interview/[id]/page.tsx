@@ -246,7 +246,16 @@ export default function InterviewSessionPage() {
       { name: user?.name ?? "Candidate", email: user?.email ?? "candidate@hiro.demo" },
       allAnswers,
     );
-    store.saveReport(report);
+    try {
+      await fetch("/api/reports", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ report }),
+      });
+    } catch (err) {
+      console.error("[reports/save]", err);
+      store.saveReport(report);
+    }
     router.replace(`/interview/${report.id}/report`);
   }
 

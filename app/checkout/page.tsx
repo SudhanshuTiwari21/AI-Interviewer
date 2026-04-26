@@ -1,21 +1,19 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
-import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
 import { store } from "@/lib/store";
+import { ensureRazorpayScriptLoaded } from "@/lib/payments/client";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
-  CreditCard,
-  Lock,
   ShieldCheck,
-  Calendar,
   Check,
   ArrowLeft,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function CheckoutPage() {
@@ -34,15 +32,14 @@ export default function CheckoutPage() {
 
 function CheckoutInner() {
   const router = useRouter();
-  const interviewPrice = useMemo(() => INTERVIEW_PRICE_INR, []);
+  const [interviewPrice, setInterviewPrice] = useState(INTERVIEW_PRICE_INR);
+  const [supportEmail, setSupportEmail] = useState("hi@selectwise.app");
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [checkedAuth, setCheckedAuth] = useState(false);
 
-  const [cardName, setCardName] = useState("");
-  const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
-  const [exp, setExp] = useState("12 / 28");
-  const [cvc, setCvc] = useState("123");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const u = store.getUser();
@@ -50,9 +47,23 @@ function CheckoutInner() {
       router.replace("/login?next=/checkout");
       return;
     }
-    if (!cardName) setCardName(u.name);
     setCheckedAuth(true);
-  }, [cardName, router]);
+
+    void fetch("/api/settings/public", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.ok) return;
+        if (typeof d.settings?.pricePerInterviewInr === "number") {
+          setInterviewPrice(d.settings.pricePerInterviewInr);
+        }
+        if (typeof d.settings?.supportEmail === "string") {
+          setSupportEmail(d.settings.supportEmail);
+        }
+        if (d.settings?.maintenanceMode) {
+          setMaintenanceMode(true);
+        }
+      });
+  }, [router]);
 
   if (!checkedAuth) {
     return (
@@ -62,14 +73,97 @@ function CheckoutInner() {
     );
   }
 
-  function onSubmit(e: React.FormEvent) {
+  if (maintenanceMode) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-ink-50/40 px-4 text-center">
+        <div className="max-w-md rounded-2xl border border-ink-200 bg-white p-8">
+          <h1 className="text-xl font-semibold text-ink-900">Checkout is temporarily unavailable</h1>
+          <p className="mt-2 text-sm text-ink-500">
+            We are in maintenance mode. Please try again shortly.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     setLoading(true);
-    setTimeout(() => {
+    const user = store.getUser();
+    if (!user) {
       setLoading(false);
+      router.replace("/login?next=/checkout");
+      return;
+    }
+    try {
+      const scriptReady = await ensureRazorpayScriptLoaded();
+      if (!scriptReady || !globalThis.window?.Razorpay) {
+        setError("Could not load payment gateway. Please refresh and try again.");
+        return;
+      }
+      const orderRes = await fetch("/api/payments/razorpay/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          productType: "interview",
+          amountInr: interviewPrice,
+        }),
+      });
+      const orderData = await orderRes.json();
+      if (!orderData.ok) {
+        setError(orderData.message ?? "Unable to start payment.");
+        return;
+      }
+      const paymentResult = await new Promise<{
+        razorpay_payment_id: string;
+        razorpay_order_id: string;
+        razorpay_signature: string;
+      } | null>((resolve) => {
+        const rz = new globalThis.window.Razorpay({
+          key: orderData.razorpayKeyId,
+          amount: orderData.order.amount,
+          currency: orderData.order.currency,
+          name: "SelectWise",
+          description: "Interview access payment",
+          order_id: orderData.order.id,
+          prefill: {
+            name: user.name,
+            email: user.email,
+          },
+          notes: { productType: "interview" },
+          theme: { color: "#111827" },
+          handler: (response) => resolve(response),
+          modal: { ondismiss: () => resolve(null) },
+        });
+        rz.open();
+      });
+      if (!paymentResult) {
+        setError("Payment was cancelled.");
+        return;
+      }
+      const verifyRes = await fetch("/api/payments/razorpay/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          razorpayOrderId: paymentResult.razorpay_order_id,
+          razorpayPaymentId: paymentResult.razorpay_payment_id,
+          razorpaySignature: paymentResult.razorpay_signature,
+          transactionId: orderData.transactionId,
+        }),
+      });
+      const verifyData = await verifyRes.json();
+      if (!verifyData.ok) {
+        setError(verifyData.message ?? "Payment verification failed.");
+        return;
+      }
       setDone(true);
-      setTimeout(() => router.push("/interview/setup"), 1200);
-    }, 1100);
+      setTimeout(() => router.push("/interview/setup"), 900);
+    } catch {
+      setError("Something went wrong while processing payment.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   const total = interviewPrice;
@@ -95,56 +189,24 @@ function CheckoutInner() {
           >
             <h1 className="text-xl font-semibold text-ink-900">Checkout</h1>
             <p className="mt-1 text-sm text-ink-500">
-              Secure payment processed by Selectwise (Stripe-compatible test mode).
+              Secure payment powered by Razorpay.
             </p>
 
-            <div className="mt-7 space-y-5">
-              <Input
-                label="Name on card"
-                value={cardName}
-                onChange={(e) => setCardName(e.target.value)}
-                placeholder="Alex Morgan"
-              />
-              <Input
-                label="Card number"
-                value={cardNumber}
-                onChange={(e) => setCardNumber(e.target.value)}
-                leftIcon={<CreditCard className="size-4" />}
-                rightSlot={
-                  <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-ink-100 px-2 py-0.5 text-[10px] font-medium text-ink-600">
-                    <Lock className="size-3" /> Encrypted
-                  </span>
-                }
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="Expiry"
-                  value={exp}
-                  onChange={(e) => setExp(e.target.value)}
-                  leftIcon={<Calendar className="size-4" />}
-                />
-                <Input
-                  label="CVC"
-                  value={cvc}
-                  onChange={(e) => setCvc(e.target.value)}
-                  leftIcon={<Lock className="size-4" />}
-                />
-              </div>
-              <Input
-                label="Billing email"
-                type="email"
-                placeholder="alex@company.com"
-                defaultValue={store.getUser()?.email}
-              />
+            <div className="mt-7 rounded-xl border border-ink-200 bg-ink-50/50 p-4 text-sm text-ink-600">
+              You will be redirected to Razorpay's secure checkout to complete your
+              payment. Once successful, your interview will unlock immediately.
             </div>
 
             <div className="mt-7 flex items-center gap-2 rounded-xl bg-ink-50 px-4 py-3 text-xs text-ink-600">
               <ShieldCheck className="size-4 text-success-500" />
-              <span>
-                This is a demo flow. No real charge will be made - use any test
-                card.
-              </span>
+              <span>Payments are verified securely on our server.</span>
             </div>
+            {error && (
+              <p className="mt-4 text-sm text-danger-600">
+                <AlertTriangle className="mr-1 inline size-4" />
+                {error}
+              </p>
+            )}
 
             <Button
               type="submit"
@@ -210,8 +272,8 @@ function CheckoutInner() {
               </p>
               <p className="mt-2">
                 Email{" "}
-                <a className="text-ink-900 underline" href="mailto:hi@selectwise.app">
-                  hi@selectwise.app
+                <a className="text-ink-900 underline" href={`mailto:${supportEmail}`}>
+                  {supportEmail}
                 </a>{" "}
                 - we typically respond within an hour during business hours.
               </p>

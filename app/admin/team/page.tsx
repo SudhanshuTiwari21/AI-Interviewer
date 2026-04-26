@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -304,6 +304,14 @@ function RoleCard({ role }: Readonly<{ role: Role }>) {
   const tone = roleTone(role);
   const counts = perms.length;
   const canSeeAudit = hasPermission(role, "audit.view" as Permission);
+  const [expanded, setExpanded] = useState(false);
+  const previewCount = 6;
+  const hiddenCount = Math.max(0, perms.length - previewCount);
+  const visiblePerms = useMemo(
+    () => (expanded ? perms : perms.slice(0, previewCount)),
+    [expanded, perms],
+  );
+
   return (
     <div className="rounded-xl border border-ink-200 p-4">
       <div className="mb-2 flex items-center justify-between">
@@ -321,7 +329,7 @@ function RoleCard({ role }: Readonly<{ role: Role }>) {
           "Read-only support tier. Can view sessions/bookings and reschedule, but cannot mutate users or settings."}
       </p>
       <div className="mt-3 flex flex-wrap gap-1.5">
-        {perms.slice(0, 6).map((p) => (
+        {visiblePerms.map((p) => (
           <span
             key={p}
             className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-700"
@@ -329,10 +337,23 @@ function RoleCard({ role }: Readonly<{ role: Role }>) {
             {p}
           </span>
         ))}
-        {perms.length > 6 && (
-          <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-500">
-            +{perms.length - 6} more
-          </span>
+        {hiddenCount > 0 && !expanded && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-600 hover:bg-ink-200"
+          >
+            +{hiddenCount} more
+          </button>
+        )}
+        {hiddenCount > 0 && expanded && (
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-600 hover:bg-ink-200"
+          >
+            Show less
+          </button>
         )}
         {!canSeeAudit && (
           <span className="rounded-full bg-warn-50 px-2 py-0.5 text-[10px] text-warn-700">

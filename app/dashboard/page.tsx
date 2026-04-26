@@ -24,15 +24,80 @@ import {
   Crown,
 } from "lucide-react";
 
+type CoachingBooking = {
+  id: string;
+  coachName: string;
+  techArea: string;
+  startsAt: string;
+  amountInr: number;
+  status: string;
+  paymentStatus: string;
+  refundReason: string | null;
+};
+
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [reports, setReports] = useState<InterviewReport[]>([]);
+  const [bookings, setBookings] = useState<CoachingBooking[]>([]);
+  const [refundReasonById, setRefundReasonById] = useState<Record<string, string>>({});
+  const [refundLoadingId, setRefundLoadingId] = useState<string | null>(null);
+  const [refundError, setRefundError] = useState<string | null>(null);
 
   useEffect(() => {
     const u = store.getUser();
     setUser(u);
-    setReports(store.getReports());
+    void fetch("/api/reports", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setReports(d.reports);
+        else setReports(store.getReports());
+      })
+      .catch(() => setReports(store.getReports()));
+    void fetch("/api/coaching/bookings", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setBookings(d.bookings);
+      });
   }, []);
+
+  async function requestRefund(bookingId: string) {
+    const reason = (refundReasonById[bookingId] ?? "").trim();
+    if (reason.length < 15) {
+      setRefundError("Please provide a proper refund reason (at least 15 characters).");
+      return;
+    }
+    setRefundError(null);
+    setRefundLoadingId(bookingId);
+    try {
+      const res = await fetch(`/api/coaching/bookings/${bookingId}/refund-request`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setRefundError(data.message ?? "Could not submit refund request.");
+        return;
+      }
+      setBookings((prev) =>
+        prev.map((b) =>
+          b.id === bookingId
+            ? {
+                ...b,
+                status: "refund_requested",
+                paymentStatus: "refund_requested",
+                refundReason: reason,
+              }
+            : b,
+        ),
+      );
+      setRefundReasonById((prev) => ({ ...prev, [bookingId]: "" }));
+    } catch {
+      setRefundError("Network error while submitting refund request.");
+    } finally {
+      setRefundLoadingId(null);
+    }
+  }
 
   const lastReport = reports[0];
   const avgScore = reports.length
@@ -226,6 +291,65 @@ export default function DashboardPage() {
                   Find a time
                 </Button>
               </div>
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Coaching bookings & refunds</CardTitle>
+            </CardHeader>
+            <CardBody className="space-y-3">
+              {bookings.length === 0 ? (
+                <p className="text-sm text-ink-500">No coaching bookings yet.</p>
+              ) : (
+                bookings.slice(0, 4).map((b) => {
+                  const canRequestRefund =
+                    b.paymentStatus === "paid" &&
+                    b.status !== "refund_requested" &&
+                    b.status !== "refund_pending" &&
+                    b.status !== "refunded";
+                  return (
+                    <div key={b.id} className="rounded-xl border border-ink-100 p-3">
+                      <p className="text-sm font-medium text-ink-900">
+                        {b.techArea} · with {b.coachName}
+                      </p>
+                      <p className="mt-0.5 text-xs text-ink-500">
+                        {formatDate(b.startsAt)} · ₹{b.amountInr} · {b.status}
+                      </p>
+                      {b.refundReason && (
+                        <p className="mt-1 text-xs text-ink-600">
+                          Refund reason: {b.refundReason}
+                        </p>
+                      )}
+                      {canRequestRefund && (
+                        <div className="mt-3 space-y-2">
+                          <textarea
+                            value={refundReasonById[b.id] ?? ""}
+                            onChange={(e) =>
+                              setRefundReasonById((prev) => ({
+                                ...prev,
+                                [b.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="Enter refund reason..."
+                            className="h-20 w-full rounded-lg border border-ink-200 px-3 py-2 text-xs outline-none ring-accent-500 focus:ring-2"
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void requestRefund(b.id)}
+                            disabled={refundLoadingId === b.id}
+                          >
+                            {refundLoadingId === b.id
+                              ? "Submitting..."
+                              : "Submit refund request"}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+              {refundError && <p className="text-xs text-danger-600">{refundError}</p>}
             </CardBody>
           </Card>
         </div>

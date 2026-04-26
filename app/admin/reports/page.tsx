@@ -6,7 +6,6 @@ import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
-import { store } from "@/lib/store";
 import type { InterviewReport } from "@/lib/question-engine";
 import { formatDate } from "@/lib/utils";
 import { FileText, Search } from "lucide-react";
@@ -16,7 +15,11 @@ export default function AdminReportsPage() {
   const [q, setQ] = useState("");
 
   useEffect(() => {
-    setReports(store.getReports());
+    void fetch("/api/reports", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setReports(d.reports);
+      });
   }, []);
 
   const filtered = useMemo(() => {

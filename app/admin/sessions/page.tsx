@@ -7,8 +7,6 @@ import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { useAdmin, AdminPageHeader } from "@/components/admin/AdminShell";
-import { store } from "@/lib/store";
-import { RECENT_SESSIONS } from "@/lib/mock-data";
 import type { InterviewReport } from "@/lib/question-engine";
 import { formatDate } from "@/lib/utils";
 import { Search, ExternalLink, Filter } from "lucide-react";
@@ -35,11 +33,15 @@ export default function AdminSessionsPage() {
   );
 
   useEffect(() => {
-    setReports(store.getReports());
+    void fetch("/api/reports", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setReports(d.reports);
+      });
   }, []);
 
   const rows: Row[] = useMemo(() => {
-    const live: Row[] = reports.map((r) => ({
+    return reports.map((r) => ({
       id: r.id,
       role: r.role,
       level: r.level,
@@ -50,17 +52,6 @@ export default function AdminSessionsPage() {
       startedAt: r.generatedAt,
       reportId: r.id,
     }));
-    const mock: Row[] = RECENT_SESSIONS.map((s) => ({
-      id: s.id,
-      role: s.role,
-      level: s.level,
-      candidate: s.candidate,
-      status: s.status as Row["status"],
-      score: s.score,
-      durationMin: s.durationMin,
-      startedAt: s.startedAt,
-    }));
-    return [...live, ...mock];
   }, [reports]);
 
   const filtered = rows.filter((r) => {

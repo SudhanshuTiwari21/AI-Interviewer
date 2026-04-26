@@ -1,5 +1,6 @@
 import { SiteHeader } from "@/components/marketing/SiteHeader";
 import { SiteFooter } from "@/components/marketing/SiteFooter";
+import { GlobalBanner } from "@/components/marketing/GlobalBanner";
 import { Hero } from "@/components/marketing/Hero";
 import { Features } from "@/components/marketing/Features";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
@@ -11,6 +12,7 @@ import { Cta } from "@/components/marketing/Cta";
 export default function HomePage() {
   return (
     <>
+      <GlobalBanner />
       <SiteHeader />
       <main>
         <Hero />

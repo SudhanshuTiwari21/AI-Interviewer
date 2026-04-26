@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { AdminPageHeader } from "@/components/admin/AdminShell";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Progress } from "@/components/ui/Progress";
-import { store } from "@/lib/store";
 import type { InterviewReport } from "@/lib/question-engine";
 
 type UserRow = { id: string };
@@ -16,7 +15,11 @@ export default function AdminConversionPage() {
   const [bookings, setBookings] = useState<BookingRow[]>([]);
 
   useEffect(() => {
-    setReports(store.getReports());
+    void fetch("/api/reports", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setReports(d.reports);
+      });
     void fetch("/api/admin/users?pageSize=200", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
