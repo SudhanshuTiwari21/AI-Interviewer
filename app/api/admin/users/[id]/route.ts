@@ -19,7 +19,7 @@ export const runtime = "nodejs";
 
 const Body = z.object({
   name: z.string().trim().min(1).max(120).optional(),
-  role: z.enum(["super_admin", "admin", "sub_admin", "user"]).optional(),
+  role: z.enum(["super_admin", "admin", "sub_admin", "coach", "user"]).optional(),
   status: z.enum(["active", "suspended"]).optional(),
 });
 

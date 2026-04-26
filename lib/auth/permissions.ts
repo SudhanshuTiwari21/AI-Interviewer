@@ -6,7 +6,7 @@
  * from this module so behavior cannot drift between layers.
  */
 
-export const ROLES = ["super_admin", "admin", "sub_admin", "user"] as const;
+export const ROLES = ["super_admin", "admin", "sub_admin", "coach", "user"] as const;
 export type Role = (typeof ROLES)[number];
 
 /** Strictly-ordered hierarchy. Higher index = lower privilege. */
@@ -14,7 +14,8 @@ const ROLE_RANK: Record<Role, number> = {
   super_admin: 0,
   admin: 1,
   sub_admin: 2,
-  user: 3,
+  coach: 3,
+  user: 4,
 };
 
 /**
@@ -123,10 +124,13 @@ const SUB_ADMIN_PERMISSIONS: Permission[] = [
   "settings.view",
 ];
 
+const COACH_PERMISSIONS: Permission[] = [];
+
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   super_admin: SUPER_ADMIN_PERMISSIONS,
   admin: ADMIN_PERMISSIONS,
   sub_admin: SUB_ADMIN_PERMISSIONS,
+  coach: COACH_PERMISSIONS,
   user: [],
 };
 
@@ -134,8 +138,17 @@ export function isAdminRole(role: string | null | undefined): boolean {
   return role === "super_admin" || role === "admin" || role === "sub_admin";
 }
 
+export function isCoachRole(role: string | null | undefined): boolean {
+  return role === "coach";
+}
+
 export function normalizeRole(role: string | null | undefined): Role {
-  if (role === "super_admin" || role === "admin" || role === "sub_admin") {
+  if (
+    role === "super_admin" ||
+    role === "admin" ||
+    role === "sub_admin" ||
+    role === "coach"
+  ) {
     return role;
   }
   // legacy: some accounts already exist with role "admin" — keep as-is.
@@ -191,6 +204,8 @@ export function roleLabel(role: Role | string | null | undefined): string {
       return "Sub Admin";
     case "user":
       return "User";
+    case "coach":
+      return "Coach";
     default:
       return "Unknown";
   }
@@ -206,6 +221,8 @@ export function roleTone(
       return "success";
     case "sub_admin":
       return "warn";
+    case "coach":
+      return "neutral";
     default:
       return "neutral";
   }

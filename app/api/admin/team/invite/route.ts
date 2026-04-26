@@ -5,7 +5,6 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { requirePermission } from "@/lib/auth/admin";
 import { db, schema } from "@/lib/db/client";
-import { hashPassword } from "@/lib/auth/password";
 import { canAssignRole, type Role } from "@/lib/auth/permissions";
 import { findUserByEmail, issueVerificationEmail } from "@/lib/auth/verification-service";
 import { recordAudit } from "@/lib/audit";
@@ -19,12 +18,6 @@ const Body = z.object({
   role: z.enum(["super_admin", "admin", "sub_admin"]),
 });
 
-/**
- * Creates an admin teammate. If the email already exists we just promote
- * (and re-send a verification email if needed). Otherwise a fresh row is
- * created with a random password — the invitee verifies via email and then
- * resets it through the normal flow.
- */
 export async function POST(req: Request) {
   const ctx = await requirePermission("team.invite");
   if (ctx instanceof NextResponse) return ctx;
@@ -56,58 +49,36 @@ export async function POST(req: Request) {
 
   const existing = await findUserByEmail(email);
 
-  if (existing) {
-    await db
-      .update(schema.users)
-      .set({ role, name, updatedAt: new Date() })
-      .where(eq(schema.users.id, existing.id));
-
-    if (!existing.emailVerified) {
-      await issueVerificationEmail({ userId: existing.id, email: existing.email, name });
-    }
-
-    await recordAudit(ctx, {
-      action: "team.promote",
-      targetType: "user",
-      targetId: existing.id,
-      metadata: { role, previousRole: existing.role },
-    });
-
-    return ok({ user: { id: existing.id, email, role }, status: "promoted" }, 200);
+  if (!existing) {
+    return fail(
+      "validation_error",
+      "This email is not registered yet. Ask this user to sign up first, then promote from team management.",
+      400,
+    );
   }
 
-  const tempPassword =
-    Math.random().toString(36).slice(2, 10) +
-    Math.random().toString(36).slice(2, 10).toUpperCase() +
-    "!";
-  const passwordHash = await hashPassword(tempPassword);
+  await db
+    .update(schema.users)
+    .set({ role, name, updatedAt: new Date() })
+    .where(eq(schema.users.id, existing.id));
 
-  const [created] = await db
-    .insert(schema.users)
-    .values({
-      email,
-      name,
-      role,
-      passwordHash,
-    })
-    .returning({ id: schema.users.id, email: schema.users.email });
-
-  if (!created) {
-    return fail("internal_error", "Could not create teammate.", 500);
+  if (!existing.emailVerified) {
+    await issueVerificationEmail({ userId: existing.id, email: existing.email, name });
   }
-
-  await issueVerificationEmail({
-    userId: created.id,
-    email: created.email,
-    name,
-  });
 
   await recordAudit(ctx, {
-    action: "team.invite",
+    action: "team.promote",
     targetType: "user",
-    targetId: created.id,
-    metadata: { role, email: created.email },
+    targetId: existing.id,
+    metadata: { role, previousRole: existing.role },
   });
 
-  return ok({ user: { id: created.id, email, role }, status: "invited" }, 201);
+  return ok(
+    {
+      user: { id: existing.id, email, role },
+      status: "promoted",
+      requiresEmailVerification: !existing.emailVerified,
+    },
+    200,
+  );
 }

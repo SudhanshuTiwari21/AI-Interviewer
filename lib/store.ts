@@ -16,7 +16,7 @@ export type User = {
   email: string;
   createdAt: string;
   plan?: Plan["id"] | "free";
-  role?: "user" | "sub_admin" | "admin" | "super_admin";
+  role?: "user" | "coach" | "sub_admin" | "admin" | "super_admin";
 };
 
 const KEYS = {

@@ -1,11 +1,14 @@
 import "server-only";
 
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { requirePermission } from "@/lib/auth/admin";
 import { fail, ok } from "@/lib/api/response";
 import { deleteCoach, listCoaches, upsertCoach } from "@/lib/server/coaches";
 import type { Coach } from "@/lib/coaches";
+import { db, schema } from "@/lib/db/client";
+import { findUserByEmail } from "@/lib/auth/verification-service";
 
 export const runtime = "nodejs";
 
@@ -49,8 +52,26 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return fail("validation_error", parsed.error.issues[0]?.message ?? "Invalid input", 400);
   }
-  await upsertCoach(parsed.data as Coach);
-  return ok({ saved: true });
+  const coach = parsed.data as Coach;
+  const existing = await findUserByEmail(coach.email);
+  if (!existing) {
+    return fail(
+      "validation_error",
+      "Coach email is not registered. Ask this user to sign up first, then add as coach.",
+      400,
+    );
+  }
+  await upsertCoach(coach);
+  if (existing.role !== "coach") {
+    await db
+      .update(schema.users)
+      .set({
+        role: "coach",
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, existing.id));
+  }
+  return ok({ saved: true, promotedCoach: true, requiresEmailVerification: !existing.emailVerified });
 }
 
 export async function DELETE(req: Request) {
@@ -59,6 +80,20 @@ export async function DELETE(req: Request) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
   if (!id) return fail("validation_error", "Coach id is required.", 400);
+  const coaches = await listCoaches();
+  const coach = coaches.find((x) => x.id === id);
   await deleteCoach(id);
+  if (coach?.email) {
+    const existing = await findUserByEmail(coach.email);
+    if (existing?.role === "coach") {
+      await db
+        .update(schema.users)
+        .set({
+          role: "user",
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, existing.id));
+    }
+  }
   return ok({ deleted: true });
 }

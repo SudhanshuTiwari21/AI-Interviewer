@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 const Query = z.object({
   q: z.string().trim().optional(),
   role: z
-    .enum(["super_admin", "admin", "sub_admin", "user", "all"])
+    .enum(["super_admin", "admin", "sub_admin", "coach", "user", "all"])
     .optional()
     .default("all"),
   status: z.enum(["active", "suspended", "all"]).optional().default("all"),

@@ -37,7 +37,7 @@ type AdminUserRow = {
   createdAt: string;
 };
 
-const ROLE_OPTIONS: Role[] = ["super_admin", "admin", "sub_admin", "user"];
+const ROLE_OPTIONS: Role[] = ["super_admin", "admin", "sub_admin", "coach", "user"];
 
 export default function AdminUsersPage() {
   const { user: me, has } = useAdmin();

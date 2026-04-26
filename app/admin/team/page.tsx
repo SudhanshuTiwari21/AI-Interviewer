@@ -22,6 +22,7 @@ import {
   Loader2,
   AlertTriangle,
   CheckCircle2,
+  Trash2,
 } from "lucide-react";
 
 type TeamRow = {
@@ -93,10 +94,9 @@ export default function AdminTeamPage() {
       }
       setSubmitMsg({
         type: "ok",
-        text:
-          data.status === "promoted"
-            ? `Promoted ${form.email} to ${roleLabel(form.role)}.`
-            : `Invitation sent to ${form.email}. They'll verify via email.`,
+        text: data.requiresEmailVerification
+          ? `Promoted ${form.email} to ${roleLabel(form.role)}. They must verify email before login.`
+          : `Promoted ${form.email} to ${roleLabel(form.role)}.`,
       });
       setForm({ name: "", email: "", role: "sub_admin" });
       void load();
@@ -104,6 +104,26 @@ export default function AdminTeamPage() {
       setSubmitMsg({ type: "err", text: "Network error." });
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function removeMember(member: TeamRow) {
+    if (member.id === me.id) {
+      setSubmitMsg({ type: "err", text: "You cannot delete your own account." });
+      return;
+    }
+    if (!confirm(`Remove ${member.email} from admin team?`)) return;
+    try {
+      const res = await fetch(`/api/admin/users/${member.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.ok) {
+        setSubmitMsg({ type: "err", text: data.message ?? "Could not remove teammate." });
+        return;
+      }
+      setSubmitMsg({ type: "ok", text: `${member.email} removed successfully.` });
+      await load();
+    } catch {
+      setSubmitMsg({ type: "err", text: "Network error while removing teammate." });
     }
   }
 
@@ -180,6 +200,17 @@ export default function AdminTeamPage() {
                       <Badge tone={u.status === "active" ? "success" : "danger"} dot>
                         {u.status}
                       </Badge>
+                      {has("team.remove") && u.id !== me.id && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-danger-600 hover:bg-danger-50 hover:text-danger-700"
+                          leftIcon={<Trash2 className="size-3.5" />}
+                          onClick={() => void removeMember(u)}
+                        >
+                          Remove
+                        </Button>
+                      )}
                       <span className="hidden text-xs text-ink-500 sm:inline">
                         Joined {formatDate(u.createdAt)}
                       </span>
@@ -216,8 +247,8 @@ export default function AdminTeamPage() {
           <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-2xl bg-white p-5 shadow-2xl sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl">
             <p className="text-sm font-semibold text-ink-900">Invite teammate</p>
             <p className="mt-1 text-xs text-ink-500">
-              We'll send a verification email. The invitee sets their password via the
-              standard sign-in flow.
+              Existing user emails only. If email is unverified, we'll resend
+              verification and promote role after that.
             </p>
             <form className="mt-4 space-y-3" onSubmit={submitInvite}>
               {submitMsg && (
@@ -276,7 +307,7 @@ export default function AdminTeamPage() {
                   Cancel
                 </Button>
                 <Button type="submit" size="sm" disabled={submitting}>
-                  {submitting ? "Sending…" : "Send invite"}
+                  {submitting ? "Promoting…" : "Promote user"}
                 </Button>
               </div>
             </form>

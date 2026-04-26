@@ -7,7 +7,7 @@ import { Logo } from "@/components/ui/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { store, type User } from "@/lib/store";
-import { isAdminRole } from "@/lib/auth/permissions";
+import { isAdminRole, isCoachRole } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -46,6 +46,10 @@ export function AppShell({
     const u = store.getUser();
     if (!u) {
       router.replace("/login");
+      return;
+    }
+    if (isCoachRole(u.role)) {
+      router.replace("/coach");
       return;
     }
     setUser(u);

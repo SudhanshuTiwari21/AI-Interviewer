@@ -18,6 +18,10 @@ type UnverifiedState = {
   info: string | null;
 };
 
+function isCoachRole(role: string | undefined) {
+  return role === "coach";
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -67,10 +71,14 @@ export default function LoginPage() {
       createdAt: new Date().toISOString(),
       plan: (res.user.plan as never) ?? "free",
       role:
-        (res.user.role as "user" | "sub_admin" | "admin" | "super_admin") ??
+        (res.user.role as "user" | "coach" | "sub_admin" | "admin" | "super_admin") ??
         "user",
     });
-    router.push(isAdminRole(res.user.role) ? "/admin" : "/dashboard");
+    if (isAdminRole(res.user.role)) {
+      router.push("/admin");
+      return;
+    }
+    router.push(isCoachRole(res.user.role) ? "/coach" : "/dashboard");
   }
 
   async function onResend() {
