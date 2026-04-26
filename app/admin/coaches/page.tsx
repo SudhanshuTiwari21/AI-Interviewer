@@ -73,7 +73,7 @@ export default function AdminCoachesPage() {
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
         title="Coaches"
-        description="Manage coach profiles and availability windows shown to candidates."
+        description="Manage coach profiles and availability windows shown to candidates. Session duration is fixed at 30 minutes."
         actions={
           canMutate && (
             <Button

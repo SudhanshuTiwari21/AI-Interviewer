@@ -14,6 +14,7 @@ import {
 } from "@/lib/email/templates/coaching";
 
 export const runtime = "nodejs";
+const COACHING_DURATION_MIN = 30;
 
 const Body = z.object({
   techArea: z.string().trim().min(2).max(120),
@@ -140,6 +141,7 @@ export async function POST(req: Request) {
       coachEmail: body.coachEmail,
       coachTimezone: body.coachTimezone,
       startsAt,
+      durationMin: COACHING_DURATION_MIN,
       amountInr: body.amountInr,
       paymentStatus: "paid",
       paymentTransactionId: body.paymentTransactionId,

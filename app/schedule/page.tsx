@@ -297,7 +297,7 @@ function ScheduleInner() {
             Coaching
           </Badge>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-            Book your one-hour coaching session.
+            Book your 30-minute coaching session.
           </h1>
           <p className="mt-3 text-sm text-ink-500">
             Choose your tech area, pay coaching fees, and request a coach slot.
@@ -331,7 +331,7 @@ function ScheduleInner() {
                       hour: "numeric",
                       minute: "2-digit",
                     })}{" "}
-                    · 60 min
+                    · 30 min
                   </Row>
                   <Row icon={<IndianRupee className="size-3.5" />}>
                     ₹{confirmed.amountInr} paid
@@ -521,7 +521,7 @@ function ScheduleInner() {
               <div className="flex flex-col items-stretch justify-between gap-3 border-t border-ink-100 bg-ink-50/50 px-5 py-4 sm:flex-row sm:items-center">
                 <p className="text-xs text-ink-500">
                   {selectedSlot
-                    ? `${formatDate(selectedSlot)} at ${new Date(selectedSlot).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} · 60 min · ₹${coach?.hourlyRateInr ?? 0}`
+                    ? `${formatDate(selectedSlot)} at ${new Date(selectedSlot).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} · 30 min · ₹${coach?.hourlyRateInr ?? 0}`
                     : "Pick a slot to continue"}
                 </p>
                 <div className="flex flex-col items-stretch gap-2">

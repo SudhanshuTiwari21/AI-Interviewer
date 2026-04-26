@@ -81,7 +81,7 @@ export const coachingBookings = pgTable(
     coachEmail: text("coach_email").notNull(),
     coachTimezone: text("coach_timezone").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
-    durationMin: integer("duration_min").notNull().default(60),
+    durationMin: integer("duration_min").notNull().default(30),
     amountInr: integer("amount_inr").notNull(),
     paymentStatus: text("payment_status").notNull().default("paid"),
     paymentTransactionId: uuid("payment_transaction_id"),
