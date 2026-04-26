@@ -8,6 +8,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { store, type Booking } from "@/lib/store";
+import { buildSlotsForCoach, type Coach } from "@/lib/coaches";
 import { cn, formatDate, uid } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -18,45 +19,6 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-
-const COACHES = [
-  {
-    id: "coach-1",
-    name: "Diana Park",
-    title: "Ex-Stripe, Senior Eng Manager",
-    rating: 4.9,
-    sessions: 312,
-    focus: ["System design", "Frontend", "Career"],
-  },
-  {
-    id: "coach-2",
-    name: "Marcus Lee",
-    title: "Ex-Meta, Staff Engineer",
-    rating: 4.8,
-    sessions: 248,
-    focus: ["Backend", "System design", "Behavioral"],
-  },
-  {
-    id: "coach-3",
-    name: "Sara Okonkwo",
-    title: "Ex-Notion, Group PM",
-    rating: 4.95,
-    sessions: 401,
-    focus: ["Product sense", "Leadership", "Storytelling"],
-  },
-];
-
-function buildSlots(date: Date): string[] {
-  const slots: string[] = [];
-  for (let h = 9; h <= 17; h++) {
-    for (const m of [0, 30]) {
-      const d = new Date(date);
-      d.setHours(h, m, 0, 0);
-      slots.push(d.toISOString());
-    }
-  }
-  return slots;
-}
 
 function startOfWeek(d: Date) {
   const date = new Date(d);
@@ -85,15 +47,22 @@ function ScheduleInner() {
   const search = useSearchParams();
   const reportId = search.get("reportId");
 
-  const [coachId, setCoachId] = useState(COACHES[0]!.id);
+  const [coaches, setCoaches] = useState<Coach[]>([]);
+  const [coachId, setCoachId] = useState<string>("");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<Booking | null>(null);
 
   useEffect(() => {
-    if (!store.getUser()) router.replace("/login?next=/schedule");
-  }, [router]);
+    if (!store.getUser()) {
+      router.replace("/login?next=/schedule");
+      return;
+    }
+    const all = store.getCoaches().filter((c) => c.active);
+    setCoaches(all);
+    if (!coachId && all[0]) setCoachId(all[0].id);
+  }, [coachId, router]);
 
   const days = useMemo(() => {
     return Array.from({ length: 5 }, (_, i) => {
@@ -107,11 +76,24 @@ function ScheduleInner() {
     if (!selectedDay) setSelectedDay(days[0] ?? null);
   }, [days, selectedDay]);
 
-  const slots = selectedDay ? buildSlots(selectedDay) : [];
-  const coach = COACHES.find((c) => c.id === coachId)!;
+  const coach = coaches.find((c) => c.id === coachId) ?? null;
+  const bookedSet = useMemo(
+    () =>
+      new Set(
+        store
+          .getBookings()
+          .filter((b) => b.coachName === coach?.name)
+          .map((b) => b.startsAt),
+      ),
+    [coach?.name],
+  );
+  const slots =
+    selectedDay && coach
+      ? buildSlotsForCoach(coach, selectedDay).filter((s) => !bookedSet.has(s))
+      : [];
 
   function confirm() {
-    if (!selectedSlot) return;
+    if (!selectedSlot || !coach) return;
     const booking: Booking = {
       id: uid("bk"),
       coachName: coach.name,
@@ -123,6 +105,31 @@ function ScheduleInner() {
     };
     store.saveBooking(booking);
     setConfirmed(booking);
+  }
+
+  if (coaches.length === 0) {
+    return (
+      <div className="min-h-screen bg-ink-50/40">
+        <header className="border-b border-ink-100 bg-white">
+          <div className="container flex h-16 max-w-6xl items-center justify-between">
+            <Logo />
+            <Button href="/dashboard" variant="ghost" size="sm" leftIcon={<ArrowLeft className="size-4" />}>
+              Back to dashboard
+            </Button>
+          </div>
+        </header>
+        <main className="container max-w-3xl px-4 py-16">
+          <Card>
+            <CardBody className="text-center">
+              <h1 className="text-xl font-semibold text-ink-900">No coaches available</h1>
+              <p className="mt-2 text-sm text-ink-500">
+                Admin has not added any active coaches yet. Please check back later.
+              </p>
+            </CardBody>
+          </Card>
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -214,7 +221,7 @@ function ScheduleInner() {
               <p className="px-1 text-xs font-medium uppercase tracking-wide text-ink-400">
                 Choose a coach
               </p>
-              {COACHES.map((c) => (
+              {coaches.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => setCoachId(c.id)}
@@ -254,7 +261,7 @@ function ScheduleInner() {
             <Card>
               <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
                 <p className="text-sm font-semibold text-ink-900">
-                  {coach.name}'s availability
+                  {coach?.name}'s availability
                 </p>
                 <div className="flex items-center gap-1">
                   <button
@@ -366,10 +373,10 @@ function ScheduleInner() {
 function Row({
   icon,
   children,
-}: {
+}: Readonly<{
   icon: React.ReactNode;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className="flex items-center gap-2 text-ink-600">
       <span className="text-ink-400">{icon}</span>

@@ -39,7 +39,7 @@ export function Logo({
           )}
           style={{ fontSize: wordmarkSize, letterSpacing: "-0.02em" }}
         >
-          Selectwise
+          SelectWise
         </span>
       )}
     </span>

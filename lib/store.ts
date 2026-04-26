@@ -8,6 +8,7 @@
 
 import type { InterviewConfig, InterviewReport } from "./question-engine";
 import type { Plan } from "./mock-data";
+import { DEFAULT_COACHES, type Coach } from "./coaches";
 
 export type User = {
   id: string;
@@ -23,10 +24,11 @@ const KEYS = {
   reports: "hiro.reports",
   config: "hiro.config",
   bookings: "hiro.bookings",
+  coaches: "hiro.coaches",
 } as const;
 
 function safeGet<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
+  if (globalThis.window === undefined) return fallback;
   try {
     const raw = localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as T) : fallback;
@@ -36,7 +38,7 @@ function safeGet<T>(key: string, fallback: T): T {
 }
 
 function safeSet(key: string, value: unknown) {
-  if (typeof window === "undefined") return;
+  if (globalThis.window === undefined) return;
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {
@@ -50,7 +52,8 @@ export const store = {
   },
   setUser(user: User | null) {
     if (user) safeSet(KEYS.user, user);
-    else if (typeof window !== "undefined") localStorage.removeItem(KEYS.user);
+    else if (globalThis.window !== undefined)
+      localStorage.removeItem(KEYS.user);
   },
   getReports(): InterviewReport[] {
     return safeGet<InterviewReport[]>(KEYS.reports, []);
@@ -74,6 +77,35 @@ export const store = {
   saveBooking(b: Booking) {
     const all = store.getBookings();
     safeSet(KEYS.bookings, [b, ...all]);
+  },
+  getCoaches(): Coach[] {
+    const saved = safeGet<Coach[] | null>(KEYS.coaches, null);
+    if (!saved || saved.length === 0) {
+      safeSet(KEYS.coaches, DEFAULT_COACHES);
+      return DEFAULT_COACHES;
+    }
+    return saved;
+  },
+  setCoaches(coaches: Coach[]) {
+    safeSet(KEYS.coaches, coaches);
+  },
+  upsertCoach(coach: Coach) {
+    const all = store.getCoaches();
+    const idx = all.findIndex((c) => c.id === coach.id);
+    if (idx === -1) {
+      safeSet(KEYS.coaches, [coach, ...all]);
+      return;
+    }
+    const next = [...all];
+    next[idx] = coach;
+    safeSet(KEYS.coaches, next);
+  },
+  deleteCoach(id: string) {
+    const all = store.getCoaches();
+    safeSet(
+      KEYS.coaches,
+      all.filter((c) => c.id !== id),
+    );
   },
 };
 
