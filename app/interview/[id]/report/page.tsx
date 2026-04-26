@@ -404,22 +404,12 @@ export default function ReportPage() {
               </div>
             </Card>
 
-            <div className="rounded-2xl border border-ink-200 bg-white p-4 text-xs text-ink-500">
-              <p className="font-medium text-ink-900">Shared with</p>
-              <ul className="mt-2 space-y-1">
-                <li>• {report.email} (you)</li>
-                <li>• admin@hiro.app</li>
-              </ul>
-              <p className="mt-3">
-                Report ID: <span className="font-mono">{report.id}</span>
-              </p>
-              <Link
-                href="/dashboard/reports"
-                className="mt-3 inline-block text-ink-700 underline"
-              >
-                Back to all reports
-              </Link>
-            </div>
+            <Link
+              href="/dashboard/reports"
+              className="inline-block text-xs text-ink-700 underline"
+            >
+              Back to all reports
+            </Link>
           </aside>
         </div>
       </main>
