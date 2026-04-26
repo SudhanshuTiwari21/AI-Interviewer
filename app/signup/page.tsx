@@ -34,6 +34,8 @@ function SignupInner() {
   const router = useRouter();
   const search = useSearchParams();
   const next = search.get("next");
+  const leadSourceFromUrl =
+    search.get("utm_source") ?? search.get("source") ?? "direct";
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -58,6 +60,7 @@ function SignupInner() {
       name: name.trim(),
       email: email.trim(),
       password,
+      leadSource: leadSourceFromUrl,
     });
     setLoading(false);
 

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { store } from "@/lib/store";
 import { authClient } from "@/lib/auth/client";
+import { isAdminRole } from "@/lib/auth/permissions";
 import { AlertTriangle, Lock, Mail } from "lucide-react";
 
 type UnverifiedState = {
@@ -65,9 +66,11 @@ export default function LoginPage() {
       email: res.user.email,
       createdAt: new Date().toISOString(),
       plan: (res.user.plan as never) ?? "free",
-      role: (res.user.role as "user" | "admin") ?? "user",
+      role:
+        (res.user.role as "user" | "sub_admin" | "admin" | "super_admin") ??
+        "user",
     });
-    router.push("/dashboard");
+    router.push(isAdminRole(res.user.role) ? "/admin" : "/dashboard");
   }
 
   async function onResend() {

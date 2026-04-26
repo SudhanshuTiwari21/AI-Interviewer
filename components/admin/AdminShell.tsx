@@ -1,0 +1,318 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { Logo } from "@/components/ui/Logo";
+import { Avatar } from "@/components/ui/Avatar";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/utils";
+import {
+  hasPermission,
+  isAdminRole,
+  normalizeRole,
+  roleLabel,
+  roleTone,
+  type Permission,
+  type Role,
+} from "@/lib/auth/permissions";
+import {
+  LayoutDashboard,
+  Users,
+  ShieldCheck,
+  GraduationCap,
+  Activity,
+  FileText,
+  CreditCard,
+  RotateCcw,
+  PieChart,
+  Filter,
+  MousePointerClick,
+  CalendarClock,
+  Settings,
+  ScrollText,
+  ArrowLeft,
+  LogOut,
+  Menu,
+  X,
+} from "lucide-react";
+
+type AdminUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+};
+
+type AdminCtx = {
+  user: AdminUser;
+  has: (p: Permission) => boolean;
+};
+
+const AdminContext = createContext<AdminCtx | null>(null);
+
+export function useAdmin(): AdminCtx {
+  const ctx = useContext(AdminContext);
+  if (!ctx) {
+    throw new Error("useAdmin must be called inside <AdminShell />");
+  }
+  return ctx;
+}
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  permission: Permission;
+};
+
+const NAV: NavItem[] = [
+  { href: "/admin", label: "Overview", icon: LayoutDashboard, permission: "overview.view" },
+  { href: "/admin/users", label: "Users", icon: Users, permission: "users.view" },
+  { href: "/admin/team", label: "Admin team", icon: ShieldCheck, permission: "team.view" },
+  { href: "/admin/coaches", label: "Coaches", icon: GraduationCap, permission: "coaches.view" },
+  { href: "/admin/sessions", label: "Sessions", icon: Activity, permission: "sessions.view" },
+  { href: "/admin/reports", label: "Reports", icon: FileText, permission: "reports.view" },
+  { href: "/admin/bookings", label: "Bookings", icon: CalendarClock, permission: "bookings.view" },
+  { href: "/admin/payments", label: "Payments", icon: CreditCard, permission: "payments.view" },
+  { href: "/admin/refunds", label: "Refunds", icon: RotateCcw, permission: "refunds.view" },
+  { href: "/admin/analytics", label: "Freshers vs Pros", icon: PieChart, permission: "analytics.freshers_vs_professionals" },
+  { href: "/admin/conversion", label: "Conversion", icon: Filter, permission: "analytics.conversion" },
+  { href: "/admin/lead-sources", label: "Lead sources", icon: MousePointerClick, permission: "analytics.lead_sources" },
+  { href: "/admin/settings", label: "Settings", icon: Settings, permission: "settings.view" },
+  { href: "/admin/audit", label: "Audit log", icon: ScrollText, permission: "audit.view" },
+];
+
+export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [user, setUser] = useState<AdminUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        const data = await res.json();
+        if (cancelled) return;
+        const u = data?.user;
+        if (!u || !isAdminRole(u.role)) {
+          router.replace("/dashboard");
+          return;
+        }
+        setUser({ id: u.id, email: u.email, name: u.name, role: normalizeRole(u.role) });
+      } catch {
+        router.replace("/login?next=/admin");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  const ctxValue = useMemo<AdminCtx | null>(() => {
+    if (!user) return null;
+    return {
+      user,
+      has: (p) => hasPermission(user.role, p),
+    };
+  }, [user]);
+
+  if (loading || !user || !ctxValue) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-sm text-ink-500">
+        Loading admin…
+      </div>
+    );
+  }
+
+  const visibleNav = NAV.filter((item) => ctxValue.has(item.permission));
+
+  return (
+    <AdminContext.Provider value={ctxValue}>
+      <div className="grid min-h-screen lg:grid-cols-[260px,1fr]">
+        <aside className="hidden flex-col border-r border-ink-100 bg-white lg:flex">
+          <SidebarBody
+            user={user}
+            pathname={pathname}
+            visibleNav={visibleNav}
+            onSignOut={() => router.push("/dashboard")}
+          />
+        </aside>
+
+        {/* Mobile drawer */}
+        {mobileOpen && (
+          <div className="fixed inset-0 z-40 lg:hidden">
+            <button
+              aria-label="Close menu"
+              className="absolute inset-0 bg-ink-900/40"
+              onClick={() => setMobileOpen(false)}
+            />
+            <div className="absolute inset-y-0 left-0 flex w-72 max-w-[80vw] flex-col bg-white shadow-xl">
+              <div className="flex items-center justify-between px-4 py-3">
+                <Logo size={26} />
+                <button
+                  onClick={() => setMobileOpen(false)}
+                  className="rounded-lg p-2 text-ink-500 hover:bg-ink-100"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+              <SidebarBody
+                user={user}
+                pathname={pathname}
+                visibleNav={visibleNav}
+                onSignOut={() => router.push("/dashboard")}
+                hideHeader
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex min-h-screen flex-col bg-ink-50/40">
+          <header className="flex h-14 items-center justify-between gap-3 border-b border-ink-100 bg-white px-4 lg:hidden">
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="rounded-lg p-2 text-ink-700 hover:bg-ink-100"
+              aria-label="Open menu"
+            >
+              <Menu className="size-5" />
+            </button>
+            <Logo size={24} />
+            <Badge tone={roleTone(user.role)} dot>
+              {roleLabel(user.role)}
+            </Badge>
+          </header>
+          <main className="flex-1 px-4 py-6 lg:px-8 lg:py-10">{children}</main>
+        </div>
+      </div>
+    </AdminContext.Provider>
+  );
+}
+
+function SidebarBody({
+  user,
+  pathname,
+  visibleNav,
+  onSignOut,
+  hideHeader,
+}: Readonly<{
+  user: AdminUser;
+  pathname: string;
+  visibleNav: NavItem[];
+  onSignOut: () => void;
+  hideHeader?: boolean;
+}>) {
+  return (
+    <>
+      {!hideHeader && (
+        <div className="flex h-16 items-center justify-between px-6">
+          <Logo />
+          <Badge tone={roleTone(user.role)} dot>
+            {roleLabel(user.role)}
+          </Badge>
+        </div>
+      )}
+      <div className="px-4 pb-2 pt-2">
+        <Button
+          href="/dashboard"
+          size="sm"
+          variant="outline"
+          className="w-full"
+          leftIcon={<ArrowLeft className="size-4" />}
+        >
+          Back to app
+        </Button>
+      </div>
+      <nav className="mt-2 flex-1 space-y-0.5 overflow-y-auto px-3">
+        {visibleNav.map((item) => (
+          <NavLink
+            key={item.href}
+            href={item.href}
+            label={item.label}
+            icon={item.icon}
+            active={isActive(pathname, item.href)}
+          />
+        ))}
+      </nav>
+      <div className="border-t border-ink-100 p-3">
+        <div className="flex items-center gap-3 rounded-xl px-2 py-2">
+          <Avatar name={user.name} size="sm" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-ink-900">{user.name}</p>
+            <p className="truncate text-xs text-ink-500">{user.email}</p>
+          </div>
+          <button
+            title="Back to dashboard"
+            onClick={onSignOut}
+            className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
+          >
+            <LogOut className="size-4" />
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function NavLink({
+  href,
+  label,
+  icon: Icon,
+  active,
+}: Readonly<{
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  active: boolean;
+}>) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+        active
+          ? "bg-ink-900 text-white"
+          : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
+      )}
+    >
+      <Icon className="size-4" />
+      {label}
+    </Link>
+  );
+}
+
+function isActive(pathname: string, href: string) {
+  if (href === "/admin") return pathname === "/admin";
+  return pathname.startsWith(href);
+}
+
+export function AdminPageHeader({
+  title,
+  description,
+  actions,
+}: Readonly<{
+  title: string;
+  description?: string;
+  actions?: React.ReactNode;
+}>) {
+  return (
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-ink-900">{title}</h1>
+        {description && <p className="mt-1 text-sm text-ink-500">{description}</p>}
+      </div>
+      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+    </div>
+  );
+}

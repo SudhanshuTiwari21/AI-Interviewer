@@ -16,7 +16,7 @@ export type User = {
   email: string;
   createdAt: string;
   plan?: Plan["id"] | "free";
-  role?: "user" | "admin";
+  role?: "user" | "sub_admin" | "admin" | "super_admin";
 };
 
 const KEYS = {
@@ -44,6 +44,16 @@ function safeSet(key: string, value: unknown) {
   } catch {
     /* quota or serialization issue - ignore for MVP */
   }
+}
+
+function normalizeCoach(raw: Coach): Coach {
+  return {
+    ...raw,
+    email: raw.email ?? `${raw.id}@selectwise.app`,
+    techAreas:
+      raw.techAreas && raw.techAreas.length > 0 ? raw.techAreas : raw.focus ?? [],
+    hourlyRateInr: raw.hourlyRateInr ?? 999,
+  };
 }
 
 export const store = {
@@ -78,13 +88,22 @@ export const store = {
     const all = store.getBookings();
     safeSet(KEYS.bookings, [b, ...all]);
   },
+  deleteBooking(id: string) {
+    const all = store.getBookings();
+    safeSet(
+      KEYS.bookings,
+      all.filter((b) => b.id !== id),
+    );
+  },
   getCoaches(): Coach[] {
     const saved = safeGet<Coach[] | null>(KEYS.coaches, null);
     if (!saved || saved.length === 0) {
       safeSet(KEYS.coaches, DEFAULT_COACHES);
       return DEFAULT_COACHES;
     }
-    return saved;
+    const normalized = saved.map((c) => normalizeCoach(c));
+    safeSet(KEYS.coaches, normalized);
+    return normalized;
   },
   setCoaches(coaches: Coach[]) {
     safeSet(KEYS.coaches, coaches);

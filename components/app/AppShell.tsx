@@ -7,6 +7,7 @@ import { Logo } from "@/components/ui/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
 import { store, type User } from "@/lib/store";
+import { isAdminRole } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -60,7 +61,7 @@ export function AppShell({
 
   const mobileNav = [
     ...NAV,
-    ...(user.role === "admin"
+    ...(isAdminRole(user.role)
       ? [{ href: "/admin", label: "Admin", icon: ShieldCheck }]
       : []),
   ];
@@ -90,7 +91,7 @@ export function AppShell({
             />
           ))}
           <div className="my-4 h-px bg-ink-100" />
-          {user.role === "admin" && (
+          {isAdminRole(user.role) && (
             <NavLink
               href="/admin"
               label="Admin"

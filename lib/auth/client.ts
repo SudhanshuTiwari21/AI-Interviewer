@@ -48,7 +48,12 @@ async function postJson<T extends Record<string, unknown>>(
 }
 
 export const authClient = {
-  signup(input: { name: string; email: string; password: string }) {
+  signup(input: {
+    name: string;
+    email: string;
+    password: string;
+    leadSource?: string;
+  }) {
     return postJson<{
       status: "verification_sent" | "verification_resent";
       message: string;

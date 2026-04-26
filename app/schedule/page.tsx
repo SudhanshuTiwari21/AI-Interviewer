@@ -1,13 +1,13 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { store, type Booking } from "@/lib/store";
+import { store } from "@/lib/store";
 import { buildSlotsForCoach, type Coach } from "@/lib/coaches";
 import { cn, formatDate, uid } from "@/lib/utils";
 import {
@@ -15,9 +15,10 @@ import {
   CalendarClock,
   CheckCircle2,
   Globe,
-  Video,
   ChevronLeft,
   ChevronRight,
+  IndianRupee,
+  AlertTriangle,
 } from "lucide-react";
 
 function startOfWeek(d: Date) {
@@ -44,15 +45,22 @@ export default function SchedulePage() {
 
 function ScheduleInner() {
   const router = useRouter();
-  const search = useSearchParams();
-  const reportId = search.get("reportId");
 
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [coachId, setCoachId] = useState<string>("");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState<Booking | null>(null);
+  const [selectedTechArea, setSelectedTechArea] = useState<string>("");
+  const [confirmed, setConfirmed] = useState<{
+    id: string;
+    coachName: string;
+    techArea: string;
+    startsAt: string;
+    amountInr: number;
+  } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!store.getUser()) {
@@ -76,35 +84,89 @@ function ScheduleInner() {
     if (!selectedDay) setSelectedDay(days[0] ?? null);
   }, [days, selectedDay]);
 
-  const coach = coaches.find((c) => c.id === coachId) ?? null;
-  const bookedSet = useMemo(
-    () =>
-      new Set(
-        store
-          .getBookings()
-          .filter((b) => b.coachName === coach?.name)
-          .map((b) => b.startsAt),
-      ),
-    [coach?.name],
-  );
+  const techAreas = useMemo(() => {
+    const all = new Set<string>();
+    coaches.forEach((c) => c.techAreas.forEach((x) => all.add(x)));
+    return Array.from(all).sort((a, b) => a.localeCompare(b));
+  }, [coaches]);
+
+  useEffect(() => {
+    if (!selectedTechArea && techAreas[0]) setSelectedTechArea(techAreas[0]);
+  }, [selectedTechArea, techAreas]);
+
+  const filteredCoaches = useMemo(() => {
+    if (!selectedTechArea) return coaches;
+    return coaches.filter((c) => c.techAreas.includes(selectedTechArea));
+  }, [coaches, selectedTechArea]);
+
+  useEffect(() => {
+    if (!filteredCoaches.some((c) => c.id === coachId)) {
+      setCoachId(filteredCoaches[0]?.id ?? "");
+    }
+  }, [coachId, filteredCoaches]);
+
+  const coach = filteredCoaches.find((c) => c.id === coachId) ?? null;
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadBooked() {
+      if (!coach?.id) return;
+      const res = await fetch("/api/coaching/bookings", { cache: "no-store" });
+      const data = await res.json();
+      if (!cancelled && data.ok) {
+        const taken = (data.bookings as Array<{ coachId: string; startsAt: string; status: string }>)
+          .filter((b) => b.coachId === coach.id && b.status !== "cancelled" && b.status !== "rejected")
+          .map((b) => new Date(b.startsAt).toISOString());
+        setBookedSlots(taken);
+      }
+    }
+    void loadBooked();
+    return () => {
+      cancelled = true;
+    };
+  }, [coach?.id]);
+  const bookedSet = useMemo(() => new Set(bookedSlots), [bookedSlots]);
   const slots =
     selectedDay && coach
       ? buildSlotsForCoach(coach, selectedDay).filter((s) => !bookedSet.has(s))
       : [];
 
-  function confirm() {
-    if (!selectedSlot || !coach) return;
-    const booking: Booking = {
-      id: uid("bk"),
-      coachName: coach.name,
-      topic: reportId ? `Coaching on report ${reportId}` : "1-hour interview coaching",
-      startsAt: selectedSlot,
-      durationMin: 60,
-      meetingUrl: "https://meet.google.com/apx-mock-coaching",
-      calendarProvider: "google",
-    };
-    store.saveBooking(booking);
-    setConfirmed(booking);
+  async function confirm() {
+    if (!selectedSlot || !coach || !selectedTechArea) return;
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const res = await fetch("/api/coaching/bookings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          techArea: selectedTechArea,
+          coachId: coach.id,
+          coachName: coach.name,
+          coachEmail: coach.email,
+          coachTimezone: coach.timezone,
+          startsAt: selectedSlot,
+          amountInr: coach.hourlyRateInr,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setError(data.message ?? "Could not create coaching booking.");
+        return;
+      }
+      setConfirmed({
+        id: data.booking.id ?? uid("cb"),
+        coachName: coach.name,
+        techArea: selectedTechArea,
+        startsAt: selectedSlot,
+        amountInr: coach.hourlyRateInr,
+      });
+      setSelectedSlot(null);
+    } catch {
+      setError("Network error while creating booking.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (coaches.length === 0) {
@@ -157,7 +219,7 @@ function ScheduleInner() {
             Book your one-hour coaching session.
           </h1>
           <p className="mt-3 text-sm text-ink-500">
-            Bookings sync to Google Calendar instantly. Reschedule any time.
+            Choose your tech area, pay coaching fees, and request a coach slot.
           </p>
         </div>
 
@@ -167,11 +229,9 @@ function ScheduleInner() {
               <span className="mx-auto inline-flex size-12 items-center justify-center rounded-full bg-success-50 text-success-600">
                 <CheckCircle2 className="size-6" />
               </span>
-              <h2 className="mt-4 text-lg font-semibold text-ink-900">
-                You're booked.
-              </h2>
+              <h2 className="mt-4 text-lg font-semibold text-ink-900">Request sent.</h2>
               <p className="mt-1 text-sm text-ink-500">
-                A Google Calendar invite is on its way to your inbox.
+                Coach and admin have been notified. Once the coach approves, you and admin will get a confirmation email.
               </p>
               <div className="mt-5 rounded-xl border border-ink-100 bg-ink-50/50 p-4 text-left text-sm">
                 <div className="flex items-center gap-3">
@@ -180,7 +240,7 @@ function ScheduleInner() {
                     <p className="font-medium text-ink-900">
                       {confirmed.coachName}
                     </p>
-                    <p className="text-xs text-ink-500">{confirmed.topic}</p>
+                    <p className="text-xs text-ink-500">{confirmed.techArea} coaching</p>
                   </div>
                 </div>
                 <dl className="mt-4 space-y-1.5 text-xs">
@@ -192,11 +252,11 @@ function ScheduleInner() {
                     })}{" "}
                     · 60 min
                   </Row>
-                  <Row icon={<Video className="size-3.5" />}>
-                    {confirmed.meetingUrl}
+                  <Row icon={<IndianRupee className="size-3.5" />}>
+                    ₹{confirmed.amountInr} paid
                   </Row>
                   <Row icon={<Globe className="size-3.5" />}>
-                    Google Calendar · added to {store.getUser()?.email}
+                    Booking ID · {confirmed.id}
                   </Row>
                 </dl>
               </div>
@@ -219,9 +279,34 @@ function ScheduleInner() {
           <div className="mt-10 grid gap-6 lg:grid-cols-[260px,1fr]">
             <div className="space-y-3">
               <p className="px-1 text-xs font-medium uppercase tracking-wide text-ink-400">
+                Tech area
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {techAreas.map((area) => {
+                  const active = area === selectedTechArea;
+                  return (
+                    <button
+                      key={area}
+                      onClick={() => {
+                        setSelectedTechArea(area);
+                        setSelectedSlot(null);
+                      }}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-xs",
+                        active
+                          ? "border-ink-900 bg-ink-900 text-white"
+                          : "border-ink-200 bg-white text-ink-700",
+                      )}
+                    >
+                      {area}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="px-1 text-xs font-medium uppercase tracking-wide text-ink-400">
                 Choose a coach
               </p>
-              {coaches.map((c) => (
+              {filteredCoaches.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => setCoachId(c.id)}
@@ -252,7 +337,7 @@ function ScheduleInner() {
                     ))}
                   </div>
                   <p className="mt-3 text-xs text-ink-500">
-                    ★ {c.rating} · {c.sessions} sessions
+                    ★ {c.rating} · {c.sessions} sessions · ₹{c.hourlyRateInr}/hour
                   </p>
                 </button>
               ))}
@@ -355,12 +440,20 @@ function ScheduleInner() {
               <div className="flex flex-col items-stretch justify-between gap-3 border-t border-ink-100 bg-ink-50/50 px-5 py-4 sm:flex-row sm:items-center">
                 <p className="text-xs text-ink-500">
                   {selectedSlot
-                    ? `${formatDate(selectedSlot)} at ${new Date(selectedSlot).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} · 60 min · Google Meet`
+                    ? `${formatDate(selectedSlot)} at ${new Date(selectedSlot).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} · 60 min · ₹${coach?.hourlyRateInr ?? 0}`
                     : "Pick a slot to continue"}
                 </p>
-                <Button onClick={confirm} disabled={!selectedSlot}>
-                  Confirm booking
-                </Button>
+                <div className="flex flex-col items-stretch gap-2">
+                  {error && (
+                    <p className="text-xs text-danger-600">
+                      <AlertTriangle className="mr-1 inline size-3.5" />
+                      {error}
+                    </p>
+                  )}
+                  <Button onClick={confirm} disabled={!selectedSlot || isSubmitting}>
+                    {isSubmitting ? "Processing payment..." : "Pay & request booking"}
+                  </Button>
+                </div>
               </div>
             </Card>
           </div>

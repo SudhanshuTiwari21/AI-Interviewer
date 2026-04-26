@@ -16,6 +16,7 @@ const Body = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
   password: z.string().min(8, "Password must be at least 8 characters").max(200),
+  leadSource: z.string().trim().max(80).optional().default("direct"),
 });
 
 export async function POST(req: Request) {
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { name, email, password } = parsed.data;
+  const { name, email, password, leadSource } = parsed.data;
 
   try {
     const existing = await findUserByEmail(email);
@@ -51,6 +52,7 @@ export async function POST(req: Request) {
         .set({
           name,
           passwordHash,
+          leadSource,
           updatedAt: new Date(),
         })
         .where(eq(schema.users.id, existing.id));
@@ -72,7 +74,7 @@ export async function POST(req: Request) {
       );
     }
 
-    if (existing && existing.emailVerified) {
+    if (existing?.emailVerified) {
       return fail(
         "email_already_registered",
         "An account with this email already exists. Please sign in instead.",
@@ -87,6 +89,7 @@ export async function POST(req: Request) {
         email,
         name,
         passwordHash,
+        leadSource,
       })
       .returning({
         id: schema.users.id,

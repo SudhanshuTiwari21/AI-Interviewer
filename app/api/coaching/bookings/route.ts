@@ -1,0 +1,159 @@
+import "server-only";
+
+import { createHash, randomBytes } from "node:crypto";
+import { and, desc, eq } from "drizzle-orm";
+import { z } from "zod";
+import { db, schema } from "@/lib/db/client";
+import { fail, ok } from "@/lib/api/response";
+import { getSessionFromCookie } from "@/lib/auth/session";
+import { findUserById } from "@/lib/auth/verification-service";
+import { sendMail } from "@/lib/email/transporter";
+import {
+  coachingRequestEmailToAdmin,
+  coachingRequestEmailToCoach,
+} from "@/lib/email/templates/coaching";
+
+export const runtime = "nodejs";
+
+const Body = z.object({
+  techArea: z.string().trim().min(2).max(120),
+  coachId: z.string().trim().min(2),
+  coachName: z.string().trim().min(2),
+  coachEmail: z.string().trim().email(),
+  coachTimezone: z.string().trim().min(2).max(100),
+  startsAt: z.string().datetime(),
+  amountInr: z.number().int().positive(),
+});
+
+function hashToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function baseUrl() {
+  return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+}
+
+export async function GET() {
+  const session = await getSessionFromCookie();
+  if (!session) return ok({ bookings: [] });
+  const me = await findUserById(session.sub);
+  if (!me) return ok({ bookings: [] });
+
+  const isAdmin =
+    me.role === "admin" || me.role === "super_admin" || me.role === "sub_admin";
+  const where = isAdmin
+    ? undefined
+    : eq(schema.coachingBookings.candidateUserId, me.id);
+
+  const q = db
+    .select()
+    .from(schema.coachingBookings)
+    .orderBy(desc(schema.coachingBookings.createdAt));
+  const rows = where ? await q.where(where).limit(200) : await q.limit(200);
+  return ok({ bookings: rows });
+}
+
+export async function POST(req: Request) {
+  const session = await getSessionFromCookie();
+  if (!session) return fail("invalid_credentials", "Please sign in first.", 401);
+  const me = await findUserById(session.sub);
+  if (!me || !me.emailVerified)
+    return fail("invalid_credentials", "Please sign in first.", 401);
+
+  let json: unknown;
+  try {
+    json = await req.json();
+  } catch {
+    return fail("validation_error", "Invalid JSON body", 400);
+  }
+  const parsed = Body.safeParse(json);
+  if (!parsed.success) {
+    return fail(
+      "validation_error",
+      parsed.error.issues[0]?.message ?? "Invalid input",
+      400,
+    );
+  }
+  const body = parsed.data;
+  const startsAt = new Date(body.startsAt);
+  if (startsAt.getTime() <= Date.now()) {
+    return fail("validation_error", "Please select a future slot.", 400);
+  }
+
+  const conflict = await db
+    .select({ id: schema.coachingBookings.id })
+    .from(schema.coachingBookings)
+    .where(
+      and(
+        eq(schema.coachingBookings.coachId, body.coachId),
+        eq(schema.coachingBookings.startsAt, startsAt),
+        eq(schema.coachingBookings.status, "pending"),
+      ),
+    )
+    .limit(1);
+  if (conflict.length > 0) {
+    return fail("validation_error", "This slot was just booked. Pick another slot.", 409);
+  }
+
+  const rawToken = randomBytes(24).toString("base64url");
+  const tokenHash = hashToken(rawToken);
+  const [created] = await db
+    .insert(schema.coachingBookings)
+    .values({
+      candidateUserId: me.id,
+      candidateName: me.name,
+      candidateEmail: me.email,
+      techArea: body.techArea,
+      coachId: body.coachId,
+      coachName: body.coachName,
+      coachEmail: body.coachEmail,
+      coachTimezone: body.coachTimezone,
+      startsAt,
+      amountInr: body.amountInr,
+      paymentStatus: "paid",
+      status: "pending",
+      coachApprovalTokenHash: tokenHash,
+    })
+    .returning();
+
+  const approvalUrl = `${baseUrl()}/api/coaching/bookings/coach-approve?token=${encodeURIComponent(rawToken)}`;
+  const adminEmail = process.env.ADMIN_EMAIL;
+
+  const coachMail = coachingRequestEmailToCoach({
+    bookingId: created.id,
+    candidateName: me.name,
+    candidateEmail: me.email,
+    techArea: body.techArea,
+    coachName: body.coachName,
+    startsAt: body.startsAt,
+    amountInr: body.amountInr,
+    approvalUrl,
+  });
+  await sendMail({
+    to: body.coachEmail,
+    subject: coachMail.subject,
+    html: coachMail.html,
+    text: coachMail.text,
+  });
+
+  if (adminEmail) {
+    const adminMail = coachingRequestEmailToAdmin({
+      bookingId: created.id,
+      candidateName: me.name,
+      candidateEmail: me.email,
+      techArea: body.techArea,
+      coachName: body.coachName,
+      startsAt: body.startsAt,
+      amountInr: body.amountInr,
+      approvalUrl,
+    });
+    await sendMail({
+      to: adminEmail,
+      subject: adminMail.subject,
+      html: adminMail.html,
+      text: adminMail.text,
+    });
+  }
+
+  return ok({ booking: created }, 201);
+}

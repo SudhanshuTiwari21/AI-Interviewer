@@ -7,9 +7,9 @@ one polished web app.
 
 This repository contains the **MVP** UI/flow built with **Next.js 14**,
 **TypeScript**, and **Tailwind CSS**. OpenAI is integrated client-side for
-adaptive follow-ups and report enrichment (demo mode), while Stripe payments,
-Google Calendar sync, and email delivery are still stubbed at the integration
-boundary.
+adaptive follow-ups and report enrichment (demo mode). Coaching bookings now
+create Google Calendar events on approval with attendee invites, while Stripe
+payments remain stubbed at the integration boundary.
 
 ---
 
@@ -23,8 +23,8 @@ boundary.
   MediaRecorder for capture; live audio meter; pause/resume.
 - **Instant scored report** - five-axis breakdown, per-question feedback,
   strengths, gaps, next steps. Downloadable as a branded **PDF**.
-- **Coaching scheduler** - coach picker, week navigator, time slots,
-  Google Calendar-style confirmation.
+- **Coaching scheduler** - coach picker by tech area, variable pricing, week
+  navigator, time slots, and Google Calendar event sync on coach approval.
 - **Admin dashboard** - sessions, score distribution, revenue, pipeline.
 - **Production-grade UI** - minimal, accessible, responsive, dark hero accents.
 
@@ -45,7 +45,7 @@ boundary.
 
 > The MVP runs **without backend APIs**. OpenAI can be enabled by setting
 > `NEXT_PUBLIC_OPENAI_API_KEY` in `.env.local` (frontend demo mode). Stripe,
-> Google Calendar, and email are isolated behind simple integration points. See
+> Stripe and some optional integrations are isolated behind simple integration points. See
 > [Wiring real backends](#wiring-real-backends) below.
 
 ---
@@ -230,6 +230,14 @@ Auth is implemented inside this Next.js app (no external service needed).
    - `me` returns the current user (verified only) or `null`.
    - `logout` clears the cookie.
 
+### Optional super admin bootstrap (env)
+
+If you set `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD`, the same `/login`
+route accepts those credentials and automatically upserts that account as a
+verified `super_admin`, then redirects to `/admin`.
+
+Useful for first-time production bootstrap without running SQL manually.
+
 ### Postgres schema
 
 ```
@@ -349,7 +357,7 @@ Typography uses Inter via Google Fonts (loaded in `app/layout.tsx`).
 | 2 | Question engine switches seamlessly between scripted and dynamically generated prompts | ✅ `lib/question-engine.ts` interleaves scripted + AI follow-ups |
 | 3 | Voice capture works in modern browsers; transcripts appear for review | ✅ `components/interview/Recorder.tsx` (MediaRecorder + Web Speech) |
 | 4 | PDF/HTML feedback reports include scoring, strengths, and improvement tips | ✅ HTML at `/interview/[id]/report`, PDF via `lib/pdf.ts` |
-| 5 | Scheduling module confirms bookings and syncs with Google Calendar | ✅ `/schedule` with confirmation; Google Calendar wiring documented above |
+| 5 | Scheduling module confirms bookings and syncs with Google Calendar | ✅ Coaching approval creates a Google Calendar event with candidate+coach+admin invites |
 | 6 | Full source code, setup instructions, and a short demo video | ✅ Source + README; recording script above |
 
 ---
