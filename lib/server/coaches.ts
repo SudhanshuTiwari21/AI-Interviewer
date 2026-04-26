@@ -2,7 +2,7 @@ import "server-only";
 
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
-import { DEFAULT_COACHES, type Coach } from "@/lib/coaches";
+import { type Coach } from "@/lib/coaches";
 
 function rowToCoach(row: typeof schema.coaches.$inferSelect): Coach {
   const availability = (row.availability ?? {}) as Coach["availability"];
@@ -45,16 +45,7 @@ function coachToInsert(coach: Coach): typeof schema.coaches.$inferInsert {
   };
 }
 
-export async function ensureDefaultCoaches() {
-  const rows = await db.select({ id: schema.coaches.id }).from(schema.coaches).limit(1);
-  if (rows.length > 0) return;
-  for (const c of DEFAULT_COACHES) {
-    await db.insert(schema.coaches).values(coachToInsert(c)).onConflictDoNothing();
-  }
-}
-
 export async function listCoaches(options?: { activeOnly?: boolean }): Promise<Coach[]> {
-  await ensureDefaultCoaches();
   const q = db.select().from(schema.coaches).orderBy(desc(schema.coaches.createdAt));
   const rows = options?.activeOnly
     ? await q.where(eq(schema.coaches.active, true))

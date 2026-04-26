@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { useAdmin, AdminPageHeader } from "@/components/admin/AdminShell";
-import { store } from "@/lib/store";
 import { type Coach } from "@/lib/coaches";
 import { cn, uid } from "@/lib/utils";
 import { Pencil, Plus, Save, Trash2 } from "lucide-react";
@@ -69,9 +68,9 @@ export default function AdminCoachesPage() {
       .then((r) => r.json())
       .then((d) => {
         if (d.ok) setCoaches(d.coaches);
-        else setCoaches(store.getCoaches());
+        else setCoaches([]);
       })
-      .catch(() => setCoaches(store.getCoaches()));
+      .catch(() => setCoaches([]));
   }, []);
 
   return (

@@ -76,9 +76,7 @@ function ScheduleInner() {
         if (!coachId && all[0]) setCoachId(all[0].id);
       })
       .catch(() => {
-        const all = store.getCoaches().filter((c) => c.active);
-        setCoaches(all);
-        if (!coachId && all[0]) setCoachId(all[0].id);
+        setCoaches([]);
       });
   }, [coachId, router]);
 

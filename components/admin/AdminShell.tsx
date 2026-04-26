@@ -180,7 +180,7 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
         )}
 
         <div className="flex min-h-screen flex-col bg-ink-50/40">
-          <header className="flex h-14 items-center justify-between gap-3 border-b border-ink-100 bg-white px-4 lg:hidden">
+          <header className="flex h-14 items-center justify-between gap-2 border-b border-ink-100 bg-white px-3 lg:hidden">
             <button
               onClick={() => setMobileOpen(true)}
               className="rounded-lg p-2 text-ink-700 hover:bg-ink-100"
@@ -188,8 +188,10 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
             >
               <Menu className="size-5" />
             </button>
-            <Logo size={24} />
-            <Badge tone={roleTone(user.role)} dot>
+            <div className="min-w-0 shrink">
+              <Logo size={22} />
+            </div>
+            <Badge tone={roleTone(user.role)} dot className="shrink-0 whitespace-nowrap px-2 py-0.5 text-[10px]">
               {roleLabel(user.role)}
             </Badge>
           </header>
@@ -216,9 +218,11 @@ function SidebarBody({
   return (
     <>
       {!hideHeader && (
-        <div className="flex h-16 items-center justify-between px-6">
-          <Logo />
-          <Badge tone={roleTone(user.role)} dot>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <div className="min-w-0 shrink">
+            <Logo />
+          </div>
+          <Badge tone={roleTone(user.role)} dot className="shrink-0 whitespace-nowrap text-[11px]">
             {roleLabel(user.role)}
           </Badge>
         </div>

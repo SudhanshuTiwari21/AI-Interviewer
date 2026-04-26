@@ -8,7 +8,7 @@
 
 import type { InterviewConfig, InterviewReport } from "./question-engine";
 import type { Plan } from "./mock-data";
-import { DEFAULT_COACHES, type Coach } from "./coaches";
+import { type Coach } from "./coaches";
 
 export type User = {
   id: string;
@@ -97,10 +97,7 @@ export const store = {
   },
   getCoaches(): Coach[] {
     const saved = safeGet<Coach[] | null>(KEYS.coaches, null);
-    if (!saved || saved.length === 0) {
-      safeSet(KEYS.coaches, DEFAULT_COACHES);
-      return DEFAULT_COACHES;
-    }
+    if (!saved || saved.length === 0) return [];
     const normalized = saved.map((c) => normalizeCoach(c));
     safeSet(KEYS.coaches, normalized);
     return normalized;

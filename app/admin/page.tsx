@@ -29,12 +29,28 @@ type CoachingBooking = {
   coachName: string;
   techArea: string;
   startsAt: string;
+  createdAt: string;
+};
+
+type AdminUserRow = {
+  id: string;
+  createdAt: string;
+};
+
+type PaymentTransaction = {
+  id: string;
+  productType: string;
+  amountInr: number;
+  status: string;
+  createdAt: string;
 };
 
 export default function AdminOverviewPage() {
   const { user, has } = useAdmin();
   const [reports, setReports] = useState<InterviewReport[]>([]);
   const [bookings, setBookings] = useState<CoachingBooking[]>([]);
+  const [users, setUsers] = useState<AdminUserRow[]>([]);
+  const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
 
   useEffect(() => {
     void fetch("/api/reports", { cache: "no-store" })
@@ -46,6 +62,16 @@ export default function AdminOverviewPage() {
       .then((r) => r.json())
       .then((d) => {
         if (d.ok) setBookings(d.bookings);
+      });
+    void fetch("/api/admin/users?page=1&pageSize=500", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setUsers(d.users);
+      });
+    void fetch("/api/admin/payments/transactions", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setTransactions(d.transactions);
       });
   }, []);
 
@@ -60,11 +86,91 @@ export default function AdminOverviewPage() {
       startedAt: r.generatedAt,
     }));
 
-  const completed = allSessions.filter((s) => s.status === "completed");
-  const avgScore = completed.length
-    ? Math.round(completed.reduce((s, x) => s + x.score, 0) / completed.length)
+  const now = Date.now();
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  const currentWeekStart = new Date(now - sevenDaysMs);
+  const previousWeekStart = new Date(now - sevenDaysMs * 2);
+
+  const currentWeekSessions = allSessions.filter(
+    (s) => new Date(s.startedAt).getTime() >= currentWeekStart.getTime(),
+  );
+  const previousWeekSessions = allSessions.filter((s) => {
+    const t = new Date(s.startedAt).getTime();
+    return t >= previousWeekStart.getTime() && t < currentWeekStart.getTime();
+  });
+
+  const currentWeekActiveCandidates = new Set(
+    currentWeekSessions.map((s) => s.candidate.toLowerCase().trim()),
+  ).size;
+  const previousWeekActiveCandidates = new Set(
+    previousWeekSessions.map((s) => s.candidate.toLowerCase().trim()),
+  ).size;
+
+  const currentWeekAvgScore = currentWeekSessions.length
+    ? Math.round(
+        currentWeekSessions.reduce((sum, item) => sum + item.score, 0) /
+          currentWeekSessions.length,
+      )
     : 0;
-  const revenue = allSessions.length * PRICE;
+  const previousWeekAvgScore = previousWeekSessions.length
+    ? Math.round(
+        previousWeekSessions.reduce((sum, item) => sum + item.score, 0) /
+          previousWeekSessions.length,
+      )
+    : 0;
+
+  const currentWeekRevenue = currentWeekSessions.length * PRICE;
+  const previousWeekRevenue = previousWeekSessions.length * PRICE;
+  const ratingBuckets = [
+    { label: "Strong hire", tone: "success" as const, count: 0 },
+    { label: "Hire", tone: "accent" as const, count: 0 },
+    { label: "Lean hire", tone: "warn" as const, count: 0 },
+    { label: "No hire", tone: "danger" as const, count: 0 },
+  ];
+  for (const report of reports) {
+    const bucket = ratingBuckets.find((b) => b.label === report.rating);
+    if (bucket) bucket.count += 1;
+  }
+  const ratingTotal = ratingBuckets.reduce((sum, b) => sum + b.count, 0);
+  const scoreDistribution = ratingBuckets.map((bucket) => ({
+    ...bucket,
+    pct: ratingTotal === 0 ? 0 : Math.round((bucket.count / ratingTotal) * 100),
+  }));
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const paidStatuses = new Set([
+    "paid",
+    "refund_requested",
+    "refund_pending",
+    "partially_refunded",
+    "refunded",
+  ]);
+  const signupsToday = users.filter(
+    (u) => new Date(u.createdAt).getTime() >= startOfToday.getTime(),
+  ).length;
+  const paidCheckoutsToday = transactions.filter(
+    (tx) =>
+      new Date(tx.createdAt).getTime() >= startOfToday.getTime() &&
+      paidStatuses.has(tx.status),
+  ).length;
+  const mockInterviewsStartedToday = reports.filter(
+    (r) => new Date(r.generatedAt).getTime() >= startOfToday.getTime(),
+  ).length;
+  const coachingBookedToday = bookings.filter(
+    (b) => new Date(b.createdAt).getTime() >= startOfToday.getTime(),
+  ).length;
+
+  const activeCandidatesDelta = formatPercentDelta(
+    currentWeekActiveCandidates,
+    previousWeekActiveCandidates,
+  );
+  const sessionsDelta = formatPercentDelta(
+    currentWeekSessions.length,
+    previousWeekSessions.length,
+  );
+  const avgScoreDelta = formatPointDelta(currentWeekAvgScore, previousWeekAvgScore);
+  const revenueDelta = formatPercentDelta(currentWeekRevenue, previousWeekRevenue);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -77,26 +183,26 @@ export default function AdminOverviewPage() {
         <Stat
           icon={Users}
           label="Active candidates"
-          value={String(allSessions.length)}
-          delta="+12% WoW"
+          value={String(currentWeekActiveCandidates)}
+          delta={activeCandidatesDelta}
         />
         <Stat
           icon={Activity}
           label="Sessions run"
-          value={String(allSessions.length)}
-          delta="+18% WoW"
+          value={String(currentWeekSessions.length)}
+          delta={sessionsDelta}
         />
         <Stat
           icon={TrendingUp}
-          label="Avg score"
-          value={String(avgScore || "-")}
-          delta="+3 pts"
+          label="Avg score (week)"
+          value={String(currentWeekAvgScore || "-")}
+          delta={avgScoreDelta}
         />
         <Stat
           icon={DollarSign}
           label="Revenue (week)"
-          value={formatCurrency(revenue, "INR")}
-          delta="+24%"
+          value={formatCurrency(currentWeekRevenue, "INR")}
+          delta={revenueDelta}
         />
       </div>
 
@@ -204,21 +310,13 @@ export default function AdminOverviewPage() {
               <p className="text-sm font-semibold text-ink-900">Score distribution</p>
             </div>
             <CardBody className="space-y-3">
-              {[
-                ["Strong hire", "success", 18],
-                ["Hire", "accent", 42],
-                ["Lean hire", "warn", 26],
-                ["No hire", "danger", 14],
-              ].map(([label, tone, value]) => (
-                <div key={label as string}>
+              {scoreDistribution.map(({ label, tone, pct }) => (
+                <div key={label}>
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <span className="text-ink-700">{label}</span>
-                    <span className="font-medium text-ink-900">{value}%</span>
+                    <span className="font-medium text-ink-900">{pct}%</span>
                   </div>
-                  <Progress
-                    value={value as number}
-                    tone={tone as "success" | "accent" | "warn" | "danger"}
-                  />
+                  <Progress value={pct} tone={tone} />
                 </div>
               ))}
             </CardBody>
@@ -233,10 +331,10 @@ export default function AdminOverviewPage() {
             <CardBody>
               <ul className="space-y-3 text-sm">
                 {[
-                  ["Sign-ups (today)", 47],
-                  ["Paid checkouts", 19],
-                  ["Mock interviews started", 24],
-                  ["Coaching booked", bookings.length || 8],
+                  ["Sign-ups (today)", signupsToday],
+                  ["Paid checkouts (today)", paidCheckoutsToday],
+                  ["Mock interviews started (today)", mockInterviewsStartedToday],
+                  ["Coaching booked (today)", coachingBookedToday],
                 ].map(([label, value]) => (
                   <li
                     key={label as string}
@@ -300,6 +398,11 @@ function Stat({
   value: string;
   delta: string;
 }>) {
+  const deltaTone = delta.startsWith("+")
+    ? "text-success-600"
+    : delta.startsWith("-")
+      ? "text-danger-600"
+      : "text-ink-500";
   return (
     <Card>
       <CardBody className="flex items-center gap-4">
@@ -309,11 +412,29 @@ function Stat({
         <div>
           <p className="text-xs text-ink-500">{label}</p>
           <p className="text-2xl font-semibold text-ink-900">{value}</p>
-          <p className="text-[11px] text-success-600">{delta}</p>
+          <p className={`text-[11px] ${deltaTone}`}>{delta}</p>
         </div>
       </CardBody>
     </Card>
   );
+}
+
+function formatPercentDelta(current: number, previous: number): string {
+  if (previous === 0) {
+    if (current === 0) return "0% vs previous week";
+    return "New this week";
+  }
+  const change = ((current - previous) / previous) * 100;
+  const rounded = Math.round(change);
+  const sign = rounded > 0 ? "+" : "";
+  return `${sign}${rounded}% vs previous week`;
+}
+
+function formatPointDelta(current: number, previous: number): string {
+  const diff = current - previous;
+  if (diff === 0) return "0 pts vs previous week";
+  const sign = diff > 0 ? "+" : "";
+  return `${sign}${diff} pts vs previous week`;
 }
 
 function QuickAction({
