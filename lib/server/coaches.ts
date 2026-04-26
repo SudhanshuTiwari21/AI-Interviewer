@@ -6,6 +6,17 @@ import { type Coach } from "@/lib/coaches";
 
 function rowToCoach(row: typeof schema.coaches.$inferSelect): Coach {
   const availability = (row.availability ?? {}) as Coach["availability"];
+  const legacyStartHour = (availability as { startHour?: number }).startHour;
+  const legacyEndHour = (availability as { endHour?: number }).endHour;
+  const normalizedWindows =
+    availability.windows && availability.windows.length > 0
+      ? availability.windows
+      : [
+          {
+            startHour: legacyStartHour ?? 9,
+            endHour: legacyEndHour ?? 18,
+          },
+        ];
   return {
     id: row.id,
     name: row.name,
@@ -20,8 +31,7 @@ function rowToCoach(row: typeof schema.coaches.$inferSelect): Coach {
     timezone: row.timezone,
     availability: {
       weekdays: availability.weekdays ?? [1, 2, 3, 4, 5],
-      startHour: availability.startHour ?? 9,
-      endHour: availability.endHour ?? 18,
+      windows: normalizedWindows,
       intervalMin: availability.intervalMin ?? 30,
     },
   };

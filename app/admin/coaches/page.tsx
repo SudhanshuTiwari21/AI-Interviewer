@@ -21,8 +21,7 @@ type CoachForm = {
   sessions: string;
   timezone: string;
   weekdays: number[];
-  startHour: string;
-  endHour: string;
+  windows: Array<{ startHour: string; endHour: string }>;
   intervalMin: string;
   active: boolean;
 };
@@ -48,8 +47,7 @@ const DEFAULT_FORM: CoachForm = {
   sessions: "0",
   timezone: "Asia/Kolkata",
   weekdays: [1, 2, 3, 4, 5],
-  startHour: "9",
-  endHour: "18",
+  windows: [{ startHour: "9", endHour: "10" }, { startHour: "18", endHour: "19" }],
   intervalMin: "30",
   active: true,
 };
@@ -135,8 +133,7 @@ export default function AdminCoachesPage() {
                 <p className="mt-2 text-xs text-ink-500">
                   {coach.techAreas.join(", ")} ·{" "}
                   {weekdaysLabel(coach.availability.weekdays)} ·{" "}
-                  {toHourLabel(coach.availability.startHour)}-
-                  {toHourLabel(coach.availability.endHour)} · every{" "}
+                  {windowsLabel(coach.availability.windows)} · every{" "}
                   {coach.availability.intervalMin}m
                 </p>
                 {canMutate && (
@@ -158,8 +155,11 @@ export default function AdminCoachesPage() {
                           sessions: String(coach.sessions),
                           timezone: coach.timezone,
                           weekdays: coach.availability.weekdays,
-                          startHour: String(coach.availability.startHour),
-                          endHour: String(coach.availability.endHour),
+                          windows:
+                            coach.availability.windows?.map((w) => ({
+                              startHour: String(w.startHour),
+                              endHour: String(w.endHour),
+                            })) ?? [{ startHour: "9", endHour: "10" }],
                           intervalMin: String(coach.availability.intervalMin),
                           active: coach.active,
                         });
@@ -337,31 +337,74 @@ export default function AdminCoachesPage() {
                   })}
                 </div>
               </Field>
-              <div className="grid grid-cols-3 gap-2">
-                <Field label="Start">
-                  <input
-                    type="number"
-                    min="0"
-                    max="23"
-                    className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
-                    value={form.startHour}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, startHour: e.target.value }))
+              <Field label="Availability windows">
+                <div className="space-y-2">
+                  {form.windows.map((win, idx) => (
+                    <div key={`${idx}-${win.startHour}-${win.endHour}`} className="grid grid-cols-[1fr,1fr,auto] gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="23"
+                        className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
+                        value={win.startHour}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            windows: f.windows.map((w, i) =>
+                              i === idx ? { ...w, startHour: e.target.value } : w,
+                            ),
+                          }))
+                        }
+                        placeholder="Start hour"
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        max="24"
+                        className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
+                        value={win.endHour}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            windows: f.windows.map((w, i) =>
+                              i === idx ? { ...w, endHour: e.target.value } : w,
+                            ),
+                          }))
+                        }
+                        placeholder="End hour"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={form.windows.length === 1}
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            windows: f.windows.filter((_, i) => i !== idx),
+                          }))
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        windows: [...f.windows, { startHour: "9", endHour: "10" }],
+                      }))
                     }
-                  />
-                </Field>
-                <Field label="End">
-                  <input
-                    type="number"
-                    min="1"
-                    max="24"
-                    className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
-                    value={form.endHour}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, endHour: e.target.value }))
-                    }
-                  />
-                </Field>
+                  >
+                    Add time window
+                  </Button>
+                </div>
+              </Field>
+              <div className="grid grid-cols-1 gap-2">
                 <Field label="Every">
                   <select
                     className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
@@ -440,13 +483,21 @@ function toHourLabel(hour: number) {
 }
 
 function toCoach(form: CoachForm, editingId: string | null): Coach | null {
-  const startHour = Number(form.startHour);
-  const endHour = Number(form.endHour);
   const intervalMin = Number(form.intervalMin);
   if (!form.name.trim() || !form.title.trim() || form.weekdays.length === 0) return null;
   if (!form.email.trim()) return null;
-  if (Number.isNaN(startHour) || Number.isNaN(endHour) || startHour >= endHour) return null;
   if (![15, 30, 60].includes(intervalMin)) return null;
+  const windows = form.windows
+    .map((w) => ({ startHour: Number(w.startHour), endHour: Number(w.endHour) }))
+    .filter(
+      (w) =>
+        !Number.isNaN(w.startHour) &&
+        !Number.isNaN(w.endHour) &&
+        w.startHour >= 0 &&
+        w.endHour <= 24 &&
+        w.startHour < w.endHour,
+    );
+  if (windows.length === 0) return null;
   const focus = form.focus
     .split(",")
     .map((x) => x.trim())
@@ -469,9 +520,13 @@ function toCoach(form: CoachForm, editingId: string | null): Coach | null {
     active: form.active,
     availability: {
       weekdays: [...form.weekdays].sort((a, b) => a - b),
-      startHour,
-      endHour,
+      windows,
       intervalMin: intervalMin as 15 | 30 | 60,
     },
   };
+}
+
+function windowsLabel(windows: Array<{ startHour: number; endHour: number }>) {
+  if (!windows || windows.length === 0) return "No windows";
+  return windows.map((w) => `${toHourLabel(w.startHour)}-${toHourLabel(w.endHour)}`).join(", ");
 }

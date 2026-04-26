@@ -26,8 +26,12 @@ const CoachSchema = z.object({
   timezone: z.string(),
   availability: z.object({
     weekdays: z.array(z.number().int()),
-    startHour: z.number().int(),
-    endHour: z.number().int(),
+    windows: z.array(
+      z.object({
+        startHour: z.number().int(),
+        endHour: z.number().int(),
+      }),
+    ),
     intervalMin: z.union([z.literal(15), z.literal(30), z.literal(60)]),
   }),
 });
