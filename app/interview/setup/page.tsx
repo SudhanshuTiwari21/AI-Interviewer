@@ -126,6 +126,13 @@ const COMPANY_TYPES = [
   "Leadership/Internal Promotion",
 ] as const;
 
+const INTERVIEWER_MODE_LABEL: Record<InterviewerMode, string> = {
+  standard: "Professional Interview Mode",
+  "ex-google": "FAANG-style Interview Mode",
+  "ex-amazon": "High-Bar Interview Mode",
+  "ex-meta": "Enterprise Interview Mode",
+};
+
 function mapTargetRole(role: string): Role {
   switch (role) {
     case "Software Engineer":
@@ -657,33 +664,33 @@ export default function SetupPage() {
                 </div>
               </Field>
               <Field
-                label="Premium interviewer mode"
-                hint="Choose the interviewer background and tone profile."
+                label="Premium interview mode"
+                hint="Choose your interview style profile."
               >
                 <div className="flex flex-wrap gap-2">
                   <Pill
                     active={interviewerMode === "ex-google"}
                     onClick={() => setInterviewerMode("ex-google")}
                   >
-                    Ex-Google
+                    {INTERVIEWER_MODE_LABEL["ex-google"]}
                   </Pill>
                   <Pill
                     active={interviewerMode === "ex-amazon"}
                     onClick={() => setInterviewerMode("ex-amazon")}
                   >
-                    Ex-Amazon
+                    {INTERVIEWER_MODE_LABEL["ex-amazon"]}
                   </Pill>
                   <Pill
                     active={interviewerMode === "ex-meta"}
                     onClick={() => setInterviewerMode("ex-meta")}
                   >
-                    Ex-Meta
+                    {INTERVIEWER_MODE_LABEL["ex-meta"]}
                   </Pill>
                   <Pill
                     active={interviewerMode === "standard"}
                     onClick={() => setInterviewerMode("standard")}
                   >
-                    Standard
+                    {INTERVIEWER_MODE_LABEL.standard}
                   </Pill>
                 </div>
               </Field>
@@ -733,7 +740,7 @@ export default function SetupPage() {
                   ))}
                 </select>
               </Field>
-              <Field label="Stress test mode">
+              <Field label="Interview intensity">
                 <button
                   type="button"
                   onClick={() => setStressTest((v) => !v)}
@@ -744,7 +751,7 @@ export default function SetupPage() {
                       : "border-ink-200 bg-white text-ink-700",
                   )}
                 >
-                  {stressTest ? "Enabled" : "Disabled"}
+                  {stressTest ? "High Pressure Simulation" : "Standard Simulation"}
                 </button>
               </Field>
             </CardBody>

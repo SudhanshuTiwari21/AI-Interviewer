@@ -33,6 +33,13 @@ import {
   VolumeX,
 } from "lucide-react";
 
+const INTERVIEWER_MODE_LABEL: Record<NonNullable<InterviewConfig["interviewerMode"]>, string> = {
+  standard: "Professional Interview Mode",
+  "ex-google": "FAANG-style Interview Mode",
+  "ex-amazon": "High-Bar Interview Mode",
+  "ex-meta": "Enterprise Interview Mode",
+};
+
 const InterviewerAvatar = dynamic(
   () => import("@/components/interview/InterviewerAvatar").then((m) => m.InterviewerAvatar),
   {
@@ -402,7 +409,7 @@ export default function InterviewSessionPage() {
             </Badge>
             {config.stressTest && (
               <Badge tone="warn" dot>
-                Stress test
+                High Pressure Simulation
               </Badge>
             )}
             <Button
@@ -473,7 +480,9 @@ export default function InterviewSessionPage() {
                       {config.interviewerStyle
                         ? `${config.interviewerStyle}`
                         : "balanced"}
-                      {config.interviewerMode ? ` · ${config.interviewerMode}` : ""}
+                      {config.interviewerMode
+                        ? ` · ${INTERVIEWER_MODE_LABEL[config.interviewerMode]}`
+                        : ""}
                       {config.companyTarget ? ` · ${config.companyTarget}` : ""}
                       {config.difficulty ? ` · ${config.difficulty}` : ""}
                     </p>

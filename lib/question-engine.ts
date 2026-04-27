@@ -67,11 +67,11 @@ export type PriorInterviewContext = {
 const INTERVIEWER_MODE_PERSONA: Record<InterviewerMode, string> = {
   standard: "Professional, balanced interviewer with clear and respectful phrasing.",
   "ex-google":
-    "Ex-Google interviewer tone: structured problem framing, first-principles reasoning, and clarity on trade-offs.",
+    "FAANG-style interviewer tone: structured problem framing, first-principles reasoning, and clarity on trade-offs.",
   "ex-amazon":
-    "Ex-Amazon interviewer tone: ownership, customer impact, bias for action, and metrics-backed decisions.",
+    "High-bar interviewer tone: ownership, customer impact, bias for action, and metrics-backed decisions.",
   "ex-meta":
-    "Ex-Meta interviewer tone: speed, product intuition, experimentation mindset, and scalable execution.",
+    "Enterprise interviewer tone: speed, product intuition, experimentation mindset, and scalable execution.",
 };
 
 function inferRoleTechnologies(config: InterviewConfig): string[] {
@@ -400,7 +400,7 @@ export async function buildInterviewPlanWithAI(
             `Difficulty: ${difficultyFromConfig(config)}`,
             `Interviewer style: ${config.interviewerStyle ?? "balanced"}`,
             `Company target: ${config.companyTarget || "generic"}`,
-            `Stress test mode: ${config.stressTest ? "on" : "off"}`,
+            `Interview intensity mode: ${config.stressTest ? "high pressure simulation" : "standard simulation"}`,
             "",
             resumeSnippet(config),
             "",
