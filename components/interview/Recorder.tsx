@@ -158,6 +158,7 @@ export function Recorder({
     setPaused(false);
     if (submit) {
       const finalText = (transcript || partial).trim();
+      if (!finalText) return;
       onSubmit({ transcript: finalText, durationSec: seconds, mode: "voice" });
       reset();
     }
@@ -265,6 +266,14 @@ export function Recorder({
               ) : (
                 <>
                   <Button
+                    onClick={() => stopRecording(true)}
+                    disabled={!recording || (!transcript && !partial)}
+                    variant="primary"
+                    leftIcon={<Square className="size-4" />}
+                  >
+                    Finish answer
+                  </Button>
+                  <Button
                     variant="outline"
                     onClick={togglePause}
                     leftIcon={
@@ -283,13 +292,9 @@ export function Recorder({
                 </>
               )}
             </div>
-            <Button
-              onClick={() => stopRecording(true)}
-              disabled={!recording || (!transcript && !partial)}
-              variant="primary"
-            >
-              Submit answer
-            </Button>
+            <p className="text-xs text-ink-500">
+              Voice mode auto-sends when you finish the answer.
+            </p>
           </div>
         </div>
       ) : (

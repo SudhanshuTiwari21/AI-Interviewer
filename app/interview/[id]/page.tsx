@@ -65,6 +65,7 @@ export default function InterviewSessionPage() {
   const [speaking, setSpeaking] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [acknowledgement, setAcknowledgement] = useState<string | null>(null);
+  const [interviewerTranscript, setInterviewerTranscript] = useState("");
   const sessionStart = useRef(Date.now());
   const spokenForId = useRef<string | null>(null);
 
@@ -159,6 +160,7 @@ export default function InterviewSessionPage() {
     const spokenPrompt = acknowledgement
       ? `${openingGreeting}${acknowledgement} ${question.text}`
       : `${openingGreeting}${question.text}`;
+    setInterviewerTranscript(spokenPrompt);
     speak(spokenPrompt, {
       onStart: () => setSpeaking(true),
       onEnd: () => setSpeaking(false),
@@ -174,6 +176,7 @@ export default function InterviewSessionPage() {
     const spokenPrompt = acknowledgement
       ? `${acknowledgement} ${question.text}`
       : question.text;
+    setInterviewerTranscript(spokenPrompt);
     speak(spokenPrompt, {
       onStart: () => setSpeaking(true),
       onEnd: () => setSpeaking(false),
@@ -416,6 +419,14 @@ export default function InterviewSessionPage() {
                     <p className="rounded-lg border border-accent-200 bg-accent-50/50 px-3 py-2 text-sm text-ink-700">
                       Good to meet you, {candidateName}. Thank you for joining today - let&apos;s begin.
                     </p>
+                  )}
+                  {interviewerTranscript && (
+                    <div className="rounded-lg border border-ink-200 bg-ink-50/70 px-3 py-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-500">
+                        Interviewer transcript
+                      </p>
+                      <p className="mt-1 text-sm text-ink-700">{interviewerTranscript}</p>
+                    </div>
                   )}
                   <p className="text-xl font-medium leading-8 text-ink-900 sm:text-2xl">
                     {question.text}
