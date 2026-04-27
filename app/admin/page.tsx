@@ -20,9 +20,12 @@ import {
   ShieldCheck,
   GraduationCap,
   Settings,
+  AlertTriangle,
+  Search,
 } from "lucide-react";
 
 const PRICE = 299;
+type TimeRange = "today" | "week" | "month" | "custom";
 
 type CoachingBooking = {
   id: string;
@@ -35,6 +38,7 @@ type CoachingBooking = {
 type AdminUserRow = {
   id: string;
   createdAt: string;
+  leadSource: string;
 };
 
 type PaymentTransaction = {
@@ -51,6 +55,10 @@ export default function AdminOverviewPage() {
   const [bookings, setBookings] = useState<CoachingBooking[]>([]);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
+  const [range, setRange] = useState<TimeRange>("week");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [candidateQuery, setCandidateQuery] = useState("");
 
   useEffect(() => {
     void fetch("/api/reports", { cache: "no-store" })
@@ -76,27 +84,49 @@ export default function AdminOverviewPage() {
   }, []);
 
   const allSessions = reports.map((r) => ({
-      id: r.id,
-      role: r.role,
-      level: r.level,
-      candidate: r.candidate,
-      status: "completed" as const,
-      score: r.overall,
-      durationMin: r.durationMin,
-      startedAt: r.generatedAt,
-    }));
+    id: r.id,
+    role: r.role,
+    level: r.level,
+    candidate: r.candidate,
+    status: "completed" as const,
+    score: r.overall,
+    durationMin: r.durationMin,
+    startedAt: r.generatedAt,
+    weakAreas: r.weakAreas,
+    hasResume: Boolean(r.jobReadiness?.resumeConsistency),
+  }));
 
   const now = Date.now();
-  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
-  const currentWeekStart = new Date(now - sevenDaysMs);
-  const previousWeekStart = new Date(now - sevenDaysMs * 2);
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  const sevenDaysMs = 7 * oneDayMs;
+  const thirtyDaysMs = 30 * oneDayMs;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const customFromTs = customFrom ? new Date(`${customFrom}T00:00:00`).getTime() : null;
+  const customToTs = customTo ? new Date(`${customTo}T23:59:59`).getTime() : null;
+
+  const rangeStartTs = resolveRangeStart({
+    range,
+    now,
+    startOfTodayMs: startOfToday.getTime(),
+    sevenDaysMs,
+    thirtyDaysMs,
+    customFromTs,
+  });
+
+  const rangeEndTs = range === "custom" && customToTs ? customToTs : now;
+  const currentWindowMs = Math.max(oneDayMs, rangeEndTs - rangeStartTs);
+  const previousWindowStartTs = rangeStartTs - currentWindowMs;
+  const previousWindowEndTs = rangeStartTs;
 
   const currentWeekSessions = allSessions.filter(
-    (s) => new Date(s.startedAt).getTime() >= currentWeekStart.getTime(),
+    (s) =>
+      new Date(s.startedAt).getTime() >= rangeStartTs &&
+      new Date(s.startedAt).getTime() <= rangeEndTs,
   );
   const previousWeekSessions = allSessions.filter((s) => {
     const t = new Date(s.startedAt).getTime();
-    return t >= previousWeekStart.getTime() && t < currentWeekStart.getTime();
+    return t >= previousWindowStartTs && t < previousWindowEndTs;
   });
 
   const currentWeekActiveCandidates = new Set(
@@ -137,8 +167,6 @@ export default function AdminOverviewPage() {
     pct: ratingTotal === 0 ? 0 : Math.round((bucket.count / ratingTotal) * 100),
   }));
 
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
   const paidStatuses = new Set([
     "paid",
     "refund_requested",
@@ -147,19 +175,79 @@ export default function AdminOverviewPage() {
     "refunded",
   ]);
   const signupsToday = users.filter(
-    (u) => new Date(u.createdAt).getTime() >= startOfToday.getTime(),
+    (u) =>
+      new Date(u.createdAt).getTime() >= rangeStartTs &&
+      new Date(u.createdAt).getTime() <= rangeEndTs,
   ).length;
   const paidCheckoutsToday = transactions.filter(
     (tx) =>
-      new Date(tx.createdAt).getTime() >= startOfToday.getTime() &&
+      new Date(tx.createdAt).getTime() >= rangeStartTs &&
+      new Date(tx.createdAt).getTime() <= rangeEndTs &&
       paidStatuses.has(tx.status),
   ).length;
   const mockInterviewsStartedToday = reports.filter(
-    (r) => new Date(r.generatedAt).getTime() >= startOfToday.getTime(),
+    (r) =>
+      new Date(r.generatedAt).getTime() >= rangeStartTs &&
+      new Date(r.generatedAt).getTime() <= rangeEndTs,
   ).length;
   const coachingBookedToday = bookings.filter(
-    (b) => new Date(b.createdAt).getTime() >= startOfToday.getTime(),
+    (b) =>
+      new Date(b.createdAt).getTime() >= rangeStartTs &&
+      new Date(b.createdAt).getTime() <= rangeEndTs,
   ).length;
+
+  const failedPayments = transactions.filter((tx) => tx.status === "failed").length;
+  const refundPending = bookings.filter(
+    (b: any) =>
+      b.paymentStatus === "refund_requested" ||
+      b.paymentStatus === "refund_pending" ||
+      b.status === "refund_requested" ||
+      b.status === "refund_pending",
+  ).length;
+  const pendingCoachingConfirmations = bookings.filter((b: any) => b.status === "pending").length;
+  const abandonedCheckouts = transactions.filter(
+    (tx) => tx.status === "created" && now - new Date(tx.createdAt).getTime() > 30 * 60 * 1000,
+  ).length;
+  const suspiciousRetries = (() => {
+    const buckets = new Map<string, number>();
+    for (const tx of transactions) {
+      const minute = new Date(tx.createdAt).toISOString().slice(0, 16);
+      buckets.set(minute, (buckets.get(minute) ?? 0) + 1);
+    }
+    return [...buckets.values()].filter((count) => count >= 4).length;
+  })();
+
+  const interviewCandidates = new Set(reports.map((r) => r.candidate.toLowerCase().trim())).size;
+  const coachingCandidates = new Set(
+    bookings.map((b: any) => (b.candidateName ?? "").toLowerCase().trim()).filter(Boolean),
+  ).size;
+  const interviewToCoachingConversion =
+    interviewCandidates > 0 ? Math.round((coachingCandidates / interviewCandidates) * 100) : 0;
+
+  const topConvertingRole = (() => {
+    const counts = new Map<string, number>();
+    for (const s of currentWeekSessions) {
+      counts.set(s.role, (counts.get(s.role) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "N/A";
+  })();
+  const mostCommonWeakArea = (() => {
+    const counts = new Map<string, number>();
+    for (const s of currentWeekSessions) {
+      for (const weak of s.weakAreas) {
+        counts.set(weak.title, (counts.get(weak.title) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "N/A";
+  })();
+  const bestLeadSource = (() => {
+    const counts = new Map<string, number>();
+    for (const u of users) {
+      const key = (u.leadSource ?? "direct").toLowerCase();
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "N/A";
+  })();
 
   const activeCandidatesDelta = formatPercentDelta(
     currentWeekActiveCandidates,
@@ -176,8 +264,61 @@ export default function AdminOverviewPage() {
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
         title={`Welcome back, ${user.name.split(" ")[0]}`}
-        description="Snapshot of platform activity in the last 7 days."
+        description="Snapshot of platform activity with operational and founder signals."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg border border-ink-200 bg-white p-0.5 text-xs">
+              {(["today", "week", "month", "custom"] as const).map((item: TimeRange) => (
+                <button
+                  key={item}
+                  onClick={() => setRange(item)}
+                  className={`rounded-md px-2.5 py-1.5 font-medium ${
+                    range === item ? "bg-ink-900 text-white" : "text-ink-600"
+                  }`}
+                >
+                  {rangeLabel(item)}
+                </button>
+              ))}
+            </div>
+            {range === "custom" && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={customFrom}
+                  onChange={(e) => setCustomFrom(e.target.value)}
+                  className="h-8 rounded-lg border border-ink-200 px-2 text-xs"
+                />
+                <input
+                  type="date"
+                  value={customTo}
+                  onChange={(e) => setCustomTo(e.target.value)}
+                  className="h-8 rounded-lg border border-ink-200 px-2 text-xs"
+                />
+              </div>
+            )}
+          </div>
+        }
       />
+
+      <div className="mb-4 rounded-xl border border-ink-200 bg-white p-3">
+        <p className="mb-2 inline-flex items-center gap-2 text-sm font-semibold text-ink-900">
+          <Search className="size-4" /> Candidate quick search
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={candidateQuery}
+            onChange={(e) => setCandidateQuery(e.target.value)}
+            placeholder="Search by name / email / interview ID"
+            className="h-9 min-w-[280px] flex-1 rounded-lg border border-ink-200 px-3 text-sm"
+          />
+          <Link href={`/admin/users?q=${encodeURIComponent(candidateQuery.trim())}`}>
+            <button className="h-9 rounded-lg bg-ink-900 px-3 text-sm text-white">Search users</button>
+          </Link>
+          <Link href={`/admin/reports`}>
+            <button className="h-9 rounded-lg border border-ink-200 px-3 text-sm text-ink-700">Open reports</button>
+          </Link>
+        </div>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
@@ -203,7 +344,67 @@ export default function AdminOverviewPage() {
           label="Revenue (week)"
           value={formatCurrency(currentWeekRevenue, "INR")}
           delta={revenueDelta}
+          emphasize
         />
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr,1fr,1fr]">
+        <Card className="border-danger-200 bg-danger-50/30">
+          <CardBody>
+            <p className="inline-flex items-center gap-2 text-sm font-semibold text-ink-900">
+              <AlertTriangle className="size-4 text-danger-600" /> Immediate attention needed
+            </p>
+            <ul className="mt-3 space-y-2 text-sm">
+              <li className="flex justify-between"><span>Failed payments</span><strong>{failedPayments}</strong></li>
+              <li className="flex justify-between"><span>Refund requests pending</span><strong>{refundPending}</strong></li>
+              <li className="flex justify-between"><span>Pending coaching confirmations</span><strong>{pendingCoachingConfirmations}</strong></li>
+            </ul>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody>
+            <p className="text-sm font-semibold text-ink-900">Payment risk view</p>
+            <ul className="mt-3 space-y-2 text-sm text-ink-700">
+              <li className="flex justify-between"><span>Failed payments</span><strong>{failedPayments}</strong></li>
+              <li className="flex justify-between"><span>Abandoned checkouts</span><strong>{abandonedCheckouts}</strong></li>
+              <li className="flex justify-between"><span>Refund pending</span><strong>{refundPending}</strong></li>
+              <li className="flex justify-between"><span>Suspicious retry windows</span><strong>{suspiciousRetries}</strong></li>
+            </ul>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardBody>
+            <p className="text-sm font-semibold text-ink-900">Founder snapshot</p>
+            <ul className="mt-3 space-y-2 text-sm text-ink-700">
+              <li className="flex justify-between"><span>Revenue today</span><strong>{formatCurrency(currentWeekRevenue, "INR")}</strong></li>
+              <li className="flex justify-between"><span>Top converting role</span><strong>{topConvertingRole}</strong></li>
+              <li className="flex justify-between"><span>Most common weak area</span><strong className="text-right">{mostCommonWeakArea}</strong></li>
+              <li className="flex justify-between"><span>Best lead source</span><strong>{bestLeadSource}</strong></li>
+            </ul>
+          </CardBody>
+        </Card>
+      </div>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardBody>
+            <p className="text-sm font-semibold text-ink-900">Coaching conversion</p>
+            <div className="mt-2 flex items-end justify-between">
+              <p className="text-3xl font-semibold text-ink-900">{interviewToCoachingConversion}%</p>
+              <p className="text-xs text-ink-500">Interview → Coaching</p>
+            </div>
+          </CardBody>
+        </Card>
+        <Card>
+          <CardBody>
+            <p className="text-sm font-semibold text-ink-900">Resume upload visibility</p>
+            <p className="mt-2 text-sm text-ink-600">
+              Visible in recent sessions as uploaded/missing for quick support diagnostics.
+            </p>
+          </CardBody>
+        </Card>
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -254,6 +455,7 @@ export default function AdminOverviewPage() {
                     <Th>Role</Th>
                     <Th>Status</Th>
                     <Th>Score</Th>
+                    <Th>Resume</Th>
                     <Th>Started</Th>
                   </tr>
                 </thead>
@@ -294,6 +496,11 @@ export default function AdminOverviewPage() {
                         ) : (
                           <span className="text-ink-400">-</span>
                         )}
+                      </Td>
+                      <Td>
+                        <Badge tone={s.hasResume ? "success" : "warn"} dot>
+                          {s.hasResume ? "Uploaded" : "Missing"}
+                        </Badge>
                       </Td>
                       <Td className="text-xs text-ink-500">{formatDate(s.startedAt)}</Td>
                     </tr>
@@ -392,19 +599,17 @@ function Stat({
   label,
   value,
   delta,
+  emphasize,
 }: Readonly<{
   icon: typeof Users;
   label: string;
   value: string;
   delta: string;
+  emphasize?: boolean;
 }>) {
-  const deltaTone = delta.startsWith("+")
-    ? "text-success-600"
-    : delta.startsWith("-")
-      ? "text-danger-600"
-      : "text-ink-500";
+  const deltaTone = deltaToneClass(delta);
   return (
-    <Card>
+    <Card className={emphasize ? "border-success-300 bg-success-50/20" : undefined}>
       <CardBody className="flex items-center gap-4">
         <span className="inline-flex size-10 items-center justify-center rounded-xl bg-ink-100 text-ink-700">
           <Icon className="size-4" />
@@ -417,6 +622,40 @@ function Stat({
       </CardBody>
     </Card>
   );
+}
+
+function resolveRangeStart({
+  range,
+  now,
+  startOfTodayMs,
+  sevenDaysMs,
+  thirtyDaysMs,
+  customFromTs,
+}: Readonly<{
+  range: TimeRange;
+  now: number;
+  startOfTodayMs: number;
+  sevenDaysMs: number;
+  thirtyDaysMs: number;
+  customFromTs: number | null;
+}>): number {
+  if (range === "today") return startOfTodayMs;
+  if (range === "week") return now - sevenDaysMs;
+  if (range === "month") return now - thirtyDaysMs;
+  return customFromTs ?? now - sevenDaysMs;
+}
+
+function rangeLabel(range: TimeRange): string {
+  if (range === "today") return "Today";
+  if (range === "week") return "This Week";
+  if (range === "month") return "This Month";
+  return "Custom";
+}
+
+function deltaToneClass(delta: string): string {
+  if (delta.startsWith("+")) return "text-success-600";
+  if (delta.startsWith("-")) return "text-danger-600";
+  return "text-ink-500";
 }
 
 function formatPercentDelta(current: number, previous: number): string {

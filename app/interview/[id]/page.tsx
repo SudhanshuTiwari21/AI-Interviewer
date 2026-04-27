@@ -399,16 +399,6 @@ export default function InterviewSessionPage() {
                       {config.companyTarget ? ` · ${config.companyTarget}` : ""}
                       {config.difficulty ? ` · ${config.difficulty}` : ""}
                     </p>
-                    <Badge
-                      tone={question.source === "ai-generated" ? "accent" : "neutral"}
-                      dot
-                    >
-                      {question.source === "ai-generated"
-                        ? question.category === "follow-up"
-                          ? "Dynamic follow-up"
-                          : "Dynamic question"
-                        : labelFor(question.category)}
-                    </Badge>
                   </div>
                   {hasStarted && acknowledgement && (
                     <p className="rounded-lg border border-success-200 bg-success-50/50 px-3 py-2 text-sm text-ink-700">
