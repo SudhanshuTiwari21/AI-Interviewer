@@ -17,6 +17,7 @@ import { cn, uid } from "@/lib/utils";
 import { LiveTranscriber } from "@/lib/speech";
 import {
   Check,
+  ChevronDown,
   Mic,
   ShieldCheck,
   Sparkles,
@@ -27,24 +28,76 @@ import {
   FileText,
   Gauge,
   AlertTriangle,
+  Search,
 } from "lucide-react";
 
 const TARGET_ROLES = [
+  "Software Engineer",
+  "Senior Software Engineer",
+  "Staff Software Engineer",
+  "Engineering Manager",
   "Scrum Master",
   "Agile Delivery Manager",
   "Agile Coach",
   "Delivery Manager",
+  "Program Manager",
+  "Technical Program Manager",
   "Product Manager",
+  "Senior Product Manager",
+  "Associate Product Manager",
+  "Business Analyst",
+  "Solution Architect",
+  "Technical Architect",
+  "Cloud Architect",
+  "UI/UX Designer",
+  "Product Designer",
   "QA Lead",
+  "QA Engineer",
+  "SDET",
+  "Test Automation Engineer",
   "DevOps Engineer",
+  "Site Reliability Engineer",
+  "Platform Engineer",
+  "Cloud Engineer",
+  "Cybersecurity Engineer",
+  "Security Analyst",
+  "Network Engineer",
+  "Systems Engineer",
   "Java Developer",
+  "Spring Boot Developer",
   ".Net Developer",
+  "C# Developer",
   "Python Developer",
+  "Node.js Developer",
+  "Golang Developer",
+  "PHP Developer",
+  "Ruby on Rails Developer",
+  "Mobile App Developer",
+  "Android Developer",
+  "iOS Developer",
+  "React Native Developer",
+  "Full Stack Developer",
+  "Back End Developer",
   "Data Analyst",
+  "BI Analyst",
+  "Analytics Engineer",
   "Project Manager",
   "Data Engineer",
+  "Big Data Engineer",
+  "Machine Learning Engineer",
   "AI/ML Engineer",
+  "MLOps Engineer",
+  "NLP Engineer",
+  "Data Scientist",
+  "Prompt Engineer",
+  "GenAI Engineer",
+  "Blockchain Developer",
+  "Salesforce Developer",
+  "SAP Consultant",
   "Front End Developer",
+  "React Developer",
+  "Angular Developer",
+  "Vue.js Developer",
 ] as const;
 
 const EXPERIENCE_BANDS = [
@@ -75,27 +128,81 @@ const COMPANY_TYPES = [
 
 function mapTargetRole(role: string): Role {
   switch (role) {
+    case "Software Engineer":
+    case "Senior Software Engineer":
+    case "Staff Software Engineer":
+    case "Full Stack Developer":
+      return "Full-Stack Engineer";
+    case "Engineering Manager":
+    case "Program Manager":
+    case "Technical Program Manager":
     case "Scrum Master":
     case "Agile Delivery Manager":
     case "Agile Coach":
     case "Delivery Manager":
     case "Product Manager":
+    case "Senior Product Manager":
+    case "Associate Product Manager":
     case "Project Manager":
+    case "Business Analyst":
       return "Product Manager";
+    case "Solution Architect":
+    case "Technical Architect":
+    case "Cloud Architect":
     case "QA Lead":
+    case "QA Engineer":
+    case "SDET":
+    case "Test Automation Engineer":
     case "DevOps Engineer":
+    case "Site Reliability Engineer":
+    case "Platform Engineer":
+    case "Cloud Engineer":
+    case "Cybersecurity Engineer":
+    case "Security Analyst":
+    case "Network Engineer":
+    case "Systems Engineer":
+    case "QA Lead":
     case "Java Developer":
+    case "Spring Boot Developer":
     case ".Net Developer":
+    case "C# Developer":
+    case "Node.js Developer":
+    case "Golang Developer":
+    case "PHP Developer":
+    case "Ruby on Rails Developer":
+    case "Back End Developer":
+    case "Salesforce Developer":
+    case "SAP Consultant":
+    case "Blockchain Developer":
       return "Backend Engineer";
     case "Python Developer":
     case "Data Analyst":
+    case "BI Analyst":
+    case "Analytics Engineer":
     case "Data Engineer":
+    case "Big Data Engineer":
+    case "Machine Learning Engineer":
     case "AI/ML Engineer":
+    case "MLOps Engineer":
+    case "NLP Engineer":
+    case "Data Scientist":
+    case "Prompt Engineer":
+    case "GenAI Engineer":
       return "Data Scientist";
+    case "UI/UX Designer":
+    case "Product Designer":
+      return "Designer";
+    case "Mobile App Developer":
+    case "Android Developer":
+    case "iOS Developer":
+    case "React Native Developer":
     case "Front End Developer":
+    case "React Developer":
+    case "Angular Developer":
+    case "Vue.js Developer":
       return "Frontend Engineer";
     default:
-      return "Product Manager";
+      return "Full-Stack Engineer";
   }
 }
 
@@ -143,6 +250,8 @@ export default function SetupPage() {
   const [stressTest, setStressTest] = useState(true);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  const [rolePickerOpen, setRolePickerOpen] = useState(false);
+  const [roleQuery, setRoleQuery] = useState("");
 
   useEffect(() => {
     const user = store.getUser();
@@ -278,6 +387,9 @@ export default function SetupPage() {
     globalThis.window !== undefined && LiveTranscriber.isSupported();
 
   const canStart = !!resume;
+  const filteredRoles = TARGET_ROLES.filter((item) =>
+    item.toLowerCase().includes(roleQuery.trim().toLowerCase()),
+  );
 
   return (
     <div className="min-h-screen bg-ink-50/40">
@@ -358,17 +470,68 @@ export default function SetupPage() {
               </div>
 
               <Field label="Target role">
-                <select
-                  value={targetRole}
-                  onChange={(e) => setTargetRole(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-ink-200 bg-white px-3 text-sm text-ink-800 outline-none ring-accent-500 focus:ring-2"
-                >
-                  {TARGET_ROLES.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setRolePickerOpen((v) => !v)}
+                    className="flex h-11 w-full items-center justify-between rounded-xl border border-ink-200 bg-white px-3 text-sm text-ink-800 outline-none ring-accent-500 transition-colors hover:border-ink-300 focus:ring-2"
+                  >
+                    <span className="truncate text-left">{targetRole}</span>
+                    <ChevronDown
+                      className={cn(
+                        "size-4 text-ink-500 transition-transform",
+                        rolePickerOpen && "rotate-180",
+                      )}
+                    />
+                  </button>
+                  {rolePickerOpen && (
+                    <div className="absolute z-30 mt-2 w-full rounded-xl border border-ink-200 bg-white p-2 shadow-xl">
+                      <div className="mb-2 flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-ink-400" />
+                          <input
+                            value={roleQuery}
+                            onChange={(e) => setRoleQuery(e.target.value)}
+                            placeholder="Search role..."
+                            className="h-9 w-full rounded-lg border border-ink-200 bg-white pl-8 pr-3 text-xs text-ink-800 outline-none ring-accent-500 focus:ring-2"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setRoleQuery("")}
+                          className="h-9 rounded-lg border border-ink-200 px-2.5 text-xs font-medium text-ink-700 hover:bg-ink-50"
+                        >
+                          Search
+                        </button>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto rounded-lg border border-ink-100">
+                        {filteredRoles.length === 0 ? (
+                          <p className="px-3 py-3 text-xs text-ink-500">No matching roles found.</p>
+                        ) : (
+                          filteredRoles.map((option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() => {
+                                setTargetRole(option);
+                                setRolePickerOpen(false);
+                              }}
+                              className={cn(
+                                "flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors",
+                                targetRole === option
+                                  ? "bg-ink-900 text-white"
+                                  : "text-ink-700 hover:bg-ink-50",
+                              )}
+                            >
+                              <span>{option}</span>
+                              {targetRole === option && <Check className="size-3.5" />}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </Field>
               <Field label="Experience level">
                 <select
