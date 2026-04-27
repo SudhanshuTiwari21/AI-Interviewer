@@ -388,7 +388,7 @@ export async function buildInterviewPlanWithAI(
       messages: [
         {
           role: "system",
-          content: `${systemPersona(config)} Produce an opening interview plan tailored to the resume. Return strict JSON: {"questions":[{"text":string,"category":"intro"|"technical"|"behavioral"|"resume-deep-dive"|"wrap","rationale":string,"expectedDurationSec":number}]}. Include 5-7 opening questions: 1 warm intro, 2-3 resume-deep-dive (projects/achievements/skills from resume), 1 behavioral, 1 role-specific technical, 1 wrap. Every question must include a concrete anchor (tech, trade-off, metric, constraint, or claim verification). No markdown, no prose outside JSON.`,
+          content: `${systemPersona(config)} Produce an opening interview plan tailored to the resume. Return strict JSON: {"questions":[{"text":string,"category":"intro"|"technical"|"behavioral"|"resume-deep-dive"|"wrap","rationale":string,"expectedDurationSec":number}]}. Include 5-7 opening questions. Sequence rules: Q1 MUST be a warm personal intro question, Q2 should be behavioral/problem-framing, resume-project deep dives should start from Q3 onward. Every question must include a concrete anchor (tech, trade-off, metric, constraint, or claim verification). No markdown, no prose outside JSON.`,
         },
         {
           role: "user",
@@ -434,16 +434,28 @@ export async function buildInterviewPlanWithAI(
       .filter((q) => !askedBefore.has(normalizedForComparison(q.text!)));
     if (!items.length) return fallback;
 
-    return items.slice(0, 8).map((q, i) => ({
+    const normalized = enforceHumanInterviewFlow(
+      items.slice(0, 8).map((q, i) => ({
+        id: uid("aiq"),
+        index: i,
+        text: q.text!.trim(),
+        category: (q.category as InterviewQuestion["category"]) ?? "technical",
+        source: "ai-generated",
+        expectedDurationSec:
+          typeof q.expectedDurationSec === "number" && q.expectedDurationSec > 0
+            ? Math.min(q.expectedDurationSec, 240)
+            : 150,
+        rationale: q.rationale,
+      })),
+    );
+
+    return normalized.map((q, i) => ({
       id: uid("aiq"),
       index: i,
-      text: q.text!.trim(),
-      category: (q.category as InterviewQuestion["category"]) ?? "technical",
-      source: "ai-generated",
-      expectedDurationSec:
-        typeof q.expectedDurationSec === "number" && q.expectedDurationSec > 0
-          ? Math.min(q.expectedDurationSec, 240)
-          : 150,
+      text: q.text,
+      category: q.category,
+      source: q.source,
+      expectedDurationSec: q.expectedDurationSec,
       rationale: q.rationale,
     }));
   } catch {
@@ -1165,4 +1177,36 @@ function buildWeakAreas(args: {
   }
 
   return items.sort((a, b) => b.impact - a.impact).slice(0, 4);
+}
+
+function enforceHumanInterviewFlow(plan: InterviewQuestion[]) {
+  if (plan.length === 0) return plan;
+  const intro = plan.find((q) => q.category === "intro");
+  const behavioral = plan.find((q) => q.category === "behavioral");
+
+  const first: InterviewQuestion =
+    intro ??
+    {
+      id: uid("intro"),
+      index: 0,
+      text: "Before we go deeper, could you briefly introduce yourself and the kind of roles you are currently targeting?",
+      category: "intro",
+      source: "ai-generated",
+      expectedDurationSec: 90,
+      rationale: "Human-style intro opener.",
+    };
+
+  const second: InterviewQuestion | null =
+    behavioral ??
+    plan.find((q) => q.id !== first.id && q.category !== "resume-deep-dive") ??
+    null;
+
+  const remaining = plan.filter((q) => q.id !== first.id && q.id !== second?.id);
+  const ordered = [first];
+  if (second) ordered.push(second);
+
+  const nonResume = remaining.filter((q) => q.category !== "resume-deep-dive");
+  const resumeDeepDive = remaining.filter((q) => q.category === "resume-deep-dive");
+
+  return [...ordered, ...nonResume, ...resumeDeepDive].map((q, i) => ({ ...q, index: i }));
 }

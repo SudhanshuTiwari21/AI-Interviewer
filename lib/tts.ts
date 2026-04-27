@@ -20,6 +20,30 @@ export function isTTSSupported() {
 
 let currentUtterance: SpeechSynthesisUtterance | null = null;
 
+function pickBestVoice(voices: SpeechSynthesisVoice[]) {
+  const femaleHints =
+    /female|woman|samantha|victoria|karen|zira|ava|aria|emma|olivia|susan|joanna|serena|alloy|nova|luna/i;
+  const naturalHints = /neural|natural|enhanced|premium|studio|wavenet/i;
+
+  return (
+    voices.find((v) => /en-?US/i.test(v.lang) && femaleHints.test(v.name) && naturalHints.test(v.name)) ??
+    voices.find((v) => /en-?US/i.test(v.lang) && femaleHints.test(v.name)) ??
+    voices.find((v) => /en-?GB/i.test(v.lang) && femaleHints.test(v.name) && naturalHints.test(v.name)) ??
+    voices.find((v) => /en-?GB/i.test(v.lang) && femaleHints.test(v.name)) ??
+    voices.find((v) => /en-/i.test(v.lang) && naturalHints.test(v.name)) ??
+    voices.find((v) => /en-/i.test(v.lang)) ??
+    voices[0]
+  );
+}
+
+function humanizeText(text: string) {
+  return text
+    .replaceAll(" - ", ". ")
+    .replaceAll(" · ", ", ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+}
+
 export function speak(text: string, handlers: SpeakHandlers = {}) {
   if (!isTTSSupported()) {
     handlers.onError?.("TTS not supported in this browser.");
@@ -27,23 +51,13 @@ export function speak(text: string, handlers: SpeakHandlers = {}) {
   }
   cancelSpeech();
 
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.rate = 0.98;
-  utter.pitch = 1;
+  const utter = new SpeechSynthesisUtterance(humanizeText(text));
+  utter.rate = 0.92;
+  utter.pitch = 1.02;
   utter.volume = 1;
 
   const voices = window.speechSynthesis.getVoices();
-  const preferred =
-    voices.find(
-      (v) =>
-        /en-?US/i.test(v.lang) &&
-        /female|woman|samantha|victoria|karen|zira|ava|aria|alloy|nova|luna/i.test(
-          v.name,
-        ),
-    ) ??
-    voices.find((v) => /en-?US/i.test(v.lang) && /enhanced|premium|natural/i.test(v.name)) ??
-    voices.find((v) => /en-?US/i.test(v.lang)) ??
-    voices[0];
+  const preferred = pickBestVoice(voices);
   if (preferred) utter.voice = preferred;
 
   utter.onstart = () => handlers.onStart?.();

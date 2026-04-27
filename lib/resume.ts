@@ -70,7 +70,7 @@ function finalize(text: string, fileName?: string): ParsedResume {
   return {
     text: cleaned.slice(0, 16_000), // safety cap for prompt size
     fileName,
-    candidateName: extractCandidateName(cleaned, fileName),
+    candidateName: extractCandidateName(cleaned),
     parsedAt: new Date().toISOString(),
     highlights: extractHighlights(cleaned),
   };
@@ -158,7 +158,7 @@ function collectSections(text: string, regex: RegExp): string[] {
   return out;
 }
 
-function extractCandidateName(text: string, fileName?: string) {
+function extractCandidateName(text: string) {
   const lines = text
     .split(/\n|\r/)
     .map((l) => l.trim())
@@ -174,21 +174,6 @@ function extractCandidateName(text: string, fileName?: string) {
     if (words.length < 2 || words.length > 4) continue;
     const looksLikeName = words.every((w) => /^[A-Z][a-zA-Z'-]+$/.test(w));
     if (looksLikeName) return line;
-  }
-
-  if (fileName) {
-    const fromFile = fileName
-      .replace(/\.[^.]+$/, "")
-      .replace(/[_-]+/g, " ")
-      .replace(/\bresume\b/gi, "")
-      .trim();
-    const words = fromFile.split(/\s+/).filter(Boolean);
-    if (words.length >= 2 && words.length <= 4) {
-      const title = words
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-        .join(" ");
-      if (!/\d/.test(title)) return title;
-    }
   }
 
   return undefined;

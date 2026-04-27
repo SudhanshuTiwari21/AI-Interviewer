@@ -137,7 +137,7 @@ export default function InterviewSessionPage() {
 
   const interviewer = useMemo(
     () => ({
-      name: "Ava Reynolds",
+      name: "Hiro",
       title: `${config?.role ?? "Senior"} Interviewer`,
     }),
     [config?.role],
