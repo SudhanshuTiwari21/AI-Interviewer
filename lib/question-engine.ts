@@ -14,6 +14,7 @@ import { uid } from "./utils";
 export type QuestionSource = "scripted" | "ai-generated";
 
 export type Difficulty = "easy" | "medium" | "hard";
+export type InterviewerMode = "standard" | "ex-google" | "ex-amazon" | "ex-meta";
 
 export type InterviewQuestion = {
   id: string;
@@ -34,8 +35,53 @@ export type InterviewConfig = {
   companyTarget?: string;
   stressTest?: boolean;
   difficulty?: Difficulty;
+  interviewerMode?: InterviewerMode;
   resume?: ParsedResume;
+  priorContext?: PriorInterviewContext[];
 };
+
+export type PriorInterviewContext = {
+  reportId: string;
+  generatedAt: string;
+  overall: number;
+  weakAreas: string[];
+  strengths: string[];
+  previousQuestions: string[];
+};
+
+const INTERVIEWER_MODE_PERSONA: Record<InterviewerMode, string> = {
+  standard: "Professional, balanced interviewer with clear and respectful phrasing.",
+  "ex-google":
+    "Ex-Google interviewer tone: structured problem framing, first-principles reasoning, and clarity on trade-offs.",
+  "ex-amazon":
+    "Ex-Amazon interviewer tone: ownership, customer impact, bias for action, and metrics-backed decisions.",
+  "ex-meta":
+    "Ex-Meta interviewer tone: speed, product intuition, experimentation mindset, and scalable execution.",
+};
+
+function inferRoleTechnologies(config: InterviewConfig): string[] {
+  const roleHints: Record<Role, string[]> = {
+    "Frontend Engineer": ["React", "TypeScript", "Next.js", "State management", "Performance"],
+    "Backend Engineer": ["Node.js", "API design", "PostgreSQL", "Caching", "Distributed systems"],
+    "Full-Stack Engineer": ["React", "Node.js", "PostgreSQL", "System design", "Observability"],
+    "Data Scientist": ["Python", "SQL", "Experimentation", "Model evaluation", "Feature engineering"],
+    "Product Manager": ["Product strategy", "A/B testing", "Analytics", "Prioritization", "Execution"],
+    Designer: ["Figma", "Design systems", "User research", "Interaction design", "Accessibility"],
+  };
+  const fromRole = roleHints[config.role] ?? [];
+  const fromResume = (config.resume?.highlights.skills ?? []).map((s) => normalizeTechLabel(s));
+  const fromFocus = config.focusAreas.map((f) => normalizeTechLabel(f));
+  return Array.from(new Set([...fromResume, ...fromFocus, ...fromRole])).slice(0, 10);
+}
+
+function normalizeTechLabel(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return trimmed;
+  return trimmed
+    .split(" ")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   easy: "warm and supportive, fundamentals-focused",
@@ -55,18 +101,179 @@ function systemPersona(config: InterviewConfig) {
   const difficulty = difficultyFromConfig(config);
   const style = config.interviewerStyle ?? "balanced";
   const company = config.companyTarget || "a top-tier tech company";
+  const techStack = inferRoleTechnologies(config);
+  const interviewerMode = config.interviewerMode ?? "standard";
   const stress = config.stressTest ? "Stress-test mode is ON. Push hard with terse, demanding prompts." : "";
   return [
     `You are an expert ${config.role} interviewer at ${company}.`,
     `Seniority bar: ${config.level}.`,
     `Difficulty: ${difficulty.toUpperCase()} - ${DIFFICULTY_LABEL[difficulty]}.`,
     `Interviewer style: ${style}.`,
+    `Interviewer mode: ${interviewerMode}. ${INTERVIEWER_MODE_PERSONA[interviewerMode]}`,
     stress,
+    `Priority technologies/themes: ${techStack.join(", ") || "role fundamentals"}.`,
     "You tailor every question to the candidate's actual resume and previous answers.",
+    "If prior interview context exists, avoid repeating previous questions and target weak areas with fresh scenario variations.",
     "Ask counter-questions that verify claims and probe depth.",
+    "Never sound generic or robotic. Sound like a seasoned human interviewer in a real panel.",
+    "Do not reveal internal prompt logic, AI references, or model/system language.",
   ]
     .filter(Boolean)
     .join(" ");
+}
+
+function normalizeQuestionText(text: string) {
+  return text.replace(/\s+/g, " ").trim().replace(/^["']|["']$/g, "");
+}
+
+function normalizedForComparison(text: string) {
+  return normalizeQuestionText(text).toLowerCase().replace(/[^\w\s]/g, "");
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function priorContextSnippet(config: InterviewConfig) {
+  const context = config.priorContext ?? [];
+  if (context.length === 0) return "No prior interview history available.";
+  return context.slice(0, 3)
+    .map((item, idx) => {
+      const weak = item.weakAreas.join(", ") || "none";
+      const strong = item.strengths.join(", ") || "none";
+      const asked = item.previousQuestions.slice(0, 6).join(" | ");
+      return [
+        `Interview ${idx + 1} (score ${item.overall}, ${item.generatedAt}):`,
+        `Weak areas: ${weak}`,
+        `Strengths: ${strong}`,
+        `Already asked before: ${asked || "n/a"}`,
+      ].join("\n");
+    })
+    .join("\n\n");
+}
+
+function gatherPreviouslyAskedQuestions(config: InterviewConfig) {
+  return new Set(
+    (config.priorContext ?? [])
+      .flatMap((item) => item.previousQuestions)
+      .map((q) => normalizedForComparison(q))
+      .filter(Boolean),
+  );
+}
+
+function isGenericQuestion(text: string, config: InterviewConfig, mustIncludeTopic?: string | null) {
+  const clean = normalizeQuestionText(text);
+  const lower = clean.toLowerCase();
+  if (clean.length < 30) return true;
+  if (!clean.includes("?")) return true;
+
+  const genericPatterns = [
+    /tell me more/i,
+    /can you elaborate/i,
+    /any other thoughts/i,
+    /what else/i,
+    /walk me through your experience/i,
+  ];
+  if (genericPatterns.some((p) => p.test(clean))) return true;
+
+  const techSignals = inferRoleTechnologies(config).map((t) => t.toLowerCase());
+  const roleSignal = config.role.toLowerCase();
+  const focusSignals = config.focusAreas.map((f) => f.toLowerCase());
+  const allSignals = [...techSignals, ...focusSignals, roleSignal];
+  const hasContextSignal = allSignals.some((signal) => signal && lower.includes(signal));
+  const hasConstraintSignal =
+    lower.includes("trade-off") ||
+    lower.includes("metric") ||
+    lower.includes("impact") ||
+    lower.includes("constraint") ||
+    /\d/.test(lower);
+
+  if (mustIncludeTopic && !new RegExp(escapeRegExp(mustIncludeTopic), "i").test(clean)) {
+    return true;
+  }
+
+  return !hasContextSignal && !hasConstraintSignal;
+}
+
+function chainTopicFromQuestion(question: InterviewQuestion) {
+  const rationale = question.rationale ?? "";
+  const match = rationale.match(/chain:([^:]+):depth=(\d+)/);
+  if (!match) return null;
+  return { topic: match[1], depth: Number(match[2]) || 1 };
+}
+
+function deriveChainTopic(answer: string, config: InterviewConfig) {
+  const keyword = extractKeyword(answer);
+  const techSignals = inferRoleTechnologies(config);
+  const lower = answer.toLowerCase();
+  const matchedTech = techSignals.find((t) => lower.includes(t.toLowerCase()));
+  return (matchedTech ?? keyword ?? "your approach").slice(0, 40);
+}
+
+function buildChainFollowUp(topic: string, nextDepth: number) {
+  if (nextDepth <= 1) {
+    return `Let's drill into ${topic}. What exact decision did you make, and what alternatives did you reject?`;
+  }
+  if (nextDepth === 2) {
+    return `Staying on ${topic}, what changed after rollout, and which metric proved your decision was right (or wrong)?`;
+  }
+  return `Final probe on ${topic}: if you had to redo this under half the timeline, what would you keep, cut, and why?`;
+}
+
+async function generateFollowUpTextWithGuard(args: {
+  config: InterviewConfig;
+  previousQuestion: InterviewQuestion;
+  answer: string;
+  priorAnswers: AnswerRecord[];
+  chainTopic: string;
+  chainDepth: number;
+  fallback: string;
+}) {
+  const { config, previousQuestion, answer, priorAnswers, chainTopic, chainDepth, fallback } = args;
+  const client = getOpenAIClient();
+  if (!client) return fallback;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const completion = await client.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.45,
+        messages: [
+          {
+            role: "system",
+            content: `${systemPersona(config)} Generate exactly one concise counter-question. Max 38 words. Keep it sharply anchored on the same claim/topic.`,
+          },
+          {
+            role: "user",
+            content: [
+              `Previous question: ${previousQuestion.text}`,
+              `Candidate answer: ${answer}`,
+              `Counter-question chain topic: ${chainTopic}`,
+              `Counter-question chain depth: ${chainDepth} of 3`,
+              `Priority technologies: ${inferRoleTechnologies(config).join(", ") || "role fundamentals"}`,
+              priorAnswers.length
+                ? `Earlier interview context: ${priorAnswers
+                    .slice(-3)
+                    .map((a) => `Q:${a.question} A:${a.transcript.slice(0, 180)}`)
+                    .join(" | ")}`
+                : "",
+              "Must include at least one concrete anchor: a technology, metric, trade-off, or explicit constraint.",
+              "Must sound like a premium human interviewer, not a generic assistant.",
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          },
+        ],
+      });
+      const aiText = normalizeQuestionText(completion.choices[0]?.message?.content ?? "");
+      if (aiText && !isGenericQuestion(aiText, config, chainTopic)) {
+        return aiText;
+      }
+    } catch {
+      // ignore and fallback
+    }
+  }
+  return fallback;
 }
 
 function resumeSnippet(config: InterviewConfig, maxChars = 3500): string {
@@ -89,6 +296,10 @@ function resumeSnippet(config: InterviewConfig, maxChars = 3500): string {
 export function buildInterviewPlan(
   config: InterviewConfig,
 ): InterviewQuestion[] {
+  const askedBefore = gatherPreviouslyAskedQuestions(config);
+  const techStack = inferRoleTechnologies(config);
+  const resumeProjects = config.resume?.highlights.projects ?? [];
+  const resumeAchievements = config.resume?.highlights.achievements ?? [];
   const technical = SCRIPTED_TECHNICAL[config.role] ?? [];
   const ordered: ScriptedQuestion[] = [
     ...SCRIPTED_INTRO,
@@ -99,14 +310,44 @@ export function buildInterviewPlan(
   ];
 
   const count = config.totalQuestions ?? 6;
-  return ordered.slice(0, count).map((q, i) => ({
-    id: q.id,
-    index: i,
-    text: q.text,
-    category: q.category,
-    source: "scripted",
-    expectedDurationSec: q.expectedDurationSec,
+  const baseline: InterviewQuestion[] = ordered
+    .filter((q) => !askedBefore.has(normalizedForComparison(q.text)))
+    .slice(0, Math.max(4, count - 2))
+    .map((q, i) => ({
+      id: q.id,
+      index: i,
+      text: q.text,
+      category: q.category,
+      source: "scripted",
+      expectedDurationSec: q.expectedDurationSec,
+    }));
+
+  const roleTechQuestions: InterviewQuestion[] = techStack.slice(0, 2).map((tech, i) => ({
+    id: uid("rq"),
+    index: baseline.length + i,
+    text: `Tell me about the most production-critical decision you made using ${tech}. What constraints did you optimize for, and what trade-off did you accept?`,
+    category: "technical",
+    source: "ai-generated",
+    expectedDurationSec: 150,
+    rationale: `Role-tech probe on ${tech}.`,
   }));
+
+  const resumeDrivenQuestion =
+    resumeProjects[0] || resumeAchievements[0]
+      ? [
+          {
+            id: uid("rq"),
+            index: baseline.length + roleTechQuestions.length,
+            text: `On your resume, you mentioned "${(resumeProjects[0] ?? resumeAchievements[0])?.slice(0, 90)}". Walk me through your personal ownership, what moved because of your work, and how you validated impact.`,
+            category: "resume-deep-dive" as const,
+            source: "ai-generated" as const,
+            expectedDurationSec: 170,
+            rationale: "Resume-grounded ownership verification.",
+          },
+        ]
+      : [];
+
+  return [...baseline, ...roleTechQuestions, ...resumeDrivenQuestion].slice(0, count);
 }
 
 /**
@@ -128,7 +369,7 @@ export async function buildInterviewPlanWithAI(
       messages: [
         {
           role: "system",
-          content: `${systemPersona(config)} Produce an opening interview plan tailored to the resume. Return strict JSON: {"questions":[{"text":string,"category":"intro"|"technical"|"behavioral"|"resume-deep-dive"|"wrap","rationale":string,"expectedDurationSec":number}]}. Include 5-7 opening questions: 1 warm intro, 2-3 resume-deep-dive (projects/achievements/skills from resume), 1 behavioral, 1 role-specific technical, 1 wrap. No markdown, no prose outside JSON.`,
+          content: `${systemPersona(config)} Produce an opening interview plan tailored to the resume. Return strict JSON: {"questions":[{"text":string,"category":"intro"|"technical"|"behavioral"|"resume-deep-dive"|"wrap","rationale":string,"expectedDurationSec":number}]}. Include 5-7 opening questions: 1 warm intro, 2-3 resume-deep-dive (projects/achievements/skills from resume), 1 behavioral, 1 role-specific technical, 1 wrap. Every question must include a concrete anchor (tech, trade-off, metric, constraint, or claim verification). No markdown, no prose outside JSON.`,
         },
         {
           role: "user",
@@ -136,12 +377,18 @@ export async function buildInterviewPlanWithAI(
             `Role: ${config.role}`,
             `Level: ${config.level}`,
             `Focus areas: ${config.focusAreas.join(", ") || "general"}`,
+            `Priority technologies: ${inferRoleTechnologies(config).join(", ") || "role fundamentals"}`,
             `Difficulty: ${difficultyFromConfig(config)}`,
             `Interviewer style: ${config.interviewerStyle ?? "balanced"}`,
             `Company target: ${config.companyTarget || "generic"}`,
             `Stress test mode: ${config.stressTest ? "on" : "off"}`,
             "",
             resumeSnippet(config),
+            "",
+            "Prior interview history:",
+            priorContextSnippet(config),
+            "",
+            "Hard rule: avoid repeating previously asked questions and prioritize weak-area probes.",
           ].join("\n"),
         },
       ],
@@ -157,7 +404,15 @@ export async function buildInterviewPlanWithAI(
       }>;
     };
 
-    const items = (parsed.questions ?? []).filter((q) => q?.text?.trim());
+    const askedBefore = gatherPreviouslyAskedQuestions(config);
+    const items = (parsed.questions ?? [])
+      .filter((q) => q?.text?.trim())
+      .map((q) => ({
+        ...q,
+        text: normalizeQuestionText(q.text!),
+      }))
+      .filter((q) => !isGenericQuestion(q.text!, config))
+      .filter((q) => !askedBefore.has(normalizedForComparison(q.text!)));
     if (!items.length) return fallback;
 
     return items.slice(0, 8).map((q, i) => ({
@@ -346,52 +601,24 @@ export async function maybeGenerateFollowUpWithAI(
     alreadyInserted,
   );
   if (!fallback) return null;
-
-  const client = getOpenAIClient();
-  if (!client) return fallback;
-
-  try {
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      temperature: 0.5,
-      messages: [
-        {
-          role: "system",
-          content: `${systemPersona(config)} Generate exactly one concise counter-question. No preamble, no bullets, no quotes. Max 35 words. Reference a specific detail from resume or previous answers when possible.`,
-        },
-        {
-          role: "user",
-          content: [
-            `Previous question: ${previousQuestion.text}`,
-            `Candidate answer: ${answer}`,
-            `Focus areas: ${config.focusAreas.join(", ") || "general"}`,
-            `Difficulty: ${difficultyFromConfig(config)}`,
-            priorAnswers.length
-              ? `Earlier in this interview: ${priorAnswers
-                  .slice(-3)
-                  .map((a) => `Q:${a.question} A:${a.transcript.slice(0, 220)}`)
-                  .join(" | ")}`
-              : "",
-            "",
-            resumeSnippet(config, 1600),
-            "",
-            "Write ONE sharp follow-up that verifies depth, metrics, ownership, or consistency with the resume.",
-          ]
-            .filter(Boolean)
-            .join("\n"),
-        },
-      ],
-    });
-    const aiText = completion.choices[0]?.message?.content?.trim();
-    if (!aiText) return fallback;
-    return {
-      ...fallback,
-      text: aiText.replace(/^["']|["']$/g, ""),
-      rationale: "Generated by OpenAI from resume + answer context.",
-    };
-  } catch {
-    return fallback;
-  }
+  const previousChain = chainTopicFromQuestion(previousQuestion);
+  const chainTopic = previousChain?.topic ?? deriveChainTopic(answer, config);
+  const chainDepth = Math.min(3, (previousChain?.depth ?? 0) + 1);
+  const fallbackText = buildChainFollowUp(chainTopic, chainDepth);
+  const text = await generateFollowUpTextWithGuard({
+    config,
+    previousQuestion,
+    answer,
+    priorAnswers,
+    chainTopic,
+    chainDepth,
+    fallback: fallbackText,
+  });
+  return {
+    ...fallback,
+    text,
+    rationale: `Generated from resume + answer context. chain:${chainTopic}:depth=${chainDepth}`,
+  };
 }
 
 export type AnswerRecord = {
@@ -445,6 +672,14 @@ export type InterviewReport = {
     reason: string;
     fix: string;
   }>;
+  detailedAnalysis?: {
+    executiveSummary: string;
+    interviewBehavior: string;
+    technicalSignals: string;
+    communicationSignals: string;
+    riskAssessment: string;
+    sevenDayPlan: string[];
+  };
 };
 
 export function generateReport(
@@ -555,6 +790,21 @@ export function generateReport(
     communicationToneAdj,
   });
 
+  const detailedAnalysis = buildDetailedAnalysis({
+    config,
+    answers,
+    overall,
+    communicationToneAdj,
+    weakAreas,
+    breakdown: {
+      communication,
+      technicalDepth,
+      problemSolving,
+      structure,
+      ownership,
+    },
+  });
+
   return {
     id: uid("rep"),
     candidate: candidate.name,
@@ -596,6 +846,7 @@ export function generateReport(
       "Prepare two concrete metrics-driven stories before your next live loop.",
     ],
     weakAreas,
+    detailedAnalysis,
   };
 }
 
@@ -616,7 +867,7 @@ export async function generateReportWithAI(
       messages: [
         {
           role: "system",
-          content: `${systemPersona(config)} You are now grading the candidate. Return strict JSON with keys: strengths (string[]), improvements (string[]), nextSteps (string[]), jobReadiness (object with keys summary: string, redFlags: string[], resumeConsistency: string). Each item concise, evidence-based, referencing specific answers or resume details when relevant.`,
+          content: `${systemPersona(config)} You are now grading the candidate. Return strict JSON with keys: strengths (string[]), improvements (string[]), nextSteps (string[]), jobReadiness (object with keys summary: string, redFlags: string[], resumeConsistency: string), detailedAnalysis (object with keys executiveSummary: string, interviewBehavior: string, technicalSignals: string, communicationSignals: string, riskAssessment: string, sevenDayPlan: string[]). Each item concise, evidence-based, referencing specific answers or resume details when relevant.`,
         },
         {
           role: "user",
@@ -651,6 +902,14 @@ export async function generateReportWithAI(
         redFlags?: string[];
         resumeConsistency?: string;
       };
+      detailedAnalysis?: {
+        executiveSummary?: string;
+        interviewBehavior?: string;
+        technicalSignals?: string;
+        communicationSignals?: string;
+        riskAssessment?: string;
+        sevenDayPlan?: string[];
+      };
     };
 
     return {
@@ -668,10 +927,74 @@ export async function generateReportWithAI(
           }
         : undefined,
       weakAreas: base.weakAreas,
+      detailedAnalysis: parsed.detailedAnalysis
+        ? {
+            executiveSummary:
+              parsed.detailedAnalysis.executiveSummary ?? base.detailedAnalysis?.executiveSummary ?? "",
+            interviewBehavior:
+              parsed.detailedAnalysis.interviewBehavior ?? base.detailedAnalysis?.interviewBehavior ?? "",
+            technicalSignals:
+              parsed.detailedAnalysis.technicalSignals ?? base.detailedAnalysis?.technicalSignals ?? "",
+            communicationSignals:
+              parsed.detailedAnalysis.communicationSignals ?? base.detailedAnalysis?.communicationSignals ?? "",
+            riskAssessment:
+              parsed.detailedAnalysis.riskAssessment ?? base.detailedAnalysis?.riskAssessment ?? "",
+            sevenDayPlan:
+              parsed.detailedAnalysis.sevenDayPlan?.filter(Boolean).slice(0, 5) ??
+              base.detailedAnalysis?.sevenDayPlan ??
+              [],
+          }
+        : base.detailedAnalysis,
     };
   } catch {
     return base;
   }
+}
+
+function buildDetailedAnalysis(args: {
+  config: InterviewConfig;
+  answers: AnswerRecord[];
+  overall: number;
+  communicationToneAdj: number;
+  weakAreas: InterviewReport["weakAreas"];
+  breakdown: ScoreBreakdown;
+}) {
+  const { config, answers, overall, communicationToneAdj, weakAreas, breakdown } = args;
+  const answerCount = answers.length;
+  const avgDurationSec =
+    answerCount > 0
+      ? Math.round(answers.reduce((sum, a) => sum + a.durationSec, 0) / answerCount)
+      : 0;
+  const aiQuestionCount = answers.filter((a) => a.source === "ai-generated").length;
+  const weakTitles = weakAreas.slice(0, 2).map((w) => w.title.toLowerCase());
+  const topStrength = Object.entries(breakdown).sort((a, b) => b[1] - a[1])[0];
+  const topWeakness = Object.entries(breakdown).sort((a, b) => a[1] - b[1])[0];
+
+  const readinessBand =
+    overall >= 85 ? "highly interview-ready" : overall >= 75 ? "interview-ready with targeted polish" : overall >= 65 ? "close, but inconsistent under pressure" : "not yet interview-ready at target bar";
+  const communicationBand =
+    communicationToneAdj >= 2
+      ? "professional and interviewer-friendly"
+      : communicationToneAdj < 0
+        ? "needs stronger professional framing and polish"
+        : "acceptable but not consistently executive-ready";
+
+  return {
+    executiveSummary: `Overall, this performance is ${readinessBand} for a ${config.level} ${config.role} loop. The strongest competency was ${topStrength?.[0] ?? "core execution"}, while the biggest drag came from ${topWeakness?.[0] ?? "consistency"}.`,
+    interviewBehavior: `You handled ${answerCount} prompts with an average response length of ~${avgDurationSec}s. ${aiQuestionCount} adaptive probes were introduced to test depth and claim consistency.`,
+    technicalSignals: `Technical depth signals were strongest in ${topStrength?.[0] ?? "core reasoning"} and weaker in ${topWeakness?.[0] ?? "detail quality"}. Focus on system constraints, explicit trade-offs, and quantifiable outcomes in each example.`,
+    communicationSignals: `Communication quality was ${communicationBand}. Strong answers start with a headline, then 2-3 concrete points, and close with measurable impact.`,
+    riskAssessment: weakTitles.length
+      ? `Primary hiring risk comes from ${weakTitles.join(" and ")}. If unaddressed, these reduce confidence in consistent on-the-job execution.`
+      : "No major hiring blocker was detected; risk is mainly around sustaining quality under tougher follow-up pressure.",
+    sevenDayPlan: [
+      "Day 1-2: Rewrite two past examples using STAR + metric + trade-off in under 90 seconds each.",
+      "Day 3-4: Practice one weak area with 10 targeted drill questions and record your responses.",
+      "Day 5: Run a timed mock focused on your lowest-scoring competency only.",
+      "Day 6: Review recordings and remove filler language; tighten opening and closing lines.",
+      "Day 7: Re-attempt a full mock interview to validate score movement.",
+    ],
+  };
 }
 
 function clampScore(n: number) {

@@ -17,6 +17,8 @@ import {
   type AnswerRecord,
   type InterviewConfig,
   type InterviewQuestion,
+  type InterviewReport,
+  type PriorInterviewContext,
 } from "@/lib/question-engine";
 import { cancelSpeech, ensureVoicesLoaded, isTTSSupported, speak } from "@/lib/tts";
 import { cn, secondsToClock } from "@/lib/utils";
@@ -80,15 +82,39 @@ export default function InterviewSessionPage() {
     }
     const resumeName = cfg.resume?.candidateName?.trim();
     setCandidateName(resumeName || user.name || "Candidate");
-    setConfig(cfg);
     sessionStart.current = Date.now();
     setAiLive(Boolean(process.env.NEXT_PUBLIC_OPENAI_API_KEY));
 
     (async () => {
       await ensureVoicesLoaded();
-      const plan = await buildInterviewPlanWithAI(cfg);
+      let priorContext: PriorInterviewContext[] = [];
+      try {
+        const reportsRes = await fetch("/api/reports", { cache: "no-store" });
+        const reportsJson = await reportsRes.json();
+        if (reportsJson.ok && Array.isArray(reportsJson.reports)) {
+          priorContext = (reportsJson.reports as InterviewReport[])
+            .slice(0, 5)
+            .map((report) => ({
+              reportId: report.id,
+              generatedAt: report.generatedAt,
+              overall: report.overall,
+              weakAreas: report.weakAreas.map((w) => w.title),
+              strengths: report.strengths.slice(0, 3),
+              previousQuestions: report.perQuestion.map((q) => q.question),
+            }));
+        }
+      } catch {
+        // optional enhancement only; proceed without prior context
+      }
+
+      const plannedConfig: InterviewConfig = {
+        ...cfg,
+        priorContext,
+      };
+      setConfig(plannedConfig);
+      const plan = await buildInterviewPlanWithAI(plannedConfig);
       if (cancelled) return;
-      setQueue(plan.length ? plan : buildInterviewPlan(cfg));
+      setQueue(plan.length ? plan : buildInterviewPlan(plannedConfig));
       setPlanning(false);
     })();
 
@@ -203,7 +229,7 @@ export default function InterviewSessionPage() {
       question,
       transcript,
       aiInserted,
-      answers,
+      nextAnswers,
     );
     let nextQueue = queue;
     if (follow) {
@@ -375,6 +401,7 @@ export default function InterviewSessionPage() {
                       {config.interviewerStyle
                         ? `${config.interviewerStyle}`
                         : "balanced"}
+                      {config.interviewerMode ? ` · ${config.interviewerMode}` : ""}
                       {config.companyTarget ? ` · ${config.companyTarget}` : ""}
                       {config.difficulty ? ` · ${config.difficulty}` : ""}
                     </p>
@@ -467,7 +494,11 @@ export default function InterviewSessionPage() {
                         i < current ? "text-ink-500" : "text-ink-700",
                       )}
                     >
-                      {q.text}
+                      {i < current
+                        ? q.text
+                        : i === current
+                          ? q.text
+                          : "Upcoming question is intentionally hidden to keep interview realism and suspense."}
                     </span>
                     {q.source === "ai-generated" && (
                       <Sparkles className="ml-auto mt-0.5 size-3 flex-none text-accent-500" />

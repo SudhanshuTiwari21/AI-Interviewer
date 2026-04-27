@@ -10,7 +10,7 @@ import { ResumeUpload } from "@/components/interview/ResumeUpload";
 import { store } from "@/lib/store";
 import { ROLES, LEVELS, FOCUS_AREAS, type Role, type Level } from "@/lib/mock-data";
 import type { ParsedResume } from "@/lib/resume";
-import type { Difficulty } from "@/lib/question-engine";
+import type { Difficulty, InterviewerMode } from "@/lib/question-engine";
 import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
 import { cn, uid } from "@/lib/utils";
 import { LiveTranscriber } from "@/lib/speech";
@@ -42,6 +42,7 @@ export default function SetupPage() {
   const [interviewerStyle, setInterviewerStyle] = useState<
     "balanced" | "bar-raiser" | "friendly"
   >("bar-raiser");
+  const [interviewerMode, setInterviewerMode] = useState<InterviewerMode>("ex-google");
   const [companyTarget, setCompanyTarget] = useState("Google");
   const [stressTest, setStressTest] = useState(true);
 
@@ -73,10 +74,10 @@ export default function SetupPage() {
       role,
       level,
       focusAreas,
-      totalQuestions: 6,
       difficulty,
       resume,
       interviewerStyle,
+      interviewerMode,
       companyTarget,
       stressTest,
     });
@@ -283,6 +284,38 @@ export default function SetupPage() {
                   </Pill>
                 </div>
               </Field>
+              <Field
+                label="Premium interviewer mode"
+                hint="Choose the interviewer background and tone profile."
+              >
+                <div className="flex flex-wrap gap-2">
+                  <Pill
+                    active={interviewerMode === "ex-google"}
+                    onClick={() => setInterviewerMode("ex-google")}
+                  >
+                    Ex-Google
+                  </Pill>
+                  <Pill
+                    active={interviewerMode === "ex-amazon"}
+                    onClick={() => setInterviewerMode("ex-amazon")}
+                  >
+                    Ex-Amazon
+                  </Pill>
+                  <Pill
+                    active={interviewerMode === "ex-meta"}
+                    onClick={() => setInterviewerMode("ex-meta")}
+                  >
+                    Ex-Meta
+                  </Pill>
+                  <Pill
+                    active={interviewerMode === "standard"}
+                    onClick={() => setInterviewerMode("standard")}
+                  >
+                    Standard
+                  </Pill>
+                </div>
+              </Field>
+
               <Field
                 label="Company target"
                 hint="Bias prompts toward specific company-style interviews."

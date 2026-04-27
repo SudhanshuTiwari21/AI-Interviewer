@@ -100,10 +100,17 @@ export default function DashboardPage() {
   }
 
   const lastReport = reports[0];
+  const previousReport = reports[1];
   const avgScore = reports.length
     ? Math.round(reports.reduce((s, r) => s + r.overall, 0) / reports.length)
     : 0;
   const userFirstName = user ? user.name.split(" ")[0] : null;
+  const trendDelta =
+    reports.length >= 2 && previousReport && lastReport
+      ? lastReport.overall - previousReport.overall
+      : null;
+  const trendDeltaLabel =
+    trendDelta === null ? "N/A" : trendDelta > 0 ? `+${trendDelta}` : `${trendDelta}`;
 
   return (
     <div className="container max-w-6xl px-4 py-8 sm:py-10">
@@ -266,6 +273,43 @@ export default function DashboardPage() {
                 <p className="text-sm text-ink-500">
                   Run your first interview to see your skill breakdown.
                 </p>
+              )}
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Progress trend</CardTitle>
+            </CardHeader>
+            <CardBody className="space-y-3">
+              {reports.length < 2 ? (
+                <p className="text-sm text-ink-500">
+                  Complete at least two interviews to unlock trend insights.
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm text-ink-700">
+                    Latest score change:{" "}
+                    <span className="font-semibold text-ink-900">
+                      {trendDeltaLabel}
+                    </span>
+                  </p>
+                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
+                    <p className="text-xs text-ink-500">Last 5 interviews</p>
+                    <div className="mt-2 flex items-end gap-2">
+                      {reports.slice(0, 5).reverse().map((r) => (
+                        <div key={r.id} className="flex-1 text-center">
+                          <div className="mx-auto flex h-24 w-7 items-end rounded bg-ink-100">
+                            <div
+                              className="w-full rounded bg-accent-500"
+                              style={{ height: `${Math.max(8, r.overall)}%` }}
+                            />
+                          </div>
+                          <p className="mt-1 text-[10px] text-ink-500">{r.overall}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
             </CardBody>
           </Card>

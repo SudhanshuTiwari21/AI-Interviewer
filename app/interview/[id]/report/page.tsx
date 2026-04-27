@@ -28,12 +28,25 @@ import {
   FileCheck2,
 } from "lucide-react";
 
+type ReportProgress = {
+  trend: "improving" | "stable" | "declining" | "insufficient_data";
+  totalInterviews: number;
+  rollingAvg3: number;
+  deltaFromPrevious: {
+    overall: number;
+  } | null;
+  deltaFromFirst: {
+    overall: number;
+  } | null;
+};
+
 export default function ReportPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [report, setReport] = useState<InterviewReport | null>(null);
   const [emailSent, setEmailSent] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState<ReportProgress | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +73,17 @@ export default function ReportPage() {
       cancelled = true;
     };
   }, [params.id, router]);
+
+  useEffect(() => {
+    if (!report) return;
+    void fetch(`/api/reports/progress?currentId=${encodeURIComponent(report.id)}`, {
+      cache: "no-store",
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) setProgress(d.progress);
+      });
+  }, [report]);
 
   if (!report) return null;
 
@@ -197,6 +221,45 @@ export default function ReportPage() {
               </CardBody>
             </Card>
 
+            {progress && (
+              <Card>
+                <div className="border-b border-ink-100 px-6 py-4">
+                  <p className="text-sm font-semibold text-ink-900">
+                    Progress vs previous interviews
+                  </p>
+                </div>
+                <CardBody className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-4">
+                    <p className="text-xs text-ink-500">Trend</p>
+                    <p className="mt-1 text-base font-semibold capitalize text-ink-900">
+                      {progress.trend.replaceAll("_", " ")}
+                    </p>
+                    <p className="mt-1 text-xs text-ink-500">
+                      Based on your latest two interviews.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-4">
+                    <p className="text-xs text-ink-500">Delta from previous</p>
+                    <p className="mt-1 text-base font-semibold text-ink-900">
+                      {formatSigned(progress.deltaFromPrevious?.overall)}
+                    </p>
+                    <p className="mt-1 text-xs text-ink-500">
+                      Overall score change.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-4">
+                    <p className="text-xs text-ink-500">Rolling average (last 3)</p>
+                    <p className="mt-1 text-base font-semibold text-ink-900">
+                      {progress.rollingAvg3}
+                    </p>
+                    <p className="mt-1 text-xs text-ink-500">
+                      Across {Math.min(3, progress.totalInterviews)} interview(s).
+                    </p>
+                  </div>
+                </CardBody>
+              </Card>
+            )}
+
             {report.jobReadiness && (
               <Card>
                 <div className="border-b border-ink-100 px-6 py-4">
@@ -237,6 +300,36 @@ export default function ReportPage() {
                       </ul>
                     </div>
                   )}
+                </CardBody>
+              </Card>
+            )}
+
+            {report.detailedAnalysis && (
+              <Card>
+                <div className="border-b border-ink-100 px-6 py-4">
+                  <p className="text-sm font-semibold text-ink-900">
+                    Detailed analysis
+                  </p>
+                </div>
+                <CardBody className="space-y-4">
+                  <InsightBlock title="Executive summary" text={report.detailedAnalysis.executiveSummary} />
+                  <InsightBlock title="Interview behavior" text={report.detailedAnalysis.interviewBehavior} />
+                  <InsightBlock title="Technical signals" text={report.detailedAnalysis.technicalSignals} />
+                  <InsightBlock title="Communication signals" text={report.detailedAnalysis.communicationSignals} />
+                  <InsightBlock title="Risk assessment" text={report.detailedAnalysis.riskAssessment} />
+                  <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                      7-day improvement plan
+                    </p>
+                    <ul className="mt-2 space-y-2 text-sm leading-6 text-ink-700">
+                      {report.detailedAnalysis.sevenDayPlan.map((step) => (
+                        <li key={step} className="flex items-start gap-2">
+                          <span className="mt-2 inline-block size-1.5 flex-none rounded-full bg-accent-500" />
+                          {step}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </CardBody>
               </Card>
             )}
@@ -417,6 +510,12 @@ export default function ReportPage() {
   );
 }
 
+function formatSigned(value: number | undefined) {
+  if (typeof value !== "number") return "N/A";
+  if (value === 0) return "0";
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
 function Section({
   title,
   icon,
@@ -433,6 +532,17 @@ function Section({
         {title}
       </p>
       <div className="mt-3">{children}</div>
+    </div>
+  );
+}
+
+function InsightBlock({ title, text }: Readonly<{ title: string; text: string }>) {
+  return (
+    <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">
+        {title}
+      </p>
+      <p className="mt-1.5 text-sm leading-6 text-ink-700">{text}</p>
     </div>
   );
 }

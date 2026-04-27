@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import type { InterviewReport } from "@/lib/question-engine";
+import { buildReportInsights } from "@/lib/report-insights";
 import { formatDate } from "@/lib/utils";
 import { FileText, Search } from "lucide-react";
 
@@ -32,6 +33,8 @@ export default function AdminReportsPage() {
         r.id.toLowerCase().includes(needle),
     );
   }, [q, reports]);
+
+  const insights = useMemo(() => buildReportInsights(reports), [reports]);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -60,6 +63,27 @@ export default function AdminReportsPage() {
             <ul>
               {filtered.map((r) => {
                 const tone = scoreTone(r.overall);
+                const insight = insights.get(r.id);
+                const noveltyTone = !insight
+                  ? "neutral"
+                  : insight.noveltyScore >= 70
+                    ? "success"
+                    : insight.noveltyScore >= 40
+                      ? "warn"
+                      : "danger";
+                const challengeTone = !insight
+                  ? "neutral"
+                  : insight.challengeDeltaFromPrevious === null
+                    ? "neutral"
+                    : insight.challengeDeltaFromPrevious >= 0
+                      ? "accent"
+                      : "warn";
+                const challengeDeltaLabel =
+                  !insight || insight.challengeDeltaFromPrevious === null
+                    ? ""
+                    : insight.challengeDeltaFromPrevious >= 0
+                      ? ` · +${insight.challengeDeltaFromPrevious}`
+                      : ` · ${insight.challengeDeltaFromPrevious}`;
                 return (
                 <li
                   key={r.id}
@@ -75,6 +99,17 @@ export default function AdminReportsPage() {
                     <Badge tone={tone} dot>
                       Score {r.overall}
                     </Badge>
+                    {insight && (
+                      <>
+                        <Badge tone={noveltyTone}>
+                          Novelty {insight.noveltyScore}
+                        </Badge>
+                        <Badge tone={challengeTone}>
+                          Challenge {insight.challengeScore}
+                          {challengeDeltaLabel}
+                        </Badge>
+                      </>
+                    )}
                     <Link href={`/interview/${r.id}/report`}>
                       <Button
                         size="sm"

@@ -126,6 +126,21 @@ export async function downloadReportPdf(report: InterviewReport) {
   y += 18;
   y = drawBullets(doc, report.nextSteps, M, y, W - M * 2);
 
+  if (report.detailedAnalysis) {
+    y += 12;
+    sectionTitle(doc, "Detailed analysis", M, y);
+    y += 18;
+    y = drawParagraph(doc, `Executive summary: ${report.detailedAnalysis.executiveSummary}`, M, y, W - M * 2);
+    y = drawParagraph(doc, `Interview behavior: ${report.detailedAnalysis.interviewBehavior}`, M, y, W - M * 2);
+    y = drawParagraph(doc, `Technical signals: ${report.detailedAnalysis.technicalSignals}`, M, y, W - M * 2);
+    y = drawParagraph(doc, `Communication signals: ${report.detailedAnalysis.communicationSignals}`, M, y, W - M * 2);
+    y = drawParagraph(doc, `Risk assessment: ${report.detailedAnalysis.riskAssessment}`, M, y, W - M * 2);
+    y += 4;
+    sectionTitle(doc, "7-day improvement plan", M, y);
+    y += 18;
+    y = drawBullets(doc, report.detailedAnalysis.sevenDayPlan, M, y, W - M * 2);
+  }
+
   // Footer
   const pages = doc.getNumberOfPages();
   for (let p = 1; p <= pages; p++) {
@@ -162,6 +177,16 @@ function drawBullets(doc: any, items: string[], x: number, y: number, w: number)
     y += lines.length * 12 + 4;
   });
   return y;
+}
+
+function drawParagraph(doc: any, text: string, x: number, y: number, w: number) {
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(60, 70, 90);
+  const lines = doc.splitTextToSize(text, w);
+  y = ensureSpace(doc, y, lines.length * 12 + 8, 48);
+  doc.text(lines, x, y);
+  return y + lines.length * 12 + 6;
 }
 
 function drawBar(
