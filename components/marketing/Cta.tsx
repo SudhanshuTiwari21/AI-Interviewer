@@ -24,7 +24,7 @@ export function Cta() {
                 className="bg-white text-ink-900 hover:bg-ink-100"
                 rightIcon={<ArrowRight className="size-4" />}
               >
-                Start your mock interview
+                Start interview
               </Button>
               <Button
                 href="/#pricing"

@@ -53,9 +53,6 @@ export function SiteHeader() {
           <Button href="/login" variant="ghost" size="sm">
             Sign in
           </Button>
-          <Button href="/signup" size="sm">
-            Start free trial
-          </Button>
         </div>
         <button
           className="inline-flex size-9 items-center justify-center rounded-lg text-ink-700 hover:bg-ink-100 md:hidden"

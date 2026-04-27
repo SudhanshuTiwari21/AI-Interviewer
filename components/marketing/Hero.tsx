@@ -26,7 +26,7 @@ export function Hero() {
           </p>
           <div className="mt-7 flex w-full flex-col items-stretch justify-center gap-3 sm:mt-8 sm:w-auto sm:flex-row sm:items-center">
             <Button href="/signup" size="lg" rightIcon={<ArrowRight className="size-4" />}>
-              Start a mock interview
+              Start interview
             </Button>
             <Button href="/#how" variant="outline" size="lg">
               See how it works
