@@ -29,6 +29,21 @@ export type InterviewQuestion = {
 export type InterviewConfig = {
   role: Role;
   level: Level;
+  targetRoleLabel?: string;
+  experienceBand?: string;
+  interviewType?:
+    | "Technical Round"
+    | "Managerial Round"
+    | "Leadership Round"
+    | "HR Round"
+    | "Behavioral Round"
+    | "Scenario Based Round";
+  companyType?:
+    | "Startup"
+    | "Product Company"
+    | "Service Company"
+    | "MNC"
+    | "Leadership/Internal Promotion";
   focusAreas: string[];
   totalQuestions?: number;
   interviewerStyle?: "balanced" | "bar-raiser" | "friendly";
@@ -107,6 +122,10 @@ function systemPersona(config: InterviewConfig) {
   return [
     `You are an expert ${config.role} interviewer at ${company}.`,
     `Seniority bar: ${config.level}.`,
+    config.targetRoleLabel ? `Target role selected by candidate: ${config.targetRoleLabel}.` : "",
+    config.experienceBand ? `Experience band selected by candidate: ${config.experienceBand}.` : "",
+    config.interviewType ? `Interview round type: ${config.interviewType}.` : "",
+    config.companyType ? `Company type context: ${config.companyType}.` : "",
     `Difficulty: ${difficulty.toUpperCase()} - ${DIFFICULTY_LABEL[difficulty]}.`,
     `Interviewer style: ${style}.`,
     `Interviewer mode: ${interviewerMode}. ${INTERVIEWER_MODE_PERSONA[interviewerMode]}`,
@@ -643,8 +662,8 @@ export type InterviewReport = {
   id: string;
   candidate: string;
   email: string;
-  role: Role;
-  level: Level;
+  role: string;
+  level: string;
   overall: number;
   rating: "Strong hire" | "Hire" | "Lean hire" | "No hire";
   durationMin: number;
@@ -809,8 +828,8 @@ export function generateReport(
     id: uid("rep"),
     candidate: candidate.name,
     email: candidate.email,
-    role: config.role,
-    level: config.level,
+    role: config.targetRoleLabel ?? config.role,
+    level: config.experienceBand ?? config.level,
     overall,
     rating,
     durationMin: Math.round(

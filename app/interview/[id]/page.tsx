@@ -152,29 +152,20 @@ export default function InterviewSessionPage() {
     if (spokenForId.current === question.id) return;
     spokenForId.current = question.id;
     setSpeaking(true);
+    const openingGreeting =
+      current === 0 && answers.length === 0
+        ? `Good to meet you, ${candidateName}. Thank you for joining today. `
+        : "";
     const spokenPrompt = acknowledgement
-      ? `${acknowledgement} ${question.text}`
-      : question.text;
+      ? `${openingGreeting}${acknowledgement} ${question.text}`
+      : `${openingGreeting}${question.text}`;
     speak(spokenPrompt, {
       onStart: () => setSpeaking(true),
       onEnd: () => setSpeaking(false),
       onError: () => setSpeaking(false),
     });
     return () => cancelSpeech();
-  }, [acknowledgement, hasStarted, question, ttsEnabled]);
-
-  useEffect(() => {
-    if (!question) return;
-    if (!hasStarted) return;
-    if (!ttsEnabled) return;
-    if (!isTTSSupported()) return;
-    if (current !== 0) return;
-    if (spokenForId.current === question.id) return;
-    spokenForId.current = question.id;
-    void speakWithAwait(
-      `Good to meet you, ${candidateName}. Thank you for joining today. Let's begin. ${question.text}`,
-    );
-  }, [candidateName, current, hasStarted, question, ttsEnabled]);
+  }, [acknowledgement, answers.length, candidateName, current, hasStarted, question, ttsEnabled]);
 
   function replaySpeech() {
     if (!question) return;
@@ -421,6 +412,11 @@ export default function InterviewSessionPage() {
                       {acknowledgement}
                     </p>
                   )}
+                  {current === 0 && answers.length === 0 && (
+                    <p className="rounded-lg border border-accent-200 bg-accent-50/50 px-3 py-2 text-sm text-ink-700">
+                      Good to meet you, {candidateName}. Thank you for joining today - let&apos;s begin.
+                    </p>
+                  )}
                   <p className="text-xl font-medium leading-8 text-ink-900 sm:text-2xl">
                     {question.text}
                   </p>
@@ -459,55 +455,6 @@ export default function InterviewSessionPage() {
           </div>
 
           <aside className="space-y-4">
-            <SidebarCard
-              title="Session"
-              icon={<ListChecks className="size-4" />}
-            >
-              <ul className="space-y-2">
-                {queue.map((q, i) => (
-                  <li
-                    key={q.id}
-                    className={cn(
-                      "flex items-start gap-2 rounded-lg px-2 py-1.5 text-xs",
-                      i === current && "bg-ink-50 text-ink-900",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "mt-1 inline-flex size-4 flex-none items-center justify-center rounded-full",
-                        i < current
-                          ? "bg-success-500 text-white"
-                          : i === current
-                            ? "border border-ink-900 bg-white text-ink-900"
-                            : "border border-ink-200 bg-white text-ink-400",
-                      )}
-                    >
-                      {i < current ? (
-                        <CheckCircle2 className="size-3" />
-                      ) : (
-                        <span className="text-[9px] font-semibold">{i + 1}</span>
-                      )}
-                    </span>
-                    <span
-                      className={cn(
-                        "line-clamp-2",
-                        i < current ? "text-ink-500" : "text-ink-700",
-                      )}
-                    >
-                      {i < current
-                        ? q.text
-                        : i === current
-                          ? q.text
-                          : "Upcoming question is intentionally hidden to keep interview realism and suspense."}
-                    </span>
-                    {q.source === "ai-generated" && (
-                      <Sparkles className="ml-auto mt-0.5 size-3 flex-none text-accent-500" />
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </SidebarCard>
-
             <SidebarCard title="Coach tips" icon={<Lightbulb className="size-4" />}>
               <ul className="space-y-2 text-xs leading-5 text-ink-600">
                 <li>Lead with a one-sentence headline before the context.</li>

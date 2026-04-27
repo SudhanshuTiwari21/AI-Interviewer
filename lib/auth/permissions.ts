@@ -61,6 +61,8 @@ export const PERMISSIONS = [
   "payments.view",
   "refunds.view",
   "refunds.manage",
+  "support.view",
+  "support.manage",
 
   // Analytics
   "analytics.freshers_vs_professionals",
@@ -100,6 +102,8 @@ const ADMIN_PERMISSIONS: Permission[] = [
   "payments.view",
   "refunds.view",
   "refunds.manage",
+  "support.view",
+  "support.manage",
   "analytics.freshers_vs_professionals",
   "analytics.conversion",
   "analytics.lead_sources",
@@ -118,6 +122,7 @@ const SUB_ADMIN_PERMISSIONS: Permission[] = [
   "bookings.reschedule",
   "payments.view",
   "refunds.view",
+  "support.view",
   "analytics.freshers_vs_professionals",
   "analytics.conversion",
   "analytics.lead_sources",

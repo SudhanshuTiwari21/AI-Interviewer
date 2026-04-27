@@ -243,6 +243,63 @@ export const interviewReports = pgTable(
   }),
 );
 
+export const userSettings = pgTable(
+  "user_settings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    timezone: text("timezone").notNull().default("Asia/Kolkata"),
+    emailNotifications: boolean("email_notifications").notNull().default(true),
+    interviewReminders: boolean("interview_reminders").notNull().default(true),
+    marketingEmails: boolean("marketing_emails").notNull().default(false),
+    defaultInterviewType: text("default_interview_type"),
+    defaultCompanyType: text("default_company_type"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userUniqueIdx: uniqueIndex("user_settings_user_id_unique_idx").on(t.userId),
+    userIdx: index("user_settings_user_id_idx").on(t.userId),
+  }),
+);
+
+export const supportTickets = pgTable(
+  "support_tickets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    userEmail: text("user_email").notNull(),
+    userName: text("user_name").notNull(),
+    category: text("category").notNull(), // payment | refund | account | coaching | technical | custom
+    subject: text("subject").notNull(),
+    description: text("description").notNull(),
+    status: text("status").notNull().default("open"), // open | in_progress | resolved | closed
+    priority: text("priority").notNull().default("medium"), // low | medium | high
+    adminNote: text("admin_note"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedBy: uuid("resolved_by"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userIdx: index("support_tickets_user_id_idx").on(t.userId),
+    statusIdx: index("support_tickets_status_idx").on(t.status),
+    categoryIdx: index("support_tickets_category_idx").on(t.category),
+  }),
+);
+
 export const emailVerificationTokens = pgTable(
   "email_verification_tokens",
   {
@@ -276,3 +333,5 @@ export type InterviewReportRow = typeof interviewReports.$inferSelect;
 export type PaymentTransactionRow = typeof paymentTransactions.$inferSelect;
 export type RazorpayWebhookEventRow = typeof razorpayWebhookEvents.$inferSelect;
 export type RefundEventRow = typeof refundEvents.$inferSelect;
+export type UserSettingsRow = typeof userSettings.$inferSelect;
+export type SupportTicketRow = typeof supportTickets.$inferSelect;

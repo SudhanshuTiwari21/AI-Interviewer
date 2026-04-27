@@ -8,10 +8,11 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ResumeUpload } from "@/components/interview/ResumeUpload";
 import { store } from "@/lib/store";
-import { ROLES, LEVELS, FOCUS_AREAS, type Role, type Level } from "@/lib/mock-data";
+import { FOCUS_AREAS, type Role, type Level } from "@/lib/mock-data";
 import type { ParsedResume } from "@/lib/resume";
 import type { Difficulty, InterviewerMode } from "@/lib/question-engine";
 import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
+import { ensureRazorpayScriptLoaded } from "@/lib/payments/client";
 import { cn, uid } from "@/lib/utils";
 import { LiveTranscriber } from "@/lib/speech";
 import {
@@ -25,11 +26,107 @@ import {
   Crown,
   FileText,
   Gauge,
+  AlertTriangle,
 } from "lucide-react";
+
+const TARGET_ROLES = [
+  "Scrum Master",
+  "Agile Delivery Manager",
+  "Agile Coach",
+  "Delivery Manager",
+  "Product Manager",
+  "QA Lead",
+  "DevOps Engineer",
+  "Java Developer",
+  ".Net Developer",
+  "Python Developer",
+  "Data Analyst",
+  "Project Manager",
+  "Data Engineer",
+  "AI/ML Engineer",
+  "Front End Developer",
+] as const;
+
+const EXPERIENCE_BANDS = [
+  "Fresher",
+  "1-3 Years",
+  "3-5 Years",
+  "5-8 Years",
+  "8+ Years",
+  "Leadership Level",
+] as const;
+
+const INTERVIEW_TYPES = [
+  "Technical Round",
+  "Managerial Round",
+  "Leadership Round",
+  "HR Round",
+  "Behavioral Round",
+  "Scenario Based Round",
+] as const;
+
+const COMPANY_TYPES = [
+  "Startup",
+  "Product Company",
+  "Service Company",
+  "MNC",
+  "Leadership/Internal Promotion",
+] as const;
+
+function mapTargetRole(role: string): Role {
+  switch (role) {
+    case "Scrum Master":
+    case "Agile Delivery Manager":
+    case "Agile Coach":
+    case "Delivery Manager":
+    case "Product Manager":
+    case "Project Manager":
+      return "Product Manager";
+    case "QA Lead":
+    case "DevOps Engineer":
+    case "Java Developer":
+    case ".Net Developer":
+      return "Backend Engineer";
+    case "Python Developer":
+    case "Data Analyst":
+    case "Data Engineer":
+    case "AI/ML Engineer":
+      return "Data Scientist";
+    case "Front End Developer":
+      return "Frontend Engineer";
+    default:
+      return "Product Manager";
+  }
+}
+
+function mapExperienceToLevel(experience: string): Level {
+  switch (experience) {
+    case "Fresher":
+      return "Junior";
+    case "1-3 Years":
+      return "Mid";
+    case "3-5 Years":
+      return "Senior";
+    case "5-8 Years":
+    case "8+ Years":
+    case "Leadership Level":
+      return "Staff";
+    default:
+      return "Senior";
+  }
+}
 
 export default function SetupPage() {
   const router = useRouter();
-  const [role, setRole] = useState<Role>("Frontend Engineer");
+  const [targetRole, setTargetRole] = useState<string>("Scrum Master");
+  const [experienceBand, setExperienceBand] = useState<string>("3-5 Years");
+  const [interviewType, setInterviewType] = useState<
+    "Technical Round" | "Managerial Round" | "Leadership Round" | "HR Round" | "Behavioral Round" | "Scenario Based Round"
+  >("Technical Round");
+  const [companyType, setCompanyType] = useState<
+    "Startup" | "Product Company" | "Service Company" | "MNC" | "Leadership/Internal Promotion"
+  >("Product Company");
+  const [role, setRole] = useState<Role>("Product Manager");
   const [level, setLevel] = useState<Level>("Senior");
   const [focusAreas, setFocusAreas] = useState<string[]>([
     "System design",
@@ -43,8 +140,9 @@ export default function SetupPage() {
     "balanced" | "bar-raiser" | "friendly"
   >("bar-raiser");
   const [interviewerMode, setInterviewerMode] = useState<InterviewerMode>("ex-google");
-  const [companyTarget, setCompanyTarget] = useState("Google");
   const [stressTest, setStressTest] = useState(true);
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
 
   useEffect(() => {
     const user = store.getUser();
@@ -68,21 +166,112 @@ export default function SetupPage() {
     }
   }
 
-  function startInterview() {
-    if (!resume) return;
+  function beginInterviewSession(parsedResume: ParsedResume) {
+    const mapped = mapTargetRole(targetRole);
+    const mappedLevel = mapExperienceToLevel(experienceBand);
+    setRole(mapped);
+    setLevel(mappedLevel);
     store.setConfig({
-      role,
-      level,
+      role: mapped,
+      level: mappedLevel,
+      targetRoleLabel: targetRole,
+      experienceBand,
+      interviewType,
+      companyType,
       focusAreas,
       difficulty,
-      resume,
+      resume: parsedResume,
       interviewerStyle,
       interviewerMode,
-      companyTarget,
+      companyTarget: companyType,
       stressTest,
     });
     const id = uid("ses");
     router.push(`/interview/${id}`);
+  }
+
+  async function payAndStartInterview() {
+    if (!resume || paying) return;
+    const user = store.getUser();
+    if (!user) {
+      router.replace("/login?next=/interview/setup");
+      return;
+    }
+
+    setPayError(null);
+    setPaying(true);
+    try {
+      const scriptReady = await ensureRazorpayScriptLoaded();
+      if (!scriptReady || !globalThis.window?.Razorpay) {
+        setPayError("Could not load payment gateway. Please refresh and try again.");
+        return;
+      }
+
+      const orderRes = await fetch("/api/payments/razorpay/order", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          productType: "interview",
+          amountInr: INTERVIEW_PRICE_INR,
+        }),
+      });
+      const orderData = await orderRes.json();
+      if (!orderData.ok) {
+        setPayError(orderData.message ?? "Unable to initiate interview payment.");
+        return;
+      }
+
+      const paymentResult = await new Promise<{
+        razorpay_payment_id: string;
+        razorpay_order_id: string;
+        razorpay_signature: string;
+      } | null>((resolve) => {
+        const rz = new globalThis.window.Razorpay({
+          key: orderData.razorpayKeyId,
+          amount: orderData.order.amount,
+          currency: orderData.order.currency,
+          name: "SelectWise",
+          description: "Interview access payment",
+          order_id: orderData.order.id,
+          prefill: {
+            name: user.name,
+            email: user.email,
+          },
+          notes: { productType: "interview", paymentMode: "one_time" },
+          theme: { color: "#111827" },
+          handler: (response) => resolve(response),
+          modal: { ondismiss: () => resolve(null) },
+        });
+        rz.open();
+      });
+
+      if (!paymentResult) {
+        setPayError("Payment was cancelled.");
+        return;
+      }
+
+      const verifyRes = await fetch("/api/payments/razorpay/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          razorpayOrderId: paymentResult.razorpay_order_id,
+          razorpayPaymentId: paymentResult.razorpay_payment_id,
+          razorpaySignature: paymentResult.razorpay_signature,
+          transactionId: orderData.transactionId,
+        }),
+      });
+      const verifyData = await verifyRes.json();
+      if (!verifyData.ok) {
+        setPayError(verifyData.message ?? "Payment verification failed.");
+        return;
+      }
+
+      beginInterviewSession(resume);
+    } catch {
+      setPayError("Something went wrong while processing payment.");
+    } finally {
+      setPaying(false);
+    }
   }
 
   const sttSupported =
@@ -168,31 +357,31 @@ export default function SetupPage() {
                 </div>
               </div>
 
-              <Field label="Role">
-                <div className="flex flex-wrap gap-2">
-                  {ROLES.map((r) => (
-                    <Pill
-                      key={r}
-                      active={role === r}
-                      onClick={() => setRole(r)}
-                    >
-                      {r}
-                    </Pill>
+              <Field label="Target role">
+                <select
+                  value={targetRole}
+                  onChange={(e) => setTargetRole(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-ink-200 bg-white px-3 text-sm text-ink-800 outline-none ring-accent-500 focus:ring-2"
+                >
+                  {TARGET_ROLES.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
                   ))}
-                </div>
+                </select>
               </Field>
-              <Field label="Seniority">
-                <div className="flex flex-wrap gap-2">
-                  {LEVELS.map((l) => (
-                    <Pill
-                      key={l}
-                      active={level === l}
-                      onClick={() => setLevel(l)}
-                    >
-                      {l}
-                    </Pill>
+              <Field label="Experience level">
+                <select
+                  value={experienceBand}
+                  onChange={(e) => setExperienceBand(e.target.value)}
+                  className="h-11 w-full rounded-xl border border-ink-200 bg-white px-3 text-sm text-ink-800 outline-none ring-accent-500 focus:ring-2"
+                >
+                  {EXPERIENCE_BANDS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
                   ))}
-                </div>
+                </select>
               </Field>
               <Field
                 label="Difficulty"
@@ -316,21 +505,50 @@ export default function SetupPage() {
                 </div>
               </Field>
 
-              <Field
-                label="Company target"
-                hint="Bias prompts toward specific company-style interviews."
-              >
-                <div className="flex flex-wrap gap-2">
-                  {["Google", "Amazon", "Meta", "Stripe", "Anthropic"].map((c) => (
-                    <Pill
-                      key={c}
-                      active={companyTarget === c}
-                      onClick={() => setCompanyTarget(c)}
-                    >
-                      {c}
-                    </Pill>
+              <Field label="Interview type">
+                <select
+                  value={interviewType}
+                  onChange={(e) =>
+                    setInterviewType(
+                      e.target.value as
+                        | "Technical Round"
+                        | "Managerial Round"
+                        | "Leadership Round"
+                        | "HR Round"
+                        | "Behavioral Round"
+                        | "Scenario Based Round",
+                    )
+                  }
+                  className="h-11 w-full rounded-xl border border-ink-200 bg-white px-3 text-sm text-ink-800 outline-none ring-accent-500 focus:ring-2"
+                >
+                  {INTERVIEW_TYPES.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
                   ))}
-                </div>
+                </select>
+              </Field>
+              <Field label="Company type">
+                <select
+                  value={companyType}
+                  onChange={(e) =>
+                    setCompanyType(
+                      e.target.value as
+                        | "Startup"
+                        | "Product Company"
+                        | "Service Company"
+                        | "MNC"
+                        | "Leadership/Internal Promotion",
+                    )
+                  }
+                  className="h-11 w-full rounded-xl border border-ink-200 bg-white px-3 text-sm text-ink-800 outline-none ring-accent-500 focus:ring-2"
+                >
+                  {COMPANY_TYPES.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="Stress test mode">
                 <button
@@ -416,20 +634,30 @@ export default function SetupPage() {
               <div>
                 <p className="font-medium text-ink-900">Ready to begin?</p>
                 <p className="text-xs text-ink-500">
-                  Resume-driven · {difficulty} difficulty · ~25–45 min · {role} · ₹{INTERVIEW_PRICE_INR} per interview
+                  Resume-driven · {difficulty} difficulty · ~25–45 min · {targetRole} · ₹{INTERVIEW_PRICE_INR} per interview
                 </p>
               </div>
             </div>
             <Button
               size="lg"
-              onClick={startInterview}
+              onClick={() => void payAndStartInterview()}
               rightIcon={<ArrowRight className="size-4" />}
-              disabled={!canStart}
+              disabled={!canStart || paying}
               className="w-full sm:w-auto"
             >
-              {resume ? "Start interview" : "Upload resume to start"}
+              {paying
+                ? `Processing payment...`
+                : resume
+                  ? `Pay ₹${INTERVIEW_PRICE_INR} and Start`
+                  : "Pay and Start"}
             </Button>
           </div>
+          {payError && (
+            <div className="flex items-center gap-2 rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
+              <AlertTriangle className="size-4" />
+              {payError}
+            </div>
+          )}
         </div>
       </main>
     </div>

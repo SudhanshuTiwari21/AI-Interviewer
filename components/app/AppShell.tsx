@@ -29,8 +29,8 @@ const NAV = [
 ];
 
 const SECONDARY = [
-  { href: "#", label: "Settings", icon: Settings },
-  { href: "#", label: "Support", icon: LifeBuoy },
+  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/support", label: "Support", icon: LifeBuoy },
 ];
 
 export function AppShell({
