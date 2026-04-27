@@ -252,10 +252,13 @@ export default function SetupPage() {
   const [payError, setPayError] = useState<string | null>(null);
   const [rolePickerOpen, setRolePickerOpen] = useState(false);
   const [roleQuery, setRoleQuery] = useState("");
+  const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     const user = store.getUser();
     if (!user) router.replace("/login?next=/interview/setup");
+    const draft = store.getInterviewDraft();
+    setDraftSessionId(draft?.sessionId ?? null);
   }, [router]);
 
   function toggleFocus(f: string) {
@@ -300,6 +303,10 @@ export default function SetupPage() {
   }
 
   async function payAndStartInterview() {
+    if (draftSessionId) {
+      router.push(`/interview/${draftSessionId}`);
+      return;
+    }
     if (!resume || paying) return;
     const user = store.getUser();
     if (!user) {
@@ -386,10 +393,23 @@ export default function SetupPage() {
   const sttSupported =
     globalThis.window !== undefined && LiveTranscriber.isSupported();
 
-  const canStart = !!resume;
+  function discardSavedInterview() {
+    if (!confirm("Discard your saved in-progress interview? You will need a new payment to start again.")) {
+      return;
+    }
+    store.clearInterviewDraft();
+    store.clearConfig();
+    setDraftSessionId(null);
+  }
+
+  const canStart = !!resume || !!draftSessionId;
   const filteredRoles = TARGET_ROLES.filter((item) =>
     item.toLowerCase().includes(roleQuery.trim().toLowerCase()),
   );
+  let startButtonLabel = "Pay and Start";
+  if (paying) startButtonLabel = "Processing payment...";
+  else if (draftSessionId) startButtonLabel = "Resume paid interview";
+  else if (resume) startButtonLabel = `Pay ₹${INTERVIEW_PRICE_INR} and Start`;
 
   return (
     <div className="min-h-screen bg-ink-50/40">
@@ -808,13 +828,23 @@ export default function SetupPage() {
               disabled={!canStart || paying}
               className="w-full sm:w-auto"
             >
-              {paying
-                ? `Processing payment...`
-                : resume
-                  ? `Pay ₹${INTERVIEW_PRICE_INR} and Start`
-                  : "Pay and Start"}
+              {startButtonLabel}
             </Button>
           </div>
+          {draftSessionId && (
+            <div className="flex items-center justify-between rounded-xl border border-accent-200 bg-accent-50 px-4 py-3 text-xs text-accent-800">
+              <span>
+                Saved paid interview found. Resume it without paying again.
+              </span>
+              <button
+                type="button"
+                onClick={discardSavedInterview}
+                className="font-semibold underline"
+              >
+                Discard and start fresh
+              </button>
+            </div>
+          )}
           {payError && (
             <div className="flex items-center gap-2 rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700">
               <AlertTriangle className="size-4" />

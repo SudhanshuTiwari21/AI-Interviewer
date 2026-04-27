@@ -1,8 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -25,12 +25,10 @@ import { cn, secondsToClock } from "@/lib/utils";
 import {
   Sparkles,
   CheckCircle2,
-  Clock,
   ChevronRight,
   ListChecks,
   Lightbulb,
   ArrowLeft,
-  BrainCircuit,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -49,6 +47,8 @@ const InterviewerAvatar = dynamic(
 
 export default function InterviewSessionPage() {
   const router = useRouter();
+  const params = useParams<{ id: string }>();
+  const sessionId = params?.id ?? "";
 
   const [config, setConfig] = useState<InterviewConfig | null>(null);
   const [queue, setQueue] = useState<InterviewQuestion[]>([]);
@@ -58,7 +58,6 @@ export default function InterviewSessionPage() {
   const [elapsed, setElapsed] = useState(0);
   const [generating, setGenerating] = useState(false);
   const [finishing, setFinishing] = useState(false);
-  const [aiLive, setAiLive] = useState(false);
   const [planning, setPlanning] = useState(true);
   const [hasStarted, setHasStarted] = useState(true);
   const [candidateName, setCandidateName] = useState("Candidate");
@@ -68,6 +67,33 @@ export default function InterviewSessionPage() {
   const [interviewerTranscript, setInterviewerTranscript] = useState("");
   const sessionStart = useRef(Date.now());
   const spokenForId = useRef<string | null>(null);
+
+  const saveDraft = useCallback(() => {
+    if (!config || !sessionId) return;
+    store.setInterviewDraft({
+      sessionId,
+      config,
+      queue,
+      current,
+      answers,
+      aiInserted,
+      elapsed,
+      acknowledgement,
+      interviewerTranscript,
+      createdAt: store.getInterviewDraft()?.createdAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }, [
+    acknowledgement,
+    aiInserted,
+    answers,
+    config,
+    current,
+    elapsed,
+    interviewerTranscript,
+    queue,
+    sessionId,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,8 +109,24 @@ export default function InterviewSessionPage() {
     }
     const resumeName = cfg.resume?.candidateName?.trim();
     setCandidateName(resumeName || user.name || "Candidate");
+    const draft = store.getInterviewDraft();
+    if (draft?.sessionId === sessionId) {
+      setConfig(draft.config);
+      setQueue(draft.queue);
+      setCurrent(draft.current);
+      setAnswers(draft.answers);
+      setAiInserted(draft.aiInserted);
+      setElapsed(draft.elapsed);
+      setAcknowledgement(draft.acknowledgement);
+      setInterviewerTranscript(draft.interviewerTranscript);
+      sessionStart.current = Date.now() - draft.elapsed * 1000;
+      setPlanning(false);
+      return () => {
+        cancelled = true;
+        cancelSpeech();
+      };
+    }
     sessionStart.current = Date.now();
-    setAiLive(Boolean(process.env.NEXT_PUBLIC_OPENAI_API_KEY));
 
     (async () => {
       await ensureVoicesLoaded();
@@ -123,7 +165,7 @@ export default function InterviewSessionPage() {
       cancelled = true;
       cancelSpeech();
     };
-  }, [router]);
+  }, [router, sessionId]);
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -131,6 +173,32 @@ export default function InterviewSessionPage() {
     }, 1000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    if (!config || !queue.length || !sessionId) return;
+    const t = setInterval(() => {
+      saveDraft();
+    }, 15000);
+    const onBeforeUnload = () => {
+      saveDraft();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, [
+    acknowledgement,
+    aiInserted,
+    answers,
+    config,
+    current,
+    elapsed,
+    interviewerTranscript,
+    queue,
+    saveDraft,
+    sessionId,
+  ]);
 
   const question = queue[current];
   const total = queue.length;
@@ -276,7 +344,27 @@ export default function InterviewSessionPage() {
       console.error("[reports/save]", err);
       store.saveReport(report);
     }
+    store.clearInterviewDraft();
+    store.clearConfig();
     router.replace(`/interview/${report.id}/report`);
+  }
+
+  function handleExit() {
+    const shouldSave = confirm(
+      "Save your progress and exit? You can resume this paid interview later from dashboard.",
+    );
+    if (shouldSave) {
+      saveDraft();
+      router.push("/dashboard");
+      return;
+    }
+    const shouldDiscard = confirm(
+      "Discard this interview progress and exit? This cannot be undone.",
+    );
+    if (!shouldDiscard) return;
+    store.clearInterviewDraft();
+    store.clearConfig();
+    router.push("/dashboard");
   }
 
   if (!config) return null;
@@ -310,14 +398,7 @@ export default function InterviewSessionPage() {
           </div>
           <div className="flex items-center gap-3">
             <Badge tone="neutral">
-              <Clock className="size-3" /> {secondsToClock(elapsed)}
-            </Badge>
-            <Badge tone="accent" dot>
-              {current + 1} of {total}
-            </Badge>
-            <Badge tone={aiLive ? "success" : "warn"} dot>
-              <BrainCircuit className="size-3" />
-              {aiLive ? "Dynamic flow enabled" : "Interview flow enabled"}
+              {secondsToClock(elapsed)}
             </Badge>
             {config.stressTest && (
               <Badge tone="warn" dot>
@@ -327,10 +408,7 @@ export default function InterviewSessionPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                if (confirm("End this session? Your progress will be discarded."))
-                  router.push("/dashboard");
-              }}
+              onClick={handleExit}
               leftIcon={<ArrowLeft className="size-4" />}
             >
               Exit

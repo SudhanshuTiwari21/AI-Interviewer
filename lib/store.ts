@@ -6,7 +6,12 @@
  * → schedule) works end-to-end without a backend.
  */
 
-import type { InterviewConfig, InterviewReport } from "./question-engine";
+import type {
+  AnswerRecord,
+  InterviewConfig,
+  InterviewQuestion,
+  InterviewReport,
+} from "./question-engine";
 import type { Plan } from "./mock-data";
 import { type Coach } from "./coaches";
 
@@ -25,6 +30,7 @@ const KEYS = {
   config: "hiro.config",
   bookings: "hiro.bookings",
   coaches: "hiro.coaches",
+  interviewDraft: "hiro.interviewDraft",
 } as const;
 
 function safeGet<T>(key: string, fallback: T): T {
@@ -81,6 +87,21 @@ export const store = {
   getConfig(): InterviewConfig | null {
     return safeGet<InterviewConfig | null>(KEYS.config, null);
   },
+  clearConfig() {
+    if (globalThis.window === undefined) return;
+    localStorage.removeItem(KEYS.config);
+  },
+  getInterviewDraft(): InterviewDraft | null {
+    return safeGet<InterviewDraft | null>(KEYS.interviewDraft, null);
+  },
+  setInterviewDraft(draft: InterviewDraft) {
+    safeSet(KEYS.interviewDraft, draft);
+    safeSet(KEYS.config, draft.config);
+  },
+  clearInterviewDraft() {
+    if (globalThis.window === undefined) return;
+    localStorage.removeItem(KEYS.interviewDraft);
+  },
   getBookings(): Booking[] {
     return safeGet<Booking[]>(KEYS.bookings, []);
   },
@@ -123,6 +144,20 @@ export const store = {
       all.filter((c) => c.id !== id),
     );
   },
+};
+
+export type InterviewDraft = {
+  sessionId: string;
+  config: InterviewConfig;
+  queue: InterviewQuestion[];
+  current: number;
+  answers: AnswerRecord[];
+  aiInserted: number;
+  elapsed: number;
+  acknowledgement: string | null;
+  interviewerTranscript: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type Booking = {

@@ -42,10 +42,13 @@ export default function DashboardPage() {
   const [refundReasonById, setRefundReasonById] = useState<Record<string, string>>({});
   const [refundLoadingId, setRefundLoadingId] = useState<string | null>(null);
   const [refundError, setRefundError] = useState<string | null>(null);
+  const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     const u = store.getUser();
     setUser(u);
+    const draft = store.getInterviewDraft();
+    setDraftSessionId(draft?.sessionId ?? null);
     void fetch("/api/reports", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
@@ -119,6 +122,11 @@ export default function DashboardPage() {
         description="Pick up where you left off or run a new mock interview."
         actions={
           <>
+            {draftSessionId && (
+              <Button href={`/interview/${draftSessionId}`} variant="primary">
+                Resume interview
+              </Button>
+            )}
             <Button href="/schedule" variant="outline">
               Book a coach
             </Button>
@@ -135,6 +143,11 @@ export default function DashboardPage() {
         <Crown className="size-3.5" />
         All premium interview features are enabled for every interview.
       </div>
+      {draftSessionId && (
+        <div className="mt-3 rounded-xl border border-accent-200 bg-accent-50 px-4 py-2 text-xs font-medium text-accent-800">
+          You have a saved paid interview in progress. Resume anytime without paying again.
+        </div>
+      )}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <Stat
