@@ -32,6 +32,12 @@ function startOfWeek(d: Date) {
   return date;
 }
 
+function startOfDay(d: Date) {
+  const date = new Date(d);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 export default function SchedulePage() {
   return (
     <Suspense
@@ -83,15 +89,19 @@ function ScheduleInner() {
   }, [coachId, router]);
 
   const days = useMemo(() => {
+    const today = startOfDay(new Date());
     return Array.from({ length: 5 }, (_, i) => {
       const d = new Date(weekStart);
       d.setDate(weekStart.getDate() + i);
+      if (d < today) return null;
       return d;
-    });
+    }).filter((d): d is Date => d !== null);
   }, [weekStart]);
 
   useEffect(() => {
-    if (!selectedDay) setSelectedDay(days[0] ?? null);
+    if (!selectedDay || (days.length > 0 && !days.some((d) => d.toDateString() === selectedDay.toDateString()))) {
+      setSelectedDay(days[0] ?? null);
+    }
   }, [days, selectedDay]);
 
   const techAreas = TARGET_ROLES;
@@ -143,7 +153,10 @@ function ScheduleInner() {
   const bookedSet = useMemo(() => new Set(bookedSlots), [bookedSlots]);
   const slots =
     selectedDay && coach
-      ? buildSlotsForCoach(coach, selectedDay).filter((s) => !bookedSet.has(s))
+      ? buildSlotsForCoach(coach, selectedDay).filter((s) => {
+          if (bookedSet.has(s)) return false;
+          return new Date(s).getTime() > Date.now();
+        })
       : [];
 
   async function confirm() {
@@ -463,10 +476,13 @@ function ScheduleInner() {
                       onClick={() => {
                         const d = new Date(weekStart);
                         d.setDate(d.getDate() - 7);
+                        const currentWeekStart = startOfWeek(new Date());
+                        if (d < currentWeekStart) return;
                         setWeekStart(d);
                         setSelectedDay(null);
                         setSelectedSlot(null);
                       }}
+                      disabled={weekStart <= startOfWeek(new Date())}
                       className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
                     >
                       <ChevronLeft className="size-4" />

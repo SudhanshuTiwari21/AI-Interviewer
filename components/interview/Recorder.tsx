@@ -16,17 +16,34 @@ import {
 
 type Mode = "voice" | "text";
 
+async function transcribeWithServer(blob: Blob): Promise<string | null> {
+  try {
+    const form = new FormData();
+    form.append("audio", blob, "answer.webm");
+    const res = await fetch("/api/transcribe", {
+      method: "POST",
+      body: form,
+    });
+    const data = (await res.json()) as { ok: boolean; transcript?: string };
+    if (!data.ok) return null;
+    const text = (data.transcript ?? "").trim();
+    return text || null;
+  } catch {
+    return null;
+  }
+}
+
 export function Recorder({
   onSubmit,
   disabled,
-}: {
+}: Readonly<{
   onSubmit: (payload: {
     transcript: string;
     durationSec: number;
     mode: Mode;
   }) => void;
   disabled?: boolean;
-}) {
+}>) {
   const [mode, setMode] = useState<Mode>("voice");
   const [recording, setRecording] = useState(false);
   const [paused, setPaused] = useState(false);
@@ -36,6 +53,7 @@ export function Recorder({
   const [textAnswer, setTextAnswer] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [level, setLevel] = useState(0);
+  const [transcribing, setTranscribing] = useState(false);
 
   const recorderRef = useRef<VoiceRecorder | null>(null);
   const transcriberRef = useRef<LiveTranscriber | null>(null);
@@ -153,12 +171,19 @@ export function Recorder({
     stopTimer();
     stopMeter();
     transcriberRef.current?.stop();
-    await recorderRef.current?.stop();
+    const audioBlob = await recorderRef.current?.stop();
     setRecording(false);
     setPaused(false);
     if (submit) {
-      const finalText = (transcript || partial).trim();
-      if (!finalText) return;
+      setTranscribing(true);
+      const serverText = audioBlob ? await transcribeWithServer(audioBlob) : null;
+      const liveText = (transcript || partial).trim();
+      const finalText = (serverText || liveText).trim();
+      setTranscribing(false);
+      if (finalText.length === 0) {
+        setError("Could not transcribe your answer. Please try again or switch to typing.");
+        return;
+      }
       onSubmit({ transcript: finalText, durationSec: seconds, mode: "voice" });
       reset();
     }
@@ -253,6 +278,9 @@ export function Recorder({
           {error && (
             <p className="mt-3 text-xs text-danger-600">{error}</p>
           )}
+          {transcribing && (
+            <p className="mt-3 text-xs text-ink-500">Transcribing your response...</p>
+          )}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               {!recording ? (
@@ -267,11 +295,11 @@ export function Recorder({
                 <>
                   <Button
                     onClick={() => stopRecording(true)}
-                    disabled={!recording || (!transcript && !partial)}
+                    disabled={!recording || transcribing}
                     variant="primary"
                     leftIcon={<Square className="size-4" />}
                   >
-                    Finish answer
+                    {transcribing ? "Transcribing..." : "Finish answer"}
                   </Button>
                   <Button
                     variant="outline"
@@ -293,7 +321,7 @@ export function Recorder({
               )}
             </div>
             <p className="text-xs text-ink-500">
-              Voice mode auto-sends when you finish the answer.
+              Voice mode sends audio for secure server transcription on submit.
             </p>
           </div>
         </div>
