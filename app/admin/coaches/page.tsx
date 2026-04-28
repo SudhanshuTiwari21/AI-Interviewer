@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -65,6 +65,7 @@ export default function AdminCoachesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const formAlertRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     void fetch("/api/admin/coaches", { cache: "no-store" })
@@ -75,6 +76,11 @@ export default function AdminCoachesPage() {
       })
       .catch(() => setCoaches([]));
   }, []);
+
+  useEffect(() => {
+    if (!saveMessage && !saveError) return;
+    formAlertRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [saveError, saveMessage]);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -89,6 +95,8 @@ export default function AdminCoachesPage() {
               onClick={() => {
                 setEditingId(null);
                 setForm(DEFAULT_FORM);
+                setSaveMessage(null);
+                setSaveError(null);
               }}
             >
               New coach
@@ -165,6 +173,8 @@ export default function AdminCoachesPage() {
                       leftIcon={<Pencil className="size-3.5" />}
                       onClick={() => {
                         setEditingId(coach.id);
+                        setSaveMessage(null);
+                        setSaveError(null);
                         setForm({
                           name: coach.name,
                           email: coach.email,
@@ -257,12 +267,18 @@ export default function AdminCoachesPage() {
                 {editingId ? "Edit coach" : "Create coach"}
               </p>
               {saveMessage ? (
-                <p className="rounded-lg border border-success-200 bg-success-50 px-3 py-2 text-xs text-success-700">
+                <p
+                  ref={formAlertRef}
+                  className="rounded-lg border border-success-200 bg-success-50 px-3 py-2 text-xs text-success-700"
+                >
                   {saveMessage}
                 </p>
               ) : null}
               {saveError ? (
-                <p className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-xs text-danger-700">
+                <p
+                  ref={formAlertRef}
+                  className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-xs text-danger-700"
+                >
                   {saveError}
                 </p>
               ) : null}
@@ -492,6 +508,8 @@ export default function AdminCoachesPage() {
                   onClick={() => {
                     setEditingId(null);
                     setForm(DEFAULT_FORM);
+                    setSaveMessage(null);
+                    setSaveError(null);
                   }}
                 >
                   Reset
