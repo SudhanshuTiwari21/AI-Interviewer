@@ -26,9 +26,9 @@ export function SiteFooter() {
               title: "Company",
               items: [
                 ["About", "/about"],
-                ["Careers", "#"],
-                ["Blog", "#"],
-                ["Contact", "#"],
+                ["Careers", "/careers"],
+                ["Blog", "/blog"],
+                ["Contact", "/contact"],
               ],
             },
             {
@@ -63,7 +63,7 @@ export function SiteFooter() {
           </p>
           <div className="flex items-center gap-2 text-xs text-ink-400">
             <span className="size-2 rounded-full bg-success-500" />
-            All systems operational
+            <span>All systems operational</span>
           </div>
         </div>
       </div>

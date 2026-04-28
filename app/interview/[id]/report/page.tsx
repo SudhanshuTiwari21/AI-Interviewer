@@ -15,6 +15,8 @@ import { formatDate, formatTime } from "@/lib/utils";
 import {
   Download,
   Mail,
+  Share2,
+  Copy,
   CalendarClock,
   CheckCircle2,
   Sparkles,
@@ -47,6 +49,8 @@ export default function ReportPage() {
   const [emailSent, setEmailSent] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<ReportProgress | null>(null);
+  const [shareText, setShareText] = useState("");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,7 +89,46 @@ export default function ReportPage() {
       });
   }, [report]);
 
+  useEffect(() => {
+    if (!report || shareText.trim().length > 0) return;
+    setShareText(buildShareTemplate(report, progress));
+  }, [progress, report, shareText]);
+
   if (!report) return null;
+
+  const fallbackReportUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/interview/${params.id}/report`;
+  const reportUrl =
+    globalThis.window === undefined
+      ? fallbackReportUrl
+      : globalThis.window.location.href;
+  const encodedShareText = encodeURIComponent(shareText);
+  const encodedReportUrl = encodeURIComponent(reportUrl);
+  const shareWithLink = `${shareText}\n\n${reportUrl}`;
+  const encodedShareWithLink = encodeURIComponent(shareWithLink);
+  const emailSubject = encodeURIComponent("My SelectWise interview report");
+  const emailBody = encodedShareWithLink;
+  const socialShareLinks = [
+    {
+      label: "LinkedIn",
+      href: `https://www.linkedin.com/feed/?shareActive=true&text=${encodedShareWithLink}`,
+    },
+    {
+      label: "X",
+      href: `https://twitter.com/intent/tweet?text=${encodedShareText}&url=${encodedReportUrl}`,
+    },
+    {
+      label: "WhatsApp",
+      href: `https://wa.me/?text=${encodedShareWithLink}`,
+    },
+    {
+      label: "Facebook",
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedReportUrl}&quote=${encodedShareText}`,
+    },
+    {
+      label: "Telegram",
+      href: `https://t.me/share/url?url=${encodedReportUrl}&text=${encodedShareText}`,
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-ink-50/40">
@@ -471,6 +514,59 @@ export default function ReportPage() {
               </CardBody>
             </Card>
 
+            <Card>
+              <div className="border-b border-ink-100 px-5 py-3">
+                <p className="inline-flex items-center gap-2 text-sm font-semibold text-ink-900">
+                  <Share2 className="size-4 text-accent-600" />
+                  Share your result
+                </p>
+              </div>
+              <CardBody className="space-y-3">
+                <p className="text-xs text-ink-500">
+                  Edit this template and share your experience with one click.
+                </p>
+                <textarea
+                  value={shareText}
+                  onChange={(e) => setShareText(e.target.value)}
+                  rows={6}
+                  className="w-full rounded-xl border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 outline-none ring-accent-500/25 transition focus:ring"
+                />
+                <div className="flex flex-wrap gap-2">
+                  {socialShareLinks.map((item) => (
+                    <Button
+                      key={item.label}
+                      size="sm"
+                      variant="outline"
+                      onClick={() => window.open(item.href, "_blank", "noopener,noreferrer")}
+                    >
+                      {item.label}
+                    </Button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    leftIcon={<Copy className="size-4" />}
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(shareWithLink);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2500);
+                    }}
+                  >
+                    {copied ? "Copied" : "Copy text + report link"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    href={`mailto:?subject=${emailSubject}&body=${emailBody}`}
+                  >
+                    Share via Email
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+
             <Card className="overflow-hidden bg-ink-950 text-white">
               <div className="relative p-5">
                 <div className="pointer-events-none absolute inset-0 grid-bg opacity-[0.06]" />
@@ -508,6 +604,19 @@ export default function ReportPage() {
       </main>
     </div>
   );
+}
+
+function buildShareTemplate(report: InterviewReport, progress: ReportProgress | null) {
+  const trendLabel = progress?.trend ? progress.trend.replaceAll("_", " ") : "improving";
+  const previousDelta = formatSigned(progress?.deltaFromPrevious?.overall);
+  return `I just completed an AI interview on SelectWise.
+
+Role: ${report.role} (${report.level})
+Overall score: ${report.overall}/100
+Recommendation: ${report.rating}
+Trend: ${trendLabel} (${previousDelta} vs previous)
+
+My personalized report and improvement plan are ready.`;
 }
 
 function formatSigned(value: number | undefined) {
