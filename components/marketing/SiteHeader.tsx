@@ -49,10 +49,10 @@ export function SiteHeader() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 w-full transition-colors",
+        "sticky top-0 z-50 w-full transition-colors",
         scrolled
           ? "border-b border-ink-100 bg-white/80 backdrop-blur-md"
-          : "bg-transparent",
+          : "border-b border-transparent bg-white/95 backdrop-blur-md",
       )}
     >
       <div className="container flex h-16 max-w-6xl items-center justify-between">
