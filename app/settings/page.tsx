@@ -35,7 +35,16 @@ export default function SettingsPage() {
           }
           return;
         }
-        const data = await res.json();
+        const raw = await res.text();
+        let data: { ok?: boolean; settings?: UserSettings; message?: string } = {};
+        try {
+          data = raw ? (JSON.parse(raw) as typeof data) : {};
+        } catch {
+          data = {
+            ok: false,
+            message: `Settings API error (${res.status}).`,
+          };
+        }
         if (cancelled) return;
         if (data.ok) {
           setSettings(data.settings);
