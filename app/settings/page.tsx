@@ -7,6 +7,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { store } from "@/lib/store";
+import { ArrowLeft } from "lucide-react";
 
 type UserSettings = {
   timezone: string;
@@ -165,7 +166,14 @@ export default function SettingsPage() {
       <PageHeader
         title="Settings"
         description="Manage your interview preferences and notification controls."
-        actions={message ? <Badge tone={messageTone}>{message}</Badge> : undefined}
+        actions={
+          <>
+            {message ? <Badge tone={messageTone}>{message}</Badge> : null}
+            <Button href="/dashboard" variant="outline" size="sm" leftIcon={<ArrowLeft className="size-4" />}>
+              Back to dashboard
+            </Button>
+          </>
+        }
       />
 
       <div className="mt-6 space-y-4">
