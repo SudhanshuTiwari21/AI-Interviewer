@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -21,13 +21,13 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
 
-  async function enforceSession() {
+  const enforceSession = useCallback(async () => {
     const sessionUser = await authClient.me();
     if (sessionUser?.role === "coach") return;
     store.setUser(null);
     router.replace("/login?next=/coach");
     router.refresh();
-  }
+  }, [router]);
 
   async function handleLogout() {
     await authClient.logout();
@@ -62,7 +62,7 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
       window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("focus", onFocus);
     };
-  }, []);
+  }, [enforceSession]);
 
   if (!user) {
     return (

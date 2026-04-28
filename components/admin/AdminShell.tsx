@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -95,13 +95,13 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  async function enforceSession() {
+  const enforceSession = useCallback(async () => {
     const sessionUser = await authClient.me();
     if (sessionUser && isAdminRole(sessionUser.role)) return;
     store.setUser(null);
     router.replace("/login?next=/admin");
     router.refresh();
-  }
+  }, [router]);
 
   async function handleSignOut() {
     await authClient.logout();
@@ -152,7 +152,7 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
       window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("focus", onFocus);
     };
-  }, []);
+  }, [enforceSession]);
 
   const ctxValue = useMemo<AdminCtx | null>(() => {
     if (!user) return null;

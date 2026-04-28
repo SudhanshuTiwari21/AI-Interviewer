@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -42,13 +42,13 @@ export function AppShell({
   const [user, setUser] = useState<User | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
-  async function enforceSession() {
+  const enforceSession = useCallback(async () => {
     const sessionUser = await authClient.me();
     if (sessionUser) return;
     store.setUser(null);
     router.replace("/login");
     router.refresh();
-  }
+  }, [router]);
 
   async function handleLogout() {
     await authClient.logout();
@@ -84,7 +84,7 @@ export function AppShell({
       window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("focus", onFocus);
     };
-  }, []);
+  }, [enforceSession]);
 
   if (!hydrated || !user) {
     return (

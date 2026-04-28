@@ -97,24 +97,28 @@ export async function PATCH(req: Request) {
       payload.newPassword !== undefined ||
       payload.confirmPassword !== undefined
     ) {
-      const hasCurrent = Boolean(payload.currentPassword);
-      const hasNext = Boolean(payload.newPassword);
-      const hasConfirm = Boolean(payload.confirmPassword);
-      if (!(hasCurrent && hasNext && hasConfirm)) {
+      const currentPassword = payload.currentPassword;
+      const newPassword = payload.newPassword;
+      const confirmPassword = payload.confirmPassword;
+      if (
+        typeof currentPassword !== "string" ||
+        typeof newPassword !== "string" ||
+        typeof confirmPassword !== "string"
+      ) {
         return fail(
           "validation_error",
           "Current password, new password, and confirm password are all required.",
           400,
         );
       }
-      if (payload.newPassword !== payload.confirmPassword) {
+      if (newPassword !== confirmPassword) {
         return fail("validation_error", "New password and confirm password must match.", 400);
       }
-      const passwordValid = await verifyPassword(payload.currentPassword, user.passwordHash);
+      const passwordValid = await verifyPassword(currentPassword, user.passwordHash);
       if (passwordValid === false) {
         return fail("invalid_credentials", "Current password is incorrect.", 401);
       }
-      const nextHash = await hashPassword(payload.newPassword);
+      const nextHash = await hashPassword(newPassword);
       await db
         .update(schema.users)
         .set({ passwordHash: nextHash, updatedAt: new Date() })
