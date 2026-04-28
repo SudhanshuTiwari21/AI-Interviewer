@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { useAdmin, AdminPageHeader } from "@/components/admin/AdminShell";
 import { type Coach } from "@/lib/coaches";
+import { TARGET_ROLES } from "@/lib/target-roles";
 import { cn, uid } from "@/lib/utils";
 import { Pencil, Plus, Save, Trash2 } from "lucide-react";
 
@@ -15,7 +16,7 @@ type CoachForm = {
   email: string;
   title: string;
   focus: string;
-  techAreas: string;
+  techAreas: string[];
   hourlyRateInr: string;
   rating: string;
   sessions: string;
@@ -40,7 +41,7 @@ const DEFAULT_FORM: CoachForm = {
   email: "",
   title: "",
   focus: "",
-  techAreas: "",
+  techAreas: [],
   hourlyRateInr: "999",
   rating: "4.8",
   sessions: "0",
@@ -145,7 +146,7 @@ export default function AdminCoachesPage() {
                           email: coach.email,
                           title: coach.title,
                           focus: coach.focus.join(", "),
-                          techAreas: coach.techAreas.join(", "),
+                          techAreas: coach.techAreas,
                           hourlyRateInr: String(coach.hourlyRateInr),
                           rating: String(coach.rating),
                           sessions: String(coach.sessions),
@@ -247,15 +248,36 @@ export default function AdminCoachesPage() {
                   required
                 />
               </Field>
-              <Field label="Tech areas (comma separated)">
-                <input
-                  className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
-                  value={form.techAreas}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, techAreas: e.target.value }))
-                  }
-                  required
-                />
+              <Field label="Tech areas">
+                <div className="max-h-44 overflow-y-auto rounded-lg border border-ink-200 bg-white p-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {TARGET_ROLES.map((role) => {
+                      const active = form.techAreas.includes(role);
+                      return (
+                        <button
+                          key={role}
+                          type="button"
+                          onClick={() =>
+                            setForm((f) => ({
+                              ...f,
+                              techAreas: active
+                                ? f.techAreas.filter((item) => item !== role)
+                                : [...f.techAreas, role],
+                            }))
+                          }
+                          className={cn(
+                            "rounded-full border px-2.5 py-1 text-xs",
+                            active
+                              ? "border-ink-900 bg-ink-900 text-white"
+                              : "border-ink-200 bg-white text-ink-700",
+                          )}
+                        >
+                          {role}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </Field>
               <div className="grid grid-cols-2 gap-2">
                 <Field label="Rating">
@@ -465,6 +487,7 @@ function toHourLabel(hour: number) {
 function toCoach(form: CoachForm, editingId: string | null): Coach | null {
   if (!form.name.trim() || !form.title.trim() || form.weekdays.length === 0) return null;
   if (!form.email.trim()) return null;
+  if (form.techAreas.length === 0) return null;
   const windows = form.windows
     .map((w) => ({ startHour: Number(w.startHour), endHour: Number(w.endHour) }))
     .filter(
@@ -480,10 +503,7 @@ function toCoach(form: CoachForm, editingId: string | null): Coach | null {
     .split(",")
     .map((x) => x.trim())
     .filter(Boolean);
-  const techAreas = form.techAreas
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
+  const techAreas = form.techAreas;
   return {
     id: editingId ?? uid("coach"),
     name: form.name.trim(),
