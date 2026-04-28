@@ -70,7 +70,7 @@ export default function SettingsPage() {
           };
         }
         if (cancelled) return;
-        if (data.ok) {
+        if (data.ok && data.settings) {
           setSettings(data.settings);
           setProfile(data.profile ?? { firstName: "", lastName: "" });
           setLoadError(null);
