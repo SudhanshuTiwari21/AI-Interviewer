@@ -10,6 +10,7 @@ import { store } from "@/lib/store";
 import { uid } from "@/lib/utils";
 import { authClient } from "@/lib/auth/client";
 import { Mail, Lock, User, CheckCircle2 } from "lucide-react";
+import { isAdminRole, isCoachRole } from "@/lib/auth/permissions";
 
 export default function SignupPage() {
   return (
@@ -54,6 +55,21 @@ function SignupInner() {
     allowSignups: true,
     maintenanceMode: false,
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    void authClient.me().then((user) => {
+      if (cancelled || !user) return;
+      if (isAdminRole(user.role)) {
+        router.replace("/admin");
+        return;
+      }
+      router.replace(isCoachRole(user.role) ? "/coach" : "/dashboard");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   useEffect(() => {
     void fetch("/api/settings/public", { cache: "no-store" })

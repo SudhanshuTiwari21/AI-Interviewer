@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AuthShell } from "@/components/auth/AuthShell";
@@ -29,6 +29,21 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unverified, setUnverified] = useState<UnverifiedState | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void authClient.me().then((user) => {
+      if (cancelled || !user) return;
+      if (isAdminRole(user.role)) {
+        router.replace("/admin");
+        return;
+      }
+      router.replace(isCoachRole(user.role) ? "/coach" : "/dashboard");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
