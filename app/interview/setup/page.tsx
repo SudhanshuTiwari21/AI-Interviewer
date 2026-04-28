@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
@@ -192,6 +192,7 @@ export default function SetupPage() {
   const [rolePickerOpen, setRolePickerOpen] = useState(false);
   const [roleQuery, setRoleQuery] = useState("");
   const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
+  const rolePickerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const user = store.getUser();
@@ -199,6 +200,23 @@ export default function SetupPage() {
     const draft = store.getInterviewDraft();
     setDraftSessionId(draft?.sessionId ?? null);
   }, [router]);
+
+  useEffect(() => {
+    function handleDocumentClick(event: MouseEvent) {
+      if (!rolePickerOpen) return;
+      const picker = rolePickerRef.current;
+      if (!picker) return;
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (!picker.contains(target)) {
+        setRolePickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleDocumentClick);
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentClick);
+    };
+  }, [rolePickerOpen]);
 
   function toggleFocus(f: string) {
     setFocusAreas((prev) =>
@@ -429,7 +447,7 @@ export default function SetupPage() {
               </div>
 
               <Field label="Target role">
-                <div className="relative">
+                <div ref={rolePickerRef} className="relative">
                   <button
                     type="button"
                     onClick={() => setRolePickerOpen((v) => !v)}
