@@ -40,6 +40,13 @@ type RefundRejectedArgs = {
   adminNote?: string | null;
 };
 
+type CoachOnboardingArgs = {
+  coachName: string;
+  coachEmail: string;
+  dashboardUrl: string;
+  supportEmail?: string | null;
+};
+
 function fmtDate(iso: string, timezone?: string | null) {
   const resolvedTimezone = timezone?.trim() || "Asia/Kolkata";
   return new Date(iso).toLocaleString("en-IN", {
@@ -203,5 +210,28 @@ Your refund request has been reviewed and was not approved.
 - Track: ${args.techArea}
 - Paid amount: ₹${args.amountInr}
 - Admin note: ${adminNote}`,
+  };
+}
+
+export function coachOnboardingEmail(args: CoachOnboardingArgs) {
+  const supportEmail = args.supportEmail?.trim() || "hello@selectwise.in";
+  return {
+    subject: "Welcome onboard as a coach at SelectWise",
+    html: `<p>Hi ${args.coachName},</p>
+<p>You have been added as a coach on SelectWise.</p>
+<p>You can now sign in and start managing your coaching requests and sessions.</p>
+<ul>
+  <li><strong>Coach account:</strong> ${args.coachEmail}</li>
+  <li><strong>Coach dashboard:</strong> <a href="${args.dashboardUrl}">${args.dashboardUrl}</a></li>
+</ul>
+<p>If you need any help getting started, reply to this email or contact us at ${supportEmail}.</p>
+<p>Thanks,<br/>SelectWise</p>`,
+    text: `Hi ${args.coachName},
+You have been added as a coach on SelectWise.
+
+- Coach account: ${args.coachEmail}
+- Coach dashboard: ${args.dashboardUrl}
+
+If you need help getting started, contact us at ${supportEmail}.`,
   };
 }

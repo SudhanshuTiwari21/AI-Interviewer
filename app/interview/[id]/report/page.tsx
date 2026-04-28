@@ -607,16 +607,32 @@ export default function ReportPage() {
 }
 
 function buildShareTemplate(report: InterviewReport, progress: ReportProgress | null) {
-  const trendLabel = progress?.trend ? progress.trend.replaceAll("_", " ") : "improving";
+  const durationLabel = `${report.durationMin} minute${report.durationMin === 1 ? "" : "s"}`;
+  const strengths = report.strengths.slice(0, 3);
+  const improvements = report.improvements.slice(0, 3);
+  const trendLabel = progress?.trend ? progress.trend.replaceAll("_", " ") : "insufficient data";
   const previousDelta = formatSigned(progress?.deltaFromPrevious?.overall);
-  return `I just completed an AI interview on SelectWise.
+  const trendLine =
+    previousDelta === "N/A" ? trendLabel : `${trendLabel} (${previousDelta} vs previous)`;
 
-Role: ${report.role} (${report.level})
-Overall score: ${report.overall}/100
-Recommendation: ${report.rating}
-Trend: ${trendLabel} (${previousDelta} vs previous)
+  return `Selectwise Interview Report
+${report.role} · ${report.level}
+Candidate ${report.candidate} · ${formatDate(report.generatedAt)} at ${formatTime(report.generatedAt)} · ${durationLabel}
 
-My personalized report and improvement plan are ready.`;
+🎯 Score
+${report.overall}/100
+
+🧭 Recommendation
+${report.rating}
+
+✅ Strengths
+${strengths.length > 0 ? strengths.map((s) => `- ${s}`).join("\n") : "- No strengths captured in this report."}
+
+🛠️ Areas to improve
+${improvements.length > 0 ? improvements.map((s) => `- ${s}`).join("\n") : "- No improvement areas captured in this report."}
+
+📈 Trend
+${trendLine}`;
 }
 
 function formatSigned(value: number | undefined) {

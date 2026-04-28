@@ -15,6 +15,7 @@ type CoachForm = {
   name: string;
   email: string;
   title: string;
+  description: string;
   focus: string;
   techAreas: string[];
   hourlyRateInr: string;
@@ -40,6 +41,7 @@ const DEFAULT_FORM: CoachForm = {
   name: "",
   email: "",
   title: "",
+  description: "",
   focus: "",
   techAreas: [],
   hourlyRateInr: "999",
@@ -74,7 +76,7 @@ export default function AdminCoachesPage() {
     <div className="mx-auto max-w-6xl">
       <AdminPageHeader
         title="Coaches"
-        description="Manage coach profiles and availability windows shown to candidates. Session duration is fixed at 30 minutes."
+        description="Manage coach profiles and availability windows shown to candidates."
         actions={
           canMutate && (
             <Button
@@ -119,6 +121,9 @@ export default function AdminCoachesPage() {
                   ★ {coach.rating.toFixed(2)} · {coach.sessions} sessions ·{" "}
                   {coach.timezone} · ₹{coach.hourlyRateInr}/hour
                 </p>
+                {coach.description ? (
+                  <p className="mt-2 text-xs text-ink-600">{coach.description}</p>
+                ) : null}
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {coach.focus.map((f) => (
                     <span
@@ -145,6 +150,7 @@ export default function AdminCoachesPage() {
                           name: coach.name,
                           email: coach.email,
                           title: coach.title,
+                          description: coach.description ?? "",
                           focus: coach.focus.join(", "),
                           techAreas: coach.techAreas,
                           hourlyRateInr: String(coach.hourlyRateInr),
@@ -238,6 +244,15 @@ export default function AdminCoachesPage() {
                   value={form.title}
                   onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                   required
+                />
+              </Field>
+              <Field label="Description">
+                <textarea
+                  rows={3}
+                  className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm"
+                  value={form.description}
+                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="Brief coach bio and expertise summary"
                 />
               </Field>
               <Field label="Focus areas (comma separated)">
@@ -509,6 +524,7 @@ function toCoach(form: CoachForm, editingId: string | null): Coach | null {
     name: form.name.trim(),
     email: form.email.trim().toLowerCase(),
     title: form.title.trim(),
+    description: form.description.trim(),
     focus,
     techAreas,
     hourlyRateInr: Number(form.hourlyRateInr) || 999,

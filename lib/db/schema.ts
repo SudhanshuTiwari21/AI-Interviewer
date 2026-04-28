@@ -201,6 +201,7 @@ export const coaches = pgTable(
     name: text("name").notNull(),
     email: text("email").notNull(),
     title: text("title").notNull(),
+    description: text("description").notNull().default(""),
     rating: integer("rating").notNull().default(48), // stored as x10
     sessions: integer("sessions").notNull().default(0),
     focus: jsonb("focus").notNull().default(sql`'[]'::jsonb`),

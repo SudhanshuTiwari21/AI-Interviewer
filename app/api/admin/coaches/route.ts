@@ -9,14 +9,21 @@ import { deleteCoach, listCoaches, upsertCoach } from "@/lib/server/coaches";
 import type { Coach } from "@/lib/coaches";
 import { db, schema } from "@/lib/db/client";
 import { findUserByEmail } from "@/lib/auth/verification-service";
+import { sendMail } from "@/lib/email/transporter";
+import { coachOnboardingEmail } from "@/lib/email/templates/coaching";
 
 export const runtime = "nodejs";
+
+function appBase() {
+  return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+}
 
 const CoachSchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.string().email(),
   title: z.string(),
+  description: z.string().max(2000),
   rating: z.number(),
   sessions: z.number(),
   focus: z.array(z.string()),
@@ -65,6 +72,7 @@ export async function POST(req: Request) {
     );
   }
   await upsertCoach(coach);
+  const promotedToCoach = existing.role !== "coach";
   if (existing.role !== "coach") {
     await db
       .update(schema.users)
@@ -74,7 +82,32 @@ export async function POST(req: Request) {
       })
       .where(eq(schema.users.id, existing.id));
   }
-  return ok({ saved: true, promotedCoach: true, requiresEmailVerification: !existing.emailVerified });
+
+  if (promotedToCoach) {
+    const dashboardUrl = `${appBase()}/coach/bookings`;
+    const mail = coachOnboardingEmail({
+      coachName: coach.name,
+      coachEmail: coach.email,
+      dashboardUrl,
+      supportEmail: process.env.SUPPORT_EMAIL ?? process.env.ADMIN_EMAIL ?? null,
+    });
+    try {
+      await sendMail({
+        to: coach.email,
+        subject: mail.subject,
+        html: mail.html,
+        text: mail.text,
+      });
+    } catch (err) {
+      console.error("[admin/coaches:onboarding-email]", err);
+    }
+  }
+
+  return ok({
+    saved: true,
+    promotedCoach: promotedToCoach,
+    requiresEmailVerification: !existing.emailVerified,
+  });
 }
 
 export async function DELETE(req: Request) {

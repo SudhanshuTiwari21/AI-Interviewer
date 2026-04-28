@@ -456,6 +456,7 @@ function ScheduleInner() {
                         </span>
                       ))}
                     </div>
+                    {c.description ? <p className="mt-2 text-xs text-ink-600">{c.description}</p> : null}
                     <p className="mt-3 text-xs text-ink-500">
                       ★ {c.rating} · {c.sessions} sessions · ₹{c.hourlyRateInr}/hour
                     </p>
