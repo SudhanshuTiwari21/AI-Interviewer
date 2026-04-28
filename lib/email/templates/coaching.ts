@@ -95,6 +95,33 @@ export function coachingRequestEmailToAdmin(args: RequestArgs) {
   };
 }
 
+export function coachingRequestEmailToCandidate(args: RequestArgs) {
+  const when = fmtDate(args.startsAt);
+  return {
+    subject: `Coaching booking received (${args.techArea})`,
+    html: `<p>Hi ${args.candidateName},</p>
+<p>Your paid coaching request has been received successfully on SelectWise.</p>
+<ul>
+  <li><strong>Coach:</strong> ${args.coachName}</li>
+  <li><strong>Tech area:</strong> ${args.techArea}</li>
+  <li><strong>Session:</strong> ${when}</li>
+  <li><strong>Amount paid:</strong> ₹${args.amountInr}</li>
+  <li><strong>Booking ID:</strong> ${args.bookingId}</li>
+</ul>
+<p>Your coach has been notified for approval. We will email you once it is confirmed.</p>
+<p>Thanks,<br/>SelectWise</p>`,
+    text: `Hi ${args.candidateName},
+Your paid coaching request has been received.
+- Coach: ${args.coachName}
+- Tech area: ${args.techArea}
+- Session: ${when}
+- Amount paid: ₹${args.amountInr}
+- Booking ID: ${args.bookingId}
+
+Your coach has been notified for approval.`,
+  };
+}
+
 export function coachingApprovedEmail(args: ApprovedArgs) {
   const when = fmtDate(args.startsAt);
   return {
@@ -153,6 +180,7 @@ Your refund request is approved.
 }
 
 export function coachingRefundRejectedEmail(args: RefundRejectedArgs) {
+  const adminNote = args.adminNote ?? "N/A";
   return {
     subject: `Refund request update (${args.techArea})`,
     html: `<p>Hi ${args.candidateName},</p>
@@ -170,6 +198,6 @@ Your refund request has been reviewed and was not approved.
 - Booking ID: ${args.bookingId}
 - Track: ${args.techArea}
 - Paid amount: ₹${args.amountInr}
-- Admin note: ${args.adminNote ?? "N/A"}`,
+- Admin note: ${adminNote}`,
   };
 }

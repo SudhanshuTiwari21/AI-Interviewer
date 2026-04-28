@@ -10,6 +10,7 @@ import { findUserById } from "@/lib/auth/verification-service";
 import { sendMail } from "@/lib/email/transporter";
 import {
   coachingRequestEmailToAdmin,
+  coachingRequestEmailToCandidate,
   coachingRequestEmailToCoach,
 } from "@/lib/email/templates/coaching";
 
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
   const session = await getSessionFromCookie();
   if (!session) return fail("invalid_credentials", "Please sign in first.", 401);
   const me = await findUserById(session.sub);
-  if (!me || !me.emailVerified)
+  if (!me?.emailVerified)
     return fail("invalid_credentials", "Please sign in first.", 401);
 
   let json: unknown;
@@ -90,7 +91,7 @@ export async function POST(req: Request) {
     )
     .limit(1);
   const paymentTx = tx[0];
-  if (!paymentTx || paymentTx.status !== "paid") {
+  if (paymentTx?.status !== "paid") {
     return fail(
       "validation_error",
       "Verified payment is required before booking.",
@@ -112,45 +113,39 @@ export async function POST(req: Request) {
     return fail("validation_error", "Please select a future slot.", 400);
   }
 
-  const conflict = await db
-    .select({ id: schema.coachingBookings.id })
-    .from(schema.coachingBookings)
-    .where(
-      and(
-        eq(schema.coachingBookings.coachId, body.coachId),
-        eq(schema.coachingBookings.startsAt, startsAt),
-        eq(schema.coachingBookings.status, "pending"),
-      ),
-    )
-    .limit(1);
-  if (conflict.length > 0) {
-    return fail("validation_error", "This slot was just booked. Pick another slot.", 409);
-  }
-
   const rawToken = randomBytes(24).toString("base64url");
   const tokenHash = hashToken(rawToken);
-  const [created] = await db
-    .insert(schema.coachingBookings)
-    .values({
-      candidateUserId: me.id,
-      candidateName: me.name,
-      candidateEmail: me.email,
-      techArea: body.techArea,
-      coachId: body.coachId,
-      coachName: body.coachName,
-      coachEmail: body.coachEmail,
-      coachTimezone: body.coachTimezone,
-      startsAt,
-      durationMin: COACHING_DURATION_MIN,
-      amountInr: body.amountInr,
-      paymentStatus: "paid",
-      paymentTransactionId: body.paymentTransactionId,
-      razorpayOrderId: body.razorpayOrderId,
-      razorpayPaymentId: body.razorpayPaymentId,
-      status: "pending",
-      coachApprovalTokenHash: tokenHash,
-    })
-    .returning();
+  let created: typeof schema.coachingBookings.$inferSelect;
+  try {
+    const createdRows = await db
+      .insert(schema.coachingBookings)
+      .values({
+        candidateUserId: me.id,
+        candidateName: me.name,
+        candidateEmail: me.email,
+        techArea: body.techArea,
+        coachId: body.coachId,
+        coachName: body.coachName,
+        coachEmail: body.coachEmail,
+        coachTimezone: body.coachTimezone,
+        startsAt,
+        durationMin: COACHING_DURATION_MIN,
+        amountInr: body.amountInr,
+        paymentStatus: "paid",
+        paymentTransactionId: body.paymentTransactionId,
+        razorpayOrderId: body.razorpayOrderId,
+        razorpayPaymentId: body.razorpayPaymentId,
+        status: "pending",
+        coachApprovalTokenHash: tokenHash,
+      })
+      .returning();
+    created = createdRows[0];
+  } catch (error: any) {
+    if (error?.code === "23505") {
+      return fail("validation_error", "This slot was just booked. Pick another slot.", 409);
+    }
+    throw error;
+  }
 
   const approvalUrl = `${baseUrl()}/api/coaching/bookings/coach-approve?token=${encodeURIComponent(rawToken)}`;
   const adminEmail = process.env.ADMIN_EMAIL;
@@ -165,12 +160,37 @@ export async function POST(req: Request) {
     amountInr: body.amountInr,
     approvalUrl,
   });
-  await sendMail({
-    to: body.coachEmail,
-    subject: coachMail.subject,
-    html: coachMail.html,
-    text: coachMail.text,
+  try {
+    await sendMail({
+      to: body.coachEmail,
+      subject: coachMail.subject,
+      html: coachMail.html,
+      text: coachMail.text,
+    });
+  } catch {
+    // Booking is already confirmed in DB; don't fail user flow for email issues.
+  }
+
+  const candidateMail = coachingRequestEmailToCandidate({
+    bookingId: created.id,
+    candidateName: me.name,
+    candidateEmail: me.email,
+    techArea: body.techArea,
+    coachName: body.coachName,
+    startsAt: body.startsAt,
+    amountInr: body.amountInr,
+    approvalUrl,
   });
+  try {
+    await sendMail({
+      to: me.email,
+      subject: candidateMail.subject,
+      html: candidateMail.html,
+      text: candidateMail.text,
+    });
+  } catch {
+    // Non-blocking email failure.
+  }
 
   if (adminEmail) {
     const adminMail = coachingRequestEmailToAdmin({
@@ -183,12 +203,16 @@ export async function POST(req: Request) {
       amountInr: body.amountInr,
       approvalUrl,
     });
-    await sendMail({
-      to: adminEmail,
-      subject: adminMail.subject,
-      html: adminMail.html,
-      text: adminMail.text,
-    });
+    try {
+      await sendMail({
+        to: adminEmail,
+        subject: adminMail.subject,
+        html: adminMail.html,
+        text: adminMail.text,
+      });
+    } catch {
+      // Non-blocking email failure.
+    }
   }
 
   return ok({ booking: created }, 201);

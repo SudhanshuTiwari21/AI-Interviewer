@@ -64,7 +64,10 @@ export async function GET() {
     };
 
     const profile = splitName(user.name);
-    return ok({ settings, profile: { firstName: profile.firstName, lastName: profile.lastName } });
+    return ok({
+      settings,
+      profile: { firstName: profile.firstName, lastName: profile.lastName, email: user.email },
+    });
   } catch {
     return fail("internal_error", "Could not load settings right now.", 500);
   }
@@ -178,6 +181,7 @@ export async function PATCH(req: Request) {
       profile: {
         firstName: nextFirstName,
         lastName: nextLastName || "",
+        email: user.email,
       },
       passwordUpdated: Boolean(payload.newPassword),
     });

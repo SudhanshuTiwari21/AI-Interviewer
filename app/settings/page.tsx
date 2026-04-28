@@ -21,6 +21,7 @@ type UserSettings = {
 type ProfileSettings = {
   firstName: string;
   lastName: string;
+  email: string;
 };
 
 type PasswordForm = {
@@ -32,7 +33,11 @@ type PasswordForm = {
 export default function SettingsPage() {
   const router = useRouter();
   const [settings, setSettings] = useState<UserSettings | null>(null);
-  const [profile, setProfile] = useState<ProfileSettings>({ firstName: "", lastName: "" });
+  const [profile, setProfile] = useState<ProfileSettings>({
+    firstName: "",
+    lastName: "",
+    email: "",
+  });
   const [passwordForm, setPasswordForm] = useState<PasswordForm>({
     currentPassword: "",
     newPassword: "",
@@ -73,7 +78,7 @@ export default function SettingsPage() {
         if (cancelled) return;
         if (data.ok && data.settings) {
           setSettings(data.settings);
-          setProfile(data.profile ?? { firstName: "", lastName: "" });
+          setProfile(data.profile ?? { firstName: "", lastName: "", email: "" });
           setLoadError(null);
           return;
         }
@@ -200,6 +205,15 @@ export default function SettingsPage() {
                 />
               </label>
             </div>
+            <label className="block text-xs text-ink-600">
+              <span>Email</span>
+              <input
+                value={profile.email}
+                disabled
+                readOnly
+                className="mt-1 h-10 w-full rounded-lg border border-ink-200 bg-ink-50 px-3 text-sm text-ink-600"
+              />
+            </label>
           </CardBody>
         </Card>
 

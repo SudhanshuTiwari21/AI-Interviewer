@@ -110,6 +110,10 @@ export const coachingBookings = pgTable(
       t.candidateUserId,
     ),
     coachIdx: index("coaching_bookings_coach_id_idx").on(t.coachId),
+    coachSlotUniqueIdx: uniqueIndex("coaching_bookings_coach_slot_unique_idx").on(
+      t.coachId,
+      t.startsAt,
+    ),
     statusIdx: index("coaching_bookings_status_idx").on(t.status),
     tokenIdx: uniqueIndex("coaching_bookings_coach_approval_token_hash_idx").on(
       t.coachApprovalTokenHash,

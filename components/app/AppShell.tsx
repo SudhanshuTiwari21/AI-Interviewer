@@ -26,6 +26,7 @@ const NAV = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/interview/setup", label: "Run interview", icon: Mic },
   { href: "/dashboard/reports", label: "Reports", icon: FileText },
+  { href: "/dashboard/coach-bookings", label: "Coach bookings", icon: CalendarClock },
   { href: "/schedule", label: "Coaching", icon: CalendarClock },
 ];
 
@@ -248,8 +249,8 @@ function MobileBottomNav({
 }>) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
-      <ul className="mx-auto grid max-w-lg grid-cols-4 gap-1">
-        {items.slice(0, 4).map((item) => {
+      <ul className="mx-auto grid max-w-lg grid-cols-5 gap-1">
+        {items.slice(0, 5).map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
           return (
