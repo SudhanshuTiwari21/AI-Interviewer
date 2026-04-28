@@ -119,7 +119,7 @@ export default function DashboardPage() {
     <div className="container max-w-6xl px-4 py-8 sm:py-10">
       <PageHeader
         title={userFirstName ? `Welcome back, ${userFirstName}.` : "Welcome back."}
-        description="Pick up where you left off or run a new mock interview."
+        description="Pick up where you left off or run a new interview."
         actions={
           <>
             {draftSessionId && (
@@ -453,7 +453,7 @@ function EmptyReports() {
           No interviews yet
         </p>
         <p className="mt-1 text-sm text-ink-500">
-          Run your first mock to see scored feedback here.
+          Run your first interview to see scored feedback here.
         </p>
       </div>
       <Button
