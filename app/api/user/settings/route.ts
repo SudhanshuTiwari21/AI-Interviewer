@@ -2,9 +2,10 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { db, schema } from "@/lib/db/client";
 import { fail, ok } from "@/lib/api/response";
-import { getSessionFromCookie } from "@/lib/auth/session";
+import { getSessionFromCookie, setSessionCookie } from "@/lib/auth/session";
 import { findUserById } from "@/lib/auth/verification-service";
 
 export const runtime = "nodejs";
@@ -14,8 +15,13 @@ const Patch = z.object({
   emailNotifications: z.boolean().optional(),
   interviewReminders: z.boolean().optional(),
   marketingEmails: z.boolean().optional(),
-  defaultInterviewType: z.string().trim().min(2).max(80).optional(),
-  defaultCompanyType: z.string().trim().min(2).max(80).optional(),
+  defaultInterviewType: z.string().trim().min(2).max(80).nullable().optional(),
+  defaultCompanyType: z.string().trim().min(2).max(80).nullable().optional(),
+  firstName: z.string().trim().min(1).max(60).optional(),
+  lastName: z.string().trim().max(60).nullable().optional(),
+  currentPassword: z.string().min(8).max(128).optional(),
+  newPassword: z.string().min(8).max(128).optional(),
+  confirmPassword: z.string().min(8).max(128).optional(),
 });
 
 async function requireSignedInUser() {
@@ -24,6 +30,16 @@ async function requireSignedInUser() {
   const user = await findUserById(session.sub);
   if (!user?.emailVerified) return null;
   return user;
+}
+
+function splitName(fullName: string) {
+  const trimmed = fullName.trim();
+  if (!trimmed) return { firstName: "", lastName: "" };
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  return {
+    firstName: parts[0] ?? "",
+    lastName: parts.slice(1).join(" "),
+  };
 }
 
 export async function GET() {
@@ -47,7 +63,8 @@ export async function GET() {
       defaultCompanyType: null,
     };
 
-    return ok({ settings });
+    const profile = splitName(user.name);
+    return ok({ settings, profile: { firstName: profile.firstName, lastName: profile.lastName } });
   } catch {
     return fail("internal_error", "Could not load settings right now.", 500);
   }
@@ -74,6 +91,58 @@ export async function PATCH(req: Request) {
     }
 
     const payload = parsed.data;
+
+    if (
+      payload.currentPassword !== undefined ||
+      payload.newPassword !== undefined ||
+      payload.confirmPassword !== undefined
+    ) {
+      const hasCurrent = Boolean(payload.currentPassword);
+      const hasNext = Boolean(payload.newPassword);
+      const hasConfirm = Boolean(payload.confirmPassword);
+      if (!(hasCurrent && hasNext && hasConfirm)) {
+        return fail(
+          "validation_error",
+          "Current password, new password, and confirm password are all required.",
+          400,
+        );
+      }
+      if (payload.newPassword !== payload.confirmPassword) {
+        return fail("validation_error", "New password and confirm password must match.", 400);
+      }
+      const passwordValid = await verifyPassword(payload.currentPassword, user.passwordHash);
+      if (passwordValid === false) {
+        return fail("invalid_credentials", "Current password is incorrect.", 401);
+      }
+      const nextHash = await hashPassword(payload.newPassword);
+      await db
+        .update(schema.users)
+        .set({ passwordHash: nextHash, updatedAt: new Date() })
+        .where(eq(schema.users.id, user.id));
+    }
+
+    const hasFirstName = Object.hasOwn(payload, "firstName");
+    const hasLastName = Object.hasOwn(payload, "lastName");
+    const currentSplitName = splitName(user.name);
+    const nextFirstName = hasFirstName ? payload.firstName?.trim() ?? "" : currentSplitName.firstName;
+    const nextLastName = hasLastName ? payload.lastName?.trim() ?? "" : currentSplitName.lastName;
+    const fullName = [nextFirstName, nextLastName].filter(Boolean).join(" ").trim();
+    if (fullName.length === 0) {
+      return fail("validation_error", "First name is required.", 400);
+    }
+    await db
+      .update(schema.users)
+      .set({ name: fullName, updatedAt: new Date() })
+      .where(eq(schema.users.id, user.id));
+
+    await setSessionCookie({
+      sub: user.id,
+      email: user.email,
+      name: fullName,
+      role: user.role,
+      plan: user.plan,
+    });
+
     const [updated] = await db
       .insert(schema.userSettings)
       .values({
@@ -100,7 +169,14 @@ export async function PATCH(req: Request) {
       })
       .returning();
 
-    return ok({ settings: updated });
+    return ok({
+      settings: updated,
+      profile: {
+        firstName: nextFirstName,
+        lastName: nextLastName || "",
+      },
+      passwordUpdated: Boolean(payload.newPassword),
+    });
   } catch {
     return fail("internal_error", "Could not save settings right now.", 500);
   }
