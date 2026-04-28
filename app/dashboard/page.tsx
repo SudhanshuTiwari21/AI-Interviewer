@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/Badge";
 import { Progress } from "@/components/ui/Progress";
 import { store, type User } from "@/lib/store";
 import {
-  coachingCredits,
   premiumPlanFeatures,
   INTERVIEW_PRICE_INR,
 } from "@/lib/plan-access";
@@ -114,6 +113,7 @@ export default function DashboardPage() {
       : null;
   const trendDeltaLabel =
     trendDelta === null ? "N/A" : trendDelta > 0 ? `+${trendDelta}` : `${trendDelta}`;
+  const paidCoachingBookings = bookings.filter((b) => b.paymentStatus === "paid").length;
 
   return (
     <div className="container max-w-6xl px-4 py-8 sm:py-10">
@@ -163,9 +163,9 @@ export default function DashboardPage() {
           icon={TrendingUp}
         />
         <Stat
-          label="Coaching credits"
-          value={coachingCredits()}
-          delta="Included per completed interview"
+          label="Paid coaching bookings"
+          value={String(paidCoachingBookings)}
+          delta="Charged per coach fee before booking request"
           icon={CalendarClock}
         />
       </div>

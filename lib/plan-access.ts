@@ -13,10 +13,6 @@ export function maxQuestionCount() {
   return Number.POSITIVE_INFINITY;
 }
 
-export function coachingCredits() {
-  return "1";
-}
-
 export function usedAttemptsThisMonth(
   generatedAtValues: string[],
   now = new Date(),
