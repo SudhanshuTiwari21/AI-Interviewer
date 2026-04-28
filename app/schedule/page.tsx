@@ -22,7 +22,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
-const TECHNOLOGY_OPTIONS = [
+const FALLBACK_TECHNOLOGIES = [
   "Frontend",
   "Backend",
   "Full Stack",
@@ -36,7 +36,7 @@ const TECHNOLOGY_OPTIONS = [
   "System Design",
   "Cloud",
   "QA Automation",
-] as const;
+];
 
 function startOfWeek(d: Date) {
   const date = new Date(d);
@@ -69,6 +69,7 @@ function ScheduleInner() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [selectedTechArea, setSelectedTechArea] = useState<string>("");
+  const [adminTechAreas, setAdminTechAreas] = useState<string[]>(FALLBACK_TECHNOLOGIES);
   const [confirmed, setConfirmed] = useState<{
     id: string;
     coachName: string;
@@ -94,6 +95,15 @@ function ScheduleInner() {
       .catch(() => {
         setCoaches([]);
       });
+    void fetch("/api/settings/public", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        const categories = d?.settings?.coachingTechnologyCategories;
+        if (!Array.isArray(categories)) return;
+        const next = categories.map((item: unknown) => String(item).trim()).filter(Boolean);
+        if (next.length) setAdminTechAreas(next);
+      })
+      .catch(() => undefined);
   }, [coachId, router]);
 
   const days = useMemo(() => {
@@ -108,7 +118,10 @@ function ScheduleInner() {
     if (!selectedDay) setSelectedDay(days[0] ?? null);
   }, [days, selectedDay]);
 
-  const techAreas = useMemo(() => Array.from(TECHNOLOGY_OPTIONS), []);
+  const techAreas = useMemo(
+    () => (adminTechAreas.length ? adminTechAreas : FALLBACK_TECHNOLOGIES),
+    [adminTechAreas],
+  );
 
   useEffect(() => {
     if (!selectedTechArea && techAreas[0]) setSelectedTechArea(techAreas[0]);

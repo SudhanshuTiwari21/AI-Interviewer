@@ -18,6 +18,8 @@ export type AdminSettings = {
   supportEmail: string;
   /** Allow signups from the public landing page. */
   allowSignups: boolean;
+  /** Coaching technologies shown on schedule page. */
+  coachingTechnologyCategories: string[];
 };
 
 export const DEFAULT_SETTINGS: AdminSettings = {
@@ -26,6 +28,21 @@ export const DEFAULT_SETTINGS: AdminSettings = {
   maintenanceMode: false,
   supportEmail: "hi@selectwise.app",
   allowSignups: true,
+  coachingTechnologyCategories: [
+    "Frontend",
+    "Backend",
+    "Full Stack",
+    "Java",
+    "Python",
+    "DevOps",
+    "Data Engineering",
+    "Data Science",
+    "AI/ML",
+    "Product Management",
+    "System Design",
+    "Cloud",
+    "QA Automation",
+  ],
 };
 
 const ROW_ID = "singleton";

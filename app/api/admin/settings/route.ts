@@ -26,6 +26,10 @@ const Patch = z.object({
   maintenanceMode: z.boolean().optional(),
   supportEmail: z.string().trim().email().max(160).optional(),
   allowSignups: z.boolean().optional(),
+  coachingTechnologyCategories: z
+    .array(z.string().trim().min(1).max(80))
+    .max(100)
+    .optional(),
 });
 
 export async function GET() {

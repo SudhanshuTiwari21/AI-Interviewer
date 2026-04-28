@@ -14,6 +14,7 @@ export async function GET() {
       supportEmail: settings.supportEmail,
       maintenanceMode: settings.maintenanceMode,
       allowSignups: settings.allowSignups,
+      coachingTechnologyCategories: settings.coachingTechnologyCategories,
       banner: settings.banner ?? { enabled: false, message: "", tone: "info" },
     },
   });
