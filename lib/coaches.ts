@@ -13,7 +13,14 @@ export type Coach = {
   title: string;
   description: string;
   rating: number;
+  reviewCount?: number;
   sessions: number;
+  recentFeedbacks?: Array<{
+    rating: number;
+    feedbackText: string;
+    candidateName: string;
+    createdAt: string;
+  }>;
   focus: string[];
   techAreas: string[];
   hourlyRateInr: number;

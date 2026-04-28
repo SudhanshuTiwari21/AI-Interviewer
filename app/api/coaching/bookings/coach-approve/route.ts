@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { sendMail } from "@/lib/email/transporter";
@@ -35,6 +35,8 @@ export async function GET(req: Request) {
   }
 
   if (booking.status !== "approved") {
+    const feedbackToken = randomBytes(24).toString("base64url");
+    const feedbackTokenHash = booking.feedbackTokenHash ?? hashToken(feedbackToken);
     let meetingUrl: string | null = booking.calendarMeetingUrl ?? null;
     let calendarEventId: string | null = booking.calendarEventId ?? null;
     try {
@@ -62,6 +64,7 @@ export async function GET(req: Request) {
         status: "approved",
         coachApprovedAt: new Date(),
         coachApprovalTokenHash: null,
+        feedbackTokenHash,
         calendarMeetingUrl: meetingUrl,
         calendarEventId,
         updatedAt: new Date(),
@@ -93,6 +96,7 @@ export async function GET(req: Request) {
         text: mail.text,
       });
     }
+
   }
 
   return Response.redirect(`${appBase()}/schedule?approved=1`, 302);

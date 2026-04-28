@@ -94,6 +94,9 @@ export const coachingBookings = pgTable(
     refundReviewedAt: timestamp("refund_reviewed_at", { withTimezone: true }),
     refundProcessedAt: timestamp("refund_processed_at", { withTimezone: true }),
     coachApprovalTokenHash: text("coach_approval_token_hash"),
+    feedbackTokenHash: text("feedback_token_hash"),
+    feedbackRequestedAt: timestamp("feedback_requested_at", { withTimezone: true }),
+    feedbackSubmittedAt: timestamp("feedback_submitted_at", { withTimezone: true }),
     coachApprovedAt: timestamp("coach_approved_at", { withTimezone: true }),
     calendarEventId: text("calendar_event_id"),
     calendarMeetingUrl: text("calendar_meeting_url"),
@@ -118,6 +121,35 @@ export const coachingBookings = pgTable(
     tokenIdx: uniqueIndex("coaching_bookings_coach_approval_token_hash_idx").on(
       t.coachApprovalTokenHash,
     ),
+    feedbackTokenIdx: uniqueIndex("coaching_bookings_feedback_token_hash_idx").on(
+      t.feedbackTokenHash,
+    ),
+  }),
+);
+
+export const coachingFeedback = pgTable(
+  "coaching_feedback",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => coachingBookings.id, { onDelete: "cascade" }),
+    coachId: text("coach_id").notNull(),
+    candidateUserId: uuid("candidate_user_id").notNull(),
+    candidateName: text("candidate_name").notNull(),
+    rating: integer("rating").notNull(),
+    feedbackText: text("feedback_text"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    bookingUniqueIdx: uniqueIndex("coaching_feedback_booking_id_unique_idx").on(t.bookingId),
+    coachIdx: index("coaching_feedback_coach_id_idx").on(t.coachId),
+    ratingIdx: index("coaching_feedback_rating_idx").on(t.rating),
   }),
 );
 
@@ -202,7 +234,7 @@ export const coaches = pgTable(
     email: text("email").notNull(),
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
-    rating: integer("rating").notNull().default(48), // stored as x10
+    rating: integer("rating").notNull().default(0), // legacy field, computed rating is feedback-based
     sessions: integer("sessions").notNull().default(0),
     focus: jsonb("focus").notNull().default(sql`'[]'::jsonb`),
     techAreas: jsonb("tech_areas").notNull().default(sql`'[]'::jsonb`),
@@ -360,5 +392,6 @@ export type InterviewReportRow = typeof interviewReports.$inferSelect;
 export type PaymentTransactionRow = typeof paymentTransactions.$inferSelect;
 export type RazorpayWebhookEventRow = typeof razorpayWebhookEvents.$inferSelect;
 export type RefundEventRow = typeof refundEvents.$inferSelect;
+export type CoachingFeedbackRow = typeof coachingFeedback.$inferSelect;
 export type UserSettingsRow = typeof userSettings.$inferSelect;
 export type SupportTicketRow = typeof supportTickets.$inferSelect;

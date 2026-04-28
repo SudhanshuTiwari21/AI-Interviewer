@@ -19,7 +19,6 @@ type CoachForm = {
   focus: string;
   techAreas: string[];
   hourlyRateInr: string;
-  rating: string;
   sessions: string;
   timezone: string;
   weekdays: number[];
@@ -45,7 +44,6 @@ const DEFAULT_FORM: CoachForm = {
   focus: "",
   techAreas: [],
   hourlyRateInr: "999",
-  rating: "4.8",
   sessions: "0",
   timezone: "Asia/Kolkata",
   weekdays: [1, 2, 3, 4, 5],
@@ -64,6 +62,9 @@ export default function AdminCoachesPage() {
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CoachForm>(DEFAULT_FORM);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     void fetch("/api/admin/coaches", { cache: "no-store" })
@@ -121,7 +122,7 @@ export default function AdminCoachesPage() {
                   </Badge>
                 </div>
                 <p className="mt-2 text-xs text-ink-500">
-                  ★ {coach.rating.toFixed(2)} · {coach.sessions} sessions ·{" "}
+                  ★ {coach.rating.toFixed(2)} ({coach.reviewCount ?? 0} reviews) · {coach.sessions} sessions ·{" "}
                   {coach.timezone} · ₹{coach.hourlyRateInr}/hour
                 </p>
                 {coach.description ? (
@@ -141,6 +142,21 @@ export default function AdminCoachesPage() {
                   {coach.techAreas.join(", ")} ·{" "}
                   {weekdaysLabel(coach.availability.weekdays)} · {windowsLabel(coach.availability.windows)}
                 </p>
+                {coach.recentFeedbacks && coach.recentFeedbacks.length > 0 ? (
+                  <div className="mt-2 space-y-1.5 rounded-lg border border-ink-100 bg-ink-50/50 p-2">
+                    {coach.recentFeedbacks.slice(0, 3).map((feedback) => (
+                      <p
+                        key={`${feedback.createdAt}-${feedback.candidateName}`}
+                        className="text-[11px] text-ink-600"
+                      >
+                        <span className="font-medium text-ink-700">
+                          {feedback.rating.toFixed(1)}★ · {feedback.candidateName}
+                        </span>{" "}
+                        {feedback.feedbackText}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
                 {canMutate && (
                   <div className="mt-3 flex gap-2">
                     <Button
@@ -157,7 +173,6 @@ export default function AdminCoachesPage() {
                           focus: coach.focus.join(", "),
                           techAreas: coach.techAreas,
                           hourlyRateInr: String(coach.hourlyRateInr),
-                          rating: String(coach.rating),
                           sessions: String(coach.sessions),
                           timezone: coach.timezone,
                           weekdays: coach.availability.weekdays,
@@ -201,29 +216,56 @@ export default function AdminCoachesPage() {
 
           {canMutate ? (
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
+                setSaveMessage(null);
+                setSaveError(null);
                 const next = toCoach(form, editingId);
                 if (!next) return;
-                void fetch("/api/admin/coaches", {
-                  method: "POST",
-                  headers: { "content-type": "application/json" },
-                  body: JSON.stringify(next),
-                });
-                setCoaches((prev) => {
-                  const idx = prev.findIndex((c) => c.id === next.id);
-                  if (idx === -1) return [next, ...prev];
-                  const copy = [...prev];
-                  copy[idx] = next;
-                  return copy;
-                });
-                setEditingId(next.id);
+                setIsSaving(true);
+                try {
+                  const res = await fetch("/api/admin/coaches", {
+                    method: "POST",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify(next),
+                  });
+                  const data = await res.json();
+                  if (!data.ok) {
+                    setSaveError(data.message ?? "Could not save coach.");
+                    return;
+                  }
+                  setCoaches((prev) => {
+                    const idx = prev.findIndex((c) => c.id === next.id);
+                    if (idx === -1) return [next, ...prev];
+                    const copy = [...prev];
+                    copy[idx] = next;
+                    return copy;
+                  });
+                  setEditingId(null);
+                  setForm(DEFAULT_FORM);
+                  setSaveMessage("Coach saved successfully.");
+                  setTimeout(() => setSaveMessage(null), 3000);
+                } catch {
+                  setSaveError("Could not save coach.");
+                } finally {
+                  setIsSaving(false);
+                }
               }}
               className="space-y-3 rounded-xl border border-ink-200 bg-ink-50/40 p-4"
             >
               <p className="text-sm font-semibold text-ink-900">
                 {editingId ? "Edit coach" : "Create coach"}
               </p>
+              {saveMessage ? (
+                <p className="rounded-lg border border-success-200 bg-success-50 px-3 py-2 text-xs text-success-700">
+                  {saveMessage}
+                </p>
+              ) : null}
+              {saveError ? (
+                <p className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-xs text-danger-700">
+                  {saveError}
+                </p>
+              ) : null}
               <Field label="Name">
                 <input
                   className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
@@ -298,19 +340,6 @@ export default function AdminCoachesPage() {
                 </div>
               </Field>
               <div className="grid grid-cols-2 gap-2">
-                <Field label="Rating">
-                  <input
-                    type="number"
-                    min="1"
-                    max="5"
-                    step="0.01"
-                    className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
-                    value={form.rating}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, rating: e.target.value }))
-                    }
-                  />
-                </Field>
                 <Field label="Sessions">
                   <input
                     type="number"
@@ -448,8 +477,13 @@ export default function AdminCoachesPage() {
                 <span>Active coach</span>
               </label>
               <div className="flex gap-2 pt-1">
-                <Button size="sm" type="submit" leftIcon={<Save className="size-3.5" />}>
-                  {editingId ? "Save coach" : "Create coach"}
+                <Button
+                  size="sm"
+                  type="submit"
+                  disabled={isSaving}
+                  leftIcon={<Save className="size-3.5" />}
+                >
+                  {isSaving ? "Saving..." : editingId ? "Save coach" : "Create coach"}
                 </Button>
                 <Button
                   size="sm"
@@ -558,7 +592,7 @@ function toCoach(form: CoachForm, editingId: string | null): Coach | null {
     focus,
     techAreas,
     hourlyRateInr: Number(form.hourlyRateInr) || 999,
-    rating: Number(form.rating) || 4.8,
+    rating: 0,
     sessions: Number(form.sessions) || 0,
     timezone: form.timezone.trim() || "Asia/Kolkata",
     active: form.active,

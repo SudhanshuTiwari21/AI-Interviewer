@@ -458,8 +458,24 @@ function ScheduleInner() {
                     </div>
                     {c.description ? <p className="mt-2 text-xs text-ink-600">{c.description}</p> : null}
                     <p className="mt-3 text-xs text-ink-500">
-                      ★ {c.rating} · {c.sessions} sessions · ₹{c.hourlyRateInr}/hour
+                      ★ {c.rating.toFixed(2)} ({c.reviewCount ?? 0} reviews) · {c.sessions} sessions · ₹
+                      {c.hourlyRateInr}/hour
                     </p>
+                    {c.recentFeedbacks && c.recentFeedbacks.length > 0 ? (
+                      <div className="mt-2 space-y-1.5">
+                        {c.recentFeedbacks.slice(0, 2).map((feedback) => (
+                          <p
+                            key={`${feedback.createdAt}-${feedback.candidateName}`}
+                            className="text-[11px] text-ink-600"
+                          >
+                            <span className="font-medium text-ink-700">
+                              {feedback.rating.toFixed(1)}★
+                            </span>{" "}
+                            "{feedback.feedbackText}"
+                          </p>
+                        ))}
+                      </div>
+                    ) : null}
                   </button>
                 ))
               )}

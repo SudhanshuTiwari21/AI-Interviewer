@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash, randomBytes } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db/client";
@@ -10,6 +11,10 @@ import { coachingApprovedEmail } from "@/lib/email/templates/coaching";
 import { createCoachingCalendarEvent } from "@/lib/integrations/google-calendar";
 
 export const runtime = "nodejs";
+
+function hashToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
 
 const Body = z.object({
   action: z.enum(["approve", "reject"]),
@@ -72,6 +77,8 @@ export async function PATCH(
 
   let meetingUrl: string | null = booking.calendarMeetingUrl ?? null;
   let calendarEventId: string | null = booking.calendarEventId ?? null;
+  const feedbackToken = randomBytes(24).toString("base64url");
+  const feedbackTokenHash = booking.feedbackTokenHash ?? hashToken(feedbackToken);
   try {
     const calendarEvent = await createCoachingCalendarEvent({
       summary: `SelectWise Coaching · ${booking.techArea}`,
@@ -97,6 +104,7 @@ export async function PATCH(
       status: "approved",
       coachApprovedAt: new Date(),
       coachApprovalTokenHash: null,
+      feedbackTokenHash,
       calendarMeetingUrl: meetingUrl,
       calendarEventId,
       updatedAt: new Date(),

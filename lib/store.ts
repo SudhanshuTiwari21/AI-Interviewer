@@ -57,6 +57,8 @@ function normalizeCoach(raw: Coach): Coach {
     ...raw,
     email: raw.email ?? `${raw.id}@selectwise.app`,
     description: raw.description ?? "",
+    reviewCount: raw.reviewCount ?? 0,
+    recentFeedbacks: raw.recentFeedbacks ?? [],
     techAreas:
       raw.techAreas && raw.techAreas.length > 0 ? raw.techAreas : raw.focus ?? [],
     hourlyRateInr: raw.hourlyRateInr ?? 999,

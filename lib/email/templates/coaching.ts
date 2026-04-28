@@ -47,6 +47,15 @@ type CoachOnboardingArgs = {
   supportEmail?: string | null;
 };
 
+type CoachingFeedbackRequestArgs = {
+  candidateName: string;
+  coachName: string;
+  techArea: string;
+  startsAt: string;
+  coachTimezone?: string | null;
+  feedbackUrl: string;
+};
+
 function fmtDate(iso: string, timezone?: string | null) {
   const resolvedTimezone = timezone?.trim() || "Asia/Kolkata";
   return new Date(iso).toLocaleString("en-IN", {
@@ -233,5 +242,31 @@ You have been added as a coach on SelectWise.
 - Coach dashboard: ${args.dashboardUrl}
 
 If you need help getting started, contact us at ${supportEmail}.`,
+  };
+}
+
+export function coachingFeedbackRequestEmail(args: CoachingFeedbackRequestArgs) {
+  const when = fmtDate(args.startsAt, args.coachTimezone);
+  return {
+    subject: `How was your coaching session with ${args.coachName}?`,
+    html: `<p>Hi ${args.candidateName},</p>
+<p>Hope your coaching session went well.</p>
+<ul>
+  <li><strong>Coach:</strong> ${args.coachName}</li>
+  <li><strong>Tech area:</strong> ${args.techArea}</li>
+  <li><strong>Session:</strong> ${when}</li>
+</ul>
+<p>Please rate your coach and share your feedback:</p>
+<p><a href="${args.feedbackUrl}">Rate this coaching session</a></p>
+<p>Thanks,<br/>SelectWise</p>`,
+    text: `Hi ${args.candidateName},
+Hope your coaching session went well.
+
+- Coach: ${args.coachName}
+- Tech area: ${args.techArea}
+- Session: ${when}
+
+Please rate your coach and share feedback:
+${args.feedbackUrl}`,
   };
 }

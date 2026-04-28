@@ -24,7 +24,6 @@ const CoachSchema = z.object({
   email: z.string().email(),
   title: z.string(),
   description: z.string().max(2000),
-  rating: z.number(),
   sessions: z.number(),
   focus: z.array(z.string()),
   techAreas: z.array(z.string()),
@@ -62,7 +61,10 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return fail("validation_error", parsed.error.issues[0]?.message ?? "Invalid input", 400);
   }
-  const coach = parsed.data as Coach;
+  const coach = {
+    ...parsed.data,
+    rating: 0,
+  } as Coach;
   const existing = await findUserByEmail(coach.email);
   if (!existing) {
     return fail(

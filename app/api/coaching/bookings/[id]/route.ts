@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash, randomBytes } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db/client";
@@ -16,6 +17,10 @@ import { createCoachingCalendarEvent } from "@/lib/integrations/google-calendar"
 import { getRazorpayClient } from "@/lib/payments/razorpay";
 
 export const runtime = "nodejs";
+
+function hashToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
 
 const Body = z.object({
   status: z
@@ -238,6 +243,9 @@ export async function PATCH(
     if (booking) {
       let meetingUrl: string | null = booking.calendarMeetingUrl ?? null;
       let calendarEventId: string | null = booking.calendarEventId ?? null;
+      const feedbackToken = randomBytes(24).toString("base64url");
+      const feedbackTokenHash =
+        booking.feedbackTokenHash ?? hashToken(feedbackToken);
       if (!meetingUrl) {
         try {
           const calendarEvent = await createCoachingCalendarEvent({
@@ -260,12 +268,22 @@ export async function PATCH(
               calendarMeetingUrl: meetingUrl,
               calendarEventId,
               coachApprovedAt: new Date(),
+              feedbackTokenHash,
               updatedAt: new Date(),
             })
             .where(eq(schema.coachingBookings.id, booking.id));
         } catch (err) {
           console.error("[coaching/calendar:create]", err);
         }
+      }
+      if (booking.feedbackTokenHash === null) {
+        await db
+          .update(schema.coachingBookings)
+          .set({
+            feedbackTokenHash,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.coachingBookings.id, booking.id));
       }
       const mail = coachingApprovedEmail({
         bookingId: booking.id,
