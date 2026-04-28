@@ -47,68 +47,71 @@ export function SiteHeader() {
   }, []);
 
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-50 w-full transition-colors",
-        scrolled
-          ? "border-b border-ink-100 bg-white/80 backdrop-blur-md"
-          : "border-b border-transparent bg-white/95 backdrop-blur-md",
-      )}
-    >
-      <div className="container flex h-16 max-w-6xl items-center justify-between">
-        <div className="flex items-center gap-8">
-          <Logo />
-          <nav className="hidden items-center gap-6 md:flex">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="text-sm text-ink-600 transition-colors hover:text-ink-900"
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+    <>
+      <header
+        className={cn(
+          "fixed inset-x-0 top-0 z-50 w-full transition-colors",
+          scrolled
+            ? "border-b border-ink-100 bg-white/80 backdrop-blur-md"
+            : "border-b border-transparent bg-white/95 backdrop-blur-md",
+        )}
+      >
+        <div className="container flex h-16 max-w-6xl items-center justify-between">
+          <div className="flex items-center gap-8">
+            <Logo />
+            <nav className="hidden items-center gap-6 md:flex">
+              {NAV.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="text-sm text-ink-600 transition-colors hover:text-ink-900"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+          <div className="hidden items-center gap-2 md:flex">
+            <Button href={sessionHref} variant={signedIn ? "outline" : "ghost"} size="sm">
+              {sessionLabel}
+            </Button>
+          </div>
+          <button
+            className="inline-flex size-9 items-center justify-center rounded-lg text-ink-700 hover:bg-ink-100 md:hidden"
+            onClick={() => setOpen((o) => !o)}
+            aria-label="Open menu"
+          >
+            {open ? <X className="size-5" /> : <Menu className="size-5" />}
+          </button>
         </div>
-        <div className="hidden items-center gap-2 md:flex">
-          <Button href={sessionHref} variant={signedIn ? "outline" : "ghost"} size="sm">
-            {sessionLabel}
-          </Button>
-        </div>
-        <button
-          className="inline-flex size-9 items-center justify-center rounded-lg text-ink-700 hover:bg-ink-100 md:hidden"
-          onClick={() => setOpen((o) => !o)}
-          aria-label="Open menu"
-        >
-          {open ? <X className="size-5" /> : <Menu className="size-5" />}
-        </button>
-      </div>
-      {open && (
-        <div className="border-t border-ink-100 bg-white md:hidden">
-          <div className="container flex flex-col gap-1 py-3">
-            {NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-ink-100"
-              >
-                {item.label}
-              </Link>
-            ))}
-            <div className="mt-2 grid grid-cols-2 gap-2 px-1">
-              <Button href={sessionHref} variant="outline" size="sm">
-                {sessionLabel}
-              </Button>
-              {!signedIn && (
-                <Button href="/signup" size="sm">
-                  Get started
+        {open && (
+          <div className="border-t border-ink-100 bg-white md:hidden">
+            <div className="container flex flex-col gap-1 py-3">
+              {NAV.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm text-ink-700 hover:bg-ink-100"
+                >
+                  {item.label}
+                </Link>
+              ))}
+              <div className="mt-2 grid grid-cols-2 gap-2 px-1">
+                <Button href={sessionHref} variant="outline" size="sm">
+                  {sessionLabel}
                 </Button>
-              )}
+                {!signedIn && (
+                  <Button href="/signup" size="sm">
+                    Get started
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </header>
+        )}
+      </header>
+      <div className="h-16" aria-hidden />
+    </>
   );
 }
