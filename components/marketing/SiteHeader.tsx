@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
+import { authClient } from "@/lib/auth/client";
+import { isAdminRole } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
 import { Menu, X } from "lucide-react";
 
@@ -17,12 +19,31 @@ const NAV = [
 export function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [sessionHref, setSessionHref] = useState("/login");
+  const [sessionLabel, setSessionLabel] = useState("Sign in");
+  const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void authClient.me().then((user) => {
+      if (cancelled || !user) return;
+      let href = "/dashboard";
+      if (isAdminRole(user.role)) href = "/admin";
+      else if (user.role === "coach") href = "/coach";
+      setSessionHref(href);
+      setSessionLabel("Dashboard");
+      setSignedIn(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -50,8 +71,8 @@ export function SiteHeader() {
           </nav>
         </div>
         <div className="hidden items-center gap-2 md:flex">
-          <Button href="/login" variant="ghost" size="sm">
-            Sign in
+          <Button href={sessionHref} variant={signedIn ? "outline" : "ghost"} size="sm">
+            {sessionLabel}
           </Button>
         </div>
         <button
@@ -76,12 +97,14 @@ export function SiteHeader() {
               </Link>
             ))}
             <div className="mt-2 grid grid-cols-2 gap-2 px-1">
-              <Button href="/login" variant="outline" size="sm">
-                Sign in
+              <Button href={sessionHref} variant="outline" size="sm">
+                {sessionLabel}
               </Button>
-              <Button href="/signup" size="sm">
-                Get started
-              </Button>
+              {!signedIn && (
+                <Button href="/signup" size="sm">
+                  Get started
+                </Button>
+              )}
             </div>
           </div>
         </div>
