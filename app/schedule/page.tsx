@@ -52,7 +52,7 @@ function ScheduleInner() {
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [coachId, setCoachId] = useState<string>("");
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
-  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [selectedDay, setSelectedDay] = useState<Date | null>(() => new Date());
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [selectedTechArea, setSelectedTechArea] = useState<string>("");
   const [techSearch, setTechSearch] = useState("");

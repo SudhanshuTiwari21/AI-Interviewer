@@ -38,14 +38,6 @@ export default function ForgotPasswordPage() {
     <AuthShell
       title="Forgot password"
       subtitle="Enter your account email and we'll send a reset link."
-      footer={
-        <>
-          Remembered your password?{" "}
-          <Link href="/login" className="underline">
-            Back to sign in
-          </Link>
-        </>
-      }
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <Input
@@ -66,6 +58,12 @@ export default function ForgotPasswordPage() {
         <Button type="submit" loading={loading} className="w-full" size="lg">
           Send reset link
         </Button>
+        <p className="text-center text-sm text-ink-500">
+          Remembered your password?{" "}
+          <Link href="/login" className="font-medium text-ink-900 underline">
+            Back to sign in
+          </Link>
+        </p>
       </form>
     </AuthShell>
   );

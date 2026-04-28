@@ -14,8 +14,7 @@ export function Cta() {
               Walk into your next interview already warmed up.
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-ink-300">
-              Join candidates using Selectwise and Hiro to turn nerves into
-              signal. Each interview is just ₹299.
+              Candidates can join using Selectwise. Each interview is just ₹299.
             </p>
             <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button

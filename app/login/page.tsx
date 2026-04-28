@@ -99,14 +99,6 @@ export default function LoginPage() {
     <AuthShell
       title="Welcome back"
       subtitle="Sign in to continue your interview prep."
-      footer={
-        <>
-          Need an account?{" "}
-          <Link href="/signup" className="underline">
-            Sign up
-          </Link>
-        </>
-      }
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <Input
@@ -138,12 +130,11 @@ export default function LoginPage() {
                   Email isn't verified yet
                 </div>
                 <div className="mt-0.5 text-ink-600">
-                  We sent a verification link to
+                  <span>We sent a verification link to </span>
                   <span className="font-medium text-ink-900">
-                    {" "}{unverified.email}
+                    {unverified.email}
                   </span>
-                  . Click it to activate your account, or request a new one
-                  below.
+                  <span>. Click it to activate your account, or request a new one below.</span>
                 </div>
                 <div className="mt-3">
                   <Button
@@ -176,6 +167,12 @@ export default function LoginPage() {
         <Button type="submit" loading={loading} className="w-full" size="lg">
           Sign in
         </Button>
+        <p className="text-center text-sm text-ink-500">
+          Need an account?{" "}
+          <Link href="/signup" className="font-medium text-ink-900 underline">
+            Sign up
+          </Link>
+        </p>
       </form>
     </AuthShell>
   );

@@ -183,19 +183,6 @@ function SignupInner() {
     <AuthShell
       title="Create your Selectwise account"
       subtitle="Create your account and start interview practice."
-      footer={
-        <>
-          By signing up you agree to our{" "}
-          <Link href="#" className="underline">
-            Terms
-          </Link>{" "}
-          and{" "}
-          <Link href="#" className="underline">
-            Privacy Policy
-          </Link>
-          .
-        </>
-      }
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <Input
@@ -237,6 +224,23 @@ function SignupInner() {
         >
           Create account
         </Button>
+        <p className="text-center text-xs text-ink-500">
+          By signing up you agree to our{" "}
+          <Link href="/terms-and-conditions" className="underline">
+            Terms
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy-policy" className="underline">
+            Privacy Policy
+          </Link>
+          .
+        </p>
+        <p className="text-center text-sm text-ink-500">
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-ink-900 underline">
+            Sign in
+          </Link>
+        </p>
         <div className="relative py-1">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-ink-100" />
@@ -263,12 +267,6 @@ function SignupInner() {
         >
           Continue with demo account
         </Button>
-        <p className="text-center text-sm text-ink-500">
-          Already have an account?{" "}
-          <Link href="/login" className="font-medium text-ink-900 underline">
-            Sign in
-          </Link>
-        </p>
       </form>
     </AuthShell>
   );
