@@ -8,13 +8,35 @@ function rowToCoach(row: typeof schema.coaches.$inferSelect): Coach {
   const availability = (row.availability ?? {}) as Coach["availability"];
   const legacyStartHour = (availability as { startHour?: number }).startHour;
   const legacyEndHour = (availability as { endHour?: number }).endHour;
+  const rawWindows = (availability as {
+    windows?: Array<{
+      startMinute?: number;
+      endMinute?: number;
+      startHour?: number;
+      endHour?: number;
+    }>;
+  }).windows;
   const normalizedWindows =
-    availability.windows && availability.windows.length > 0
-      ? availability.windows
+    rawWindows && rawWindows.length > 0
+      ? rawWindows.map((window) => {
+          if (
+            typeof window.startMinute === "number" &&
+            typeof window.endMinute === "number"
+          ) {
+            return {
+              startMinute: Math.max(0, Math.min(23 * 60 + 59, window.startMinute)),
+              endMinute: Math.max(1, Math.min(23 * 60 + 59, window.endMinute)),
+            };
+          }
+          return {
+            startMinute: (window.startHour ?? 9) * 60,
+            endMinute: Math.min(23 * 60 + 59, (window.endHour ?? 18) * 60),
+          };
+        })
       : [
           {
-            startHour: legacyStartHour ?? 9,
-            endHour: legacyEndHour ?? 18,
+            startMinute: (legacyStartHour ?? 9) * 60,
+            endMinute: Math.min(23 * 60 + 59, (legacyEndHour ?? 18) * 60),
           },
         ];
   return {

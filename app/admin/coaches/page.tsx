@@ -23,7 +23,7 @@ type CoachForm = {
   sessions: string;
   timezone: string;
   weekdays: number[];
-  windows: Array<{ startHour: string; endHour: string }>;
+  windows: Array<{ startMinute: string; endMinute: string }>;
   active: boolean;
 };
 
@@ -49,7 +49,10 @@ const DEFAULT_FORM: CoachForm = {
   sessions: "0",
   timezone: "Asia/Kolkata",
   weekdays: [1, 2, 3, 4, 5],
-  windows: [{ startHour: "9", endHour: "10" }, { startHour: "18", endHour: "19" }],
+  windows: [
+    { startMinute: "09:00", endMinute: "10:00" },
+    { startMinute: "18:00", endMinute: "19:00" },
+  ],
   active: true,
 };
 
@@ -160,9 +163,9 @@ export default function AdminCoachesPage() {
                           weekdays: coach.availability.weekdays,
                           windows:
                             coach.availability.windows?.map((w) => ({
-                              startHour: String(w.startHour),
-                              endHour: String(w.endHour),
-                            })) ?? [{ startHour: "9", endHour: "10" }],
+                              startMinute: toTimeValue(w.startMinute),
+                              endMinute: toTimeValue(w.endMinute),
+                            })) ?? [{ startMinute: "09:00", endMinute: "10:00" }],
                           active: coach.active,
                         });
                       }}
@@ -372,38 +375,36 @@ export default function AdminCoachesPage() {
               <Field label="Availability windows">
                 <div className="space-y-2">
                   {form.windows.map((win, idx) => (
-                    <div key={`${idx}-${win.startHour}-${win.endHour}`} className="grid grid-cols-[1fr,1fr,auto] gap-2">
+                    <div key={`${idx}-${win.startMinute}-${win.endMinute}`} className="grid grid-cols-[1fr,1fr,auto] gap-2">
                       <input
-                        type="number"
-                        min="0"
-                        max="23"
+                        type="time"
+                        step="60"
                         className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
-                        value={win.startHour}
+                        value={win.startMinute}
                         onChange={(e) =>
                           setForm((f) => ({
                             ...f,
                             windows: f.windows.map((w, i) =>
-                              i === idx ? { ...w, startHour: e.target.value } : w,
+                              i === idx ? { ...w, startMinute: e.target.value } : w,
                             ),
                           }))
                         }
-                        placeholder="Start hour"
+                        placeholder="Start time"
                       />
                       <input
-                        type="number"
-                        min="1"
-                        max="24"
+                        type="time"
+                        step="60"
                         className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
-                        value={win.endHour}
+                        value={win.endMinute}
                         onChange={(e) =>
                           setForm((f) => ({
                             ...f,
                             windows: f.windows.map((w, i) =>
-                              i === idx ? { ...w, endHour: e.target.value } : w,
+                              i === idx ? { ...w, endMinute: e.target.value } : w,
                             ),
                           }))
                         }
-                        placeholder="End hour"
+                        placeholder="End time"
                       />
                       <Button
                         type="button"
@@ -428,7 +429,7 @@ export default function AdminCoachesPage() {
                     onClick={() =>
                       setForm((f) => ({
                         ...f,
-                        windows: [...f.windows, { startHour: "9", endHour: "10" }],
+                        windows: [...f.windows, { startMinute: "09:00", endMinute: "10:00" }],
                       }))
                     }
                   >
@@ -493,10 +494,36 @@ function weekdaysLabel(days: number[]) {
   return labels.join(", ") || "No days";
 }
 
-function toHourLabel(hour: number) {
-  const suffix = hour >= 12 ? "PM" : "AM";
-  const h = hour % 12 || 12;
-  return `${h}${suffix}`;
+function toTimeValue(totalMinutes: number) {
+  const safeMinutes = Math.max(0, Math.min(23 * 60 + 59, totalMinutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const minutes = safeMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function parseTimeToMinutes(value: string) {
+  const [hourPart, minutePart] = value.split(":");
+  const hours = Number(hourPart);
+  const minutes = Number(minutePart);
+  if (
+    Number.isNaN(hours) ||
+    Number.isNaN(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return Number.NaN;
+  }
+  return hours * 60 + minutes;
+}
+
+function toHourMinuteLabel(totalMinutes: number) {
+  const hours24 = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  const suffix = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 || 12;
+  return `${hours12}:${String(minutes).padStart(2, "0")} ${suffix}`;
 }
 
 function toCoach(form: CoachForm, editingId: string | null): Coach | null {
@@ -504,14 +531,17 @@ function toCoach(form: CoachForm, editingId: string | null): Coach | null {
   if (!form.email.trim()) return null;
   if (form.techAreas.length === 0) return null;
   const windows = form.windows
-    .map((w) => ({ startHour: Number(w.startHour), endHour: Number(w.endHour) }))
+    .map((w) => ({
+      startMinute: parseTimeToMinutes(w.startMinute),
+      endMinute: parseTimeToMinutes(w.endMinute),
+    }))
     .filter(
       (w) =>
-        !Number.isNaN(w.startHour) &&
-        !Number.isNaN(w.endHour) &&
-        w.startHour >= 0 &&
-        w.endHour <= 24 &&
-        w.startHour < w.endHour,
+        !Number.isNaN(w.startMinute) &&
+        !Number.isNaN(w.endMinute) &&
+        w.startMinute >= 0 &&
+        w.endMinute <= 23 * 60 + 59 &&
+        w.startMinute < w.endMinute,
     );
   if (windows.length === 0) return null;
   const focus = form.focus
@@ -539,7 +569,9 @@ function toCoach(form: CoachForm, editingId: string | null): Coach | null {
   };
 }
 
-function windowsLabel(windows: Array<{ startHour: number; endHour: number }>) {
+function windowsLabel(windows: Array<{ startMinute: number; endMinute: number }>) {
   if (!windows || windows.length === 0) return "No windows";
-  return windows.map((w) => `${toHourLabel(w.startHour)}-${toHourLabel(w.endHour)}`).join(", ");
+  return windows
+    .map((w) => `${toHourMinuteLabel(w.startMinute)}-${toHourMinuteLabel(w.endMinute)}`)
+    .join(", ");
 }

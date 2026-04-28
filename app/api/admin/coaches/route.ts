@@ -35,8 +35,8 @@ const CoachSchema = z.object({
     weekdays: z.array(z.number().int()),
     windows: z.array(
       z.object({
-        startHour: z.number().int(),
-        endHour: z.number().int(),
+        startMinute: z.number().int(),
+        endMinute: z.number().int(),
       }),
     ),
   }),

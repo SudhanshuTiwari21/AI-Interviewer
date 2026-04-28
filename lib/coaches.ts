@@ -1,8 +1,8 @@
 export type CoachAvailability = {
   weekdays: number[]; // 0-6 (Sun-Sat)
   windows: Array<{
-    startHour: number; // 0-23
-    endHour: number; // 1-24
+    startMinute: number; // 0-1439
+    endMinute: number; // 1-1440
   }>;
 };
 
@@ -30,14 +30,16 @@ export function buildSlotsForCoach(coach: Coach, date: Date): string[] {
   const { windows } = coach.availability;
   const slotStepMin = 30;
   for (const window of windows) {
-    for (let hour = window.startHour; hour < window.endHour; hour++) {
-      for (let minute = 0; minute < 60; minute += slotStepMin) {
-        const slot = new Date(date);
-        slot.setHours(hour, minute, 0, 0);
-        const totalMinutes = slot.getHours() * 60 + slot.getMinutes();
-        if (totalMinutes >= window.endHour * 60) continue;
-        slots.push(slot.toISOString());
-      }
+    for (
+      let totalMinutes = window.startMinute;
+      totalMinutes + slotStepMin <= window.endMinute;
+      totalMinutes += slotStepMin
+    ) {
+      const slot = new Date(date);
+      const hour = Math.floor(totalMinutes / 60);
+      const minute = totalMinutes % 60;
+      slot.setHours(hour, minute, 0, 0);
+      slots.push(slot.toISOString());
     }
   }
   return slots;
