@@ -42,6 +42,14 @@ export function AppShell({
   const [user, setUser] = useState<User | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
+  async function enforceSession() {
+    const sessionUser = await authClient.me();
+    if (sessionUser) return;
+    store.setUser(null);
+    router.replace("/login");
+    router.refresh();
+  }
+
   async function handleLogout() {
     await authClient.logout();
     store.setUser(null);
@@ -62,6 +70,21 @@ export function AppShell({
     }
     setUser(u);
   }, [router]);
+
+  useEffect(() => {
+    function onPageShow() {
+      void enforceSession();
+    }
+    function onFocus() {
+      void enforceSession();
+    }
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
 
   if (!hydrated || !user) {
     return (

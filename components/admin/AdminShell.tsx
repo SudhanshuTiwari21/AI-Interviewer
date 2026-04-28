@@ -95,6 +95,14 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  async function enforceSession() {
+    const sessionUser = await authClient.me();
+    if (sessionUser && isAdminRole(sessionUser.role)) return;
+    store.setUser(null);
+    router.replace("/login?next=/admin");
+    router.refresh();
+  }
+
   async function handleSignOut() {
     await authClient.logout();
     store.setUser(null);
@@ -130,6 +138,21 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    function onPageShow() {
+      void enforceSession();
+    }
+    function onFocus() {
+      void enforceSession();
+    }
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
 
   const ctxValue = useMemo<AdminCtx | null>(() => {
     if (!user) return null;

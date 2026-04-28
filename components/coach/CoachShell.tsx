@@ -21,6 +21,14 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
 
+  async function enforceSession() {
+    const sessionUser = await authClient.me();
+    if (sessionUser?.role === "coach") return;
+    store.setUser(null);
+    router.replace("/login?next=/coach");
+    router.refresh();
+  }
+
   async function handleLogout() {
     await authClient.logout();
     store.setUser(null);
@@ -40,6 +48,21 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
     }
     setUser(u);
   }, [router]);
+
+  useEffect(() => {
+    function onPageShow() {
+      void enforceSession();
+    }
+    function onFocus() {
+      void enforceSession();
+    }
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
 
   if (!user) {
     return (
