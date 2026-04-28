@@ -21,7 +21,6 @@ type Settings = {
   maintenanceMode: boolean;
   supportEmail: string;
   allowSignups: boolean;
-  coachingTechnologyCategories: string[];
 };
 
 export default function AdminSettingsPage() {
@@ -41,7 +40,6 @@ export default function AdminSettingsPage() {
   const [maintenance, setMaintenance] = useState(false);
   const [supportEmail, setSupportEmail] = useState("hi@selectwise.app");
   const [allowSignups, setAllowSignups] = useState(true);
-  const [coachingCategories, setCoachingCategories] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -59,7 +57,6 @@ export default function AdminSettingsPage() {
         setMaintenance(s.maintenanceMode);
         setSupportEmail(s.supportEmail);
         setAllowSignups(s.allowSignups);
-        setCoachingCategories((s.coachingTechnologyCategories ?? []).join("\n"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -218,36 +215,6 @@ export default function AdminSettingsPage() {
           }
         >
           Save banner
-        </Button>
-      </SettingCard>
-
-      <SettingCard
-        icon={Wrench}
-        title="Coaching technology taxonomy"
-        description="Controls technology chips shown on the coaching schedule page."
-      >
-        <Field label="One category per line">
-          <textarea
-            disabled={!canEdit}
-            value={coachingCategories}
-            onChange={(e) => setCoachingCategories(e.target.value)}
-            rows={8}
-            className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm disabled:bg-ink-50"
-            placeholder={"Frontend\nBackend\nFull Stack"}
-          />
-        </Field>
-        <Button
-          size="sm"
-          disabled={!canEdit || saving}
-          onClick={() => {
-            const parsed = coachingCategories
-              .split("\n")
-              .map((item) => item.trim())
-              .filter(Boolean);
-            void save({ coachingTechnologyCategories: parsed });
-          }}
-        >
-          Save categories
         </Button>
       </SettingCard>
 
