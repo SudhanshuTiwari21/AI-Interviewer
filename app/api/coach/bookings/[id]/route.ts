@@ -112,6 +112,7 @@ export async function PATCH(
     startsAt: booking.startsAt.toISOString(),
     amountInr: booking.amountInr,
     meetingUrl,
+    coachTimezone: booking.coachTimezone,
   });
   await sendMail({
     to: booking.candidateEmail,

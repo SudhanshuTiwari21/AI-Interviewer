@@ -77,6 +77,7 @@ export async function GET(req: Request) {
       startsAt: booking.startsAt.toISOString(),
       amountInr: booking.amountInr,
       meetingUrl,
+      coachTimezone: booking.coachTimezone,
     });
     await sendMail({
       to: booking.candidateEmail,

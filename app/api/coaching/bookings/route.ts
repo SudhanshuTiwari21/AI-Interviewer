@@ -159,6 +159,7 @@ export async function POST(req: Request) {
     startsAt: body.startsAt,
     amountInr: body.amountInr,
     approvalUrl,
+    coachTimezone: body.coachTimezone,
   });
   try {
     await sendMail({
@@ -180,6 +181,7 @@ export async function POST(req: Request) {
     startsAt: body.startsAt,
     amountInr: body.amountInr,
     approvalUrl,
+    coachTimezone: body.coachTimezone,
   });
   try {
     await sendMail({
@@ -202,6 +204,7 @@ export async function POST(req: Request) {
       startsAt: body.startsAt,
       amountInr: body.amountInr,
       approvalUrl,
+      coachTimezone: body.coachTimezone,
     });
     try {
       await sendMail({

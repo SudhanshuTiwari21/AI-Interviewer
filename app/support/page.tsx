@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/app/AppShell";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { ArrowLeft } from "lucide-react";
 
 type Ticket = {
   id: string;
@@ -74,6 +75,11 @@ export default function SupportPage() {
       <PageHeader
         title="Support"
         description="Raise payment/refund/custom issues. Admin team resolves tickets from dashboard."
+        actions={
+          <Button href="/dashboard" variant="outline" size="sm" leftIcon={<ArrowLeft className="size-4" />}>
+            Back to dashboard
+          </Button>
+        }
       />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.1fr,1fr]">
@@ -81,7 +87,7 @@ export default function SupportPage() {
           <CardBody className="space-y-3">
             <p className="text-sm font-semibold text-ink-900">Raise a support ticket</p>
             <label className="block text-xs text-ink-600">
-              Category
+              <span>Category</span>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as (typeof CATEGORIES)[number]["id"])}
@@ -95,7 +101,7 @@ export default function SupportPage() {
               </select>
             </label>
             <label className="block text-xs text-ink-600">
-              Subject
+              <span>Subject</span>
               <input
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
@@ -104,7 +110,7 @@ export default function SupportPage() {
               />
             </label>
             <label className="block text-xs text-ink-600">
-              Description
+              <span>Description</span>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -136,7 +142,7 @@ export default function SupportPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-medium text-ink-900">{t.subject}</p>
                       <Badge tone={ticketTone(t.status)}>{t.status}</Badge>
-                      <Badge tone={t.priority === "high" ? "danger" : t.priority === "medium" ? "warn" : "neutral"}>
+                      <Badge tone={priorityTone(t.priority)}>
                         {t.priority}
                       </Badge>
                     </div>
@@ -165,4 +171,10 @@ function ticketTone(status: Ticket["status"]): "accent" | "warn" | "success" | "
   if (status === "in_progress") return "accent";
   if (status === "closed") return "neutral";
   return "warn";
+}
+
+function priorityTone(priority: Ticket["priority"]): "danger" | "warn" | "neutral" {
+  if (priority === "high") return "danger";
+  if (priority === "medium") return "warn";
+  return "neutral";
 }

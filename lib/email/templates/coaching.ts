@@ -7,6 +7,7 @@ type RequestArgs = {
   startsAt: string;
   amountInr: number;
   approvalUrl: string;
+  coachTimezone?: string | null;
 };
 
 type ApprovedArgs = {
@@ -18,6 +19,7 @@ type ApprovedArgs = {
   startsAt: string;
   amountInr: number;
   meetingUrl?: string | null;
+  coachTimezone?: string | null;
 };
 
 type RefundApprovedArgs = {
@@ -38,15 +40,17 @@ type RefundRejectedArgs = {
   adminNote?: string | null;
 };
 
-function fmtDate(iso: string) {
+function fmtDate(iso: string, timezone?: string | null) {
+  const resolvedTimezone = timezone?.trim() || "Asia/Kolkata";
   return new Date(iso).toLocaleString("en-IN", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: resolvedTimezone,
   });
 }
 
 export function coachingRequestEmailToCoach(args: RequestArgs) {
-  const when = fmtDate(args.startsAt);
+  const when = fmtDate(args.startsAt, args.coachTimezone);
   return {
     subject: `Action needed: coaching request from ${args.candidateName}`,
     html: `<p>Hi ${args.coachName},</p>
@@ -73,7 +77,7 @@ Approve: ${args.approvalUrl}`,
 }
 
 export function coachingRequestEmailToAdmin(args: RequestArgs) {
-  const when = fmtDate(args.startsAt);
+  const when = fmtDate(args.startsAt, args.coachTimezone);
   return {
     subject: `New coaching booking request (${args.techArea})`,
     html: `<p>New coaching booking request received.</p>
@@ -96,7 +100,7 @@ export function coachingRequestEmailToAdmin(args: RequestArgs) {
 }
 
 export function coachingRequestEmailToCandidate(args: RequestArgs) {
-  const when = fmtDate(args.startsAt);
+  const when = fmtDate(args.startsAt, args.coachTimezone);
   return {
     subject: `Coaching booking received (${args.techArea})`,
     html: `<p>Hi ${args.candidateName},</p>
@@ -123,7 +127,7 @@ Your coach has been notified for approval.`,
 }
 
 export function coachingApprovedEmail(args: ApprovedArgs) {
-  const when = fmtDate(args.startsAt);
+  const when = fmtDate(args.startsAt, args.coachTimezone);
   return {
     subject: `Coaching session confirmed (${args.techArea})`,
     html: `<p>Your coaching session is confirmed.</p>
