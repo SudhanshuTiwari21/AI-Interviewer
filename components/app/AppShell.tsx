@@ -58,17 +58,42 @@ export function AppShell({
   }
 
   useEffect(() => {
-    setHydrated(true);
-    const u = store.getUser();
-    if (!u) {
-      router.replace("/login");
-      return;
+    let cancelled = false;
+    async function load() {
+      setHydrated(true);
+      const localUser = store.getUser();
+      if (localUser) {
+        if (isCoachRole(localUser.role)) {
+          router.replace("/coach");
+          return;
+        }
+        if (!cancelled) setUser(localUser);
+        return;
+      }
+      const sessionUser = await authClient.me();
+      if (!sessionUser) {
+        router.replace("/login");
+        return;
+      }
+      if (isCoachRole(sessionUser.role)) {
+        router.replace("/coach");
+        return;
+      }
+      const hydratedUser: User = {
+        id: sessionUser.id,
+        name: sessionUser.name,
+        email: sessionUser.email,
+        createdAt: new Date().toISOString(),
+        plan: (sessionUser.plan as User["plan"]) ?? "free",
+        role: (sessionUser.role as User["role"]) ?? "user",
+      };
+      store.setUser(hydratedUser);
+      if (!cancelled) setUser(hydratedUser);
     }
-    if (isCoachRole(u.role)) {
-      router.replace("/coach");
-      return;
-    }
-    setUser(u);
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   useEffect(() => {
