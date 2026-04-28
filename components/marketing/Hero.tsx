@@ -65,7 +65,7 @@ function HeroPreview() {
           <div className="flex items-center justify-between">
             <span className="inline-flex items-center gap-2 rounded-full bg-accent-50 px-2.5 py-1 text-xs font-medium text-accent-700">
               <span className="size-1.5 animate-pulse rounded-full bg-accent-500" />
-              Question 4 of 6 · Adaptive
+              <span>Question 4 of 6 · Adaptive</span>
             </span>
             <span className="text-xs text-ink-400">02:14</span>
           </div>
@@ -77,14 +77,14 @@ function HeroPreview() {
             <div className="flex items-center justify-between text-xs text-ink-500">
               <span className="inline-flex items-center gap-2">
                 <span className="size-1.5 animate-pulse rounded-full bg-danger-500" />
-                Recording · live transcript
+                <span>Recording · live transcript</span>
               </span>
               <span>Voice</span>
             </div>
             <p className="mt-3 text-sm leading-6 text-ink-700">
               Sure - the biggest trade-off was between consistency and freshness.
-              We chose a write-through cache for hot keys and accepted a 2-second
-              staleness window for the long tail, which let us
+              We chose a write-through cache for hot keys and accepted a 2-second staleness window
+              for the long tail, which let us{" "}
               <span className="text-ink-400"> cut p95 latency from 380ms to 220ms…</span>
             </p>
           </div>
@@ -96,9 +96,9 @@ function HeroPreview() {
               <span className="bar" />
               <span className="bar" />
             </div>
-            <button className="ml-auto inline-flex h-9 items-center gap-2 rounded-lg bg-ink-900 px-3 text-xs font-medium text-white">
+            <span className="ml-auto inline-flex h-9 items-center gap-2 rounded-lg border border-ink-200 bg-ink-100 px-3 text-xs font-medium text-ink-500">
               Submit answer
-            </button>
+            </span>
           </div>
         </div>
         <div className="space-y-4 p-4 sm:p-6">

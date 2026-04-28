@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Section, SectionHeading } from "@/components/ui/Section";
-import { Button } from "@/components/ui/Button";
 import { Check } from "lucide-react";
 import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
 import { formatCurrency } from "@/lib/utils";
@@ -52,11 +51,6 @@ export function Pricing() {
             </li>
           ))}
         </ul>
-        <div className="mt-7 pt-2">
-          <Button href="/checkout" className="w-full">
-            Continue to checkout
-          </Button>
-        </div>
       </div>
     </Section>
   );
