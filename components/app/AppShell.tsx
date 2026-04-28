@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { authClient } from "@/lib/auth/client";
 import { store, type User } from "@/lib/store";
 import { isAdminRole, isCoachRole } from "@/lib/auth/permissions";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,13 @@ export function AppShell({
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [hydrated, setHydrated] = useState(false);
+
+  async function handleLogout() {
+    await authClient.logout();
+    store.setUser(null);
+    router.replace("/");
+    router.refresh();
+  }
 
   useEffect(() => {
     setHydrated(true);
@@ -123,8 +131,7 @@ export function AppShell({
             <button
               title="Sign out"
               onClick={() => {
-                store.setUser(null);
-                router.push("/");
+                void handleLogout();
               }}
               className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
             >

@@ -18,11 +18,10 @@ export default function PrivacyPolicyPage() {
               Effective Date: 01/05/2026
             </p>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-ink-600 sm:text-base">
-              Welcome to SelectWise.in ("SelectWise," "we," "our," or "us"). Your privacy matters
-              to us. This Privacy Policy explains how we collect, use, store, and protect your
-              personal information when you use our platform, including AI-powered mock interviews,
-              interview reports, resume reviews, and coaching services. By using SelectWise.in, you
-              agree to the practices described in this Privacy Policy.
+              This Privacy Policy explains data collection, usage, storage, and protection practices
+              for personal information when using the platform, including AI-powered mock interviews,
+              interview reports, resume reviews, and coaching services. Continued use of the
+              platform indicates acceptance of the practices described in this Privacy Policy.
             </p>
           </div>
         </section>

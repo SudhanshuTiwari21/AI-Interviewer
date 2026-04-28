@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
+import { authClient } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 import { store, type User } from "@/lib/store";
 import { CalendarClock, LayoutDashboard, LogOut } from "lucide-react";
@@ -19,6 +20,13 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+
+  async function handleLogout() {
+    await authClient.logout();
+    store.setUser(null);
+    router.replace("/");
+    router.refresh();
+  }
 
   useEffect(() => {
     const u = store.getUser();
@@ -77,8 +85,7 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
             <button
               title="Sign out"
               onClick={() => {
-                store.setUser(null);
-                router.push("/");
+                void handleLogout();
               }}
               className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
             >

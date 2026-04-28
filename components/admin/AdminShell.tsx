@@ -7,6 +7,8 @@ import { Logo } from "@/components/ui/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { authClient } from "@/lib/auth/client";
+import { store } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import {
   hasPermission,
@@ -93,6 +95,13 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
   const [loading, setLoading] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  async function handleSignOut() {
+    await authClient.logout();
+    store.setUser(null);
+    router.replace("/");
+    router.refresh();
+  }
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -148,7 +157,9 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
             user={user}
             pathname={pathname}
             visibleNav={visibleNav}
-            onSignOut={() => router.push("/dashboard")}
+            onSignOut={() => {
+              void handleSignOut();
+            }}
           />
         </aside>
 
@@ -174,7 +185,9 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
                 user={user}
                 pathname={pathname}
                 visibleNav={visibleNav}
-                onSignOut={() => router.push("/dashboard")}
+                onSignOut={() => {
+                  void handleSignOut();
+                }}
                 hideHeader
               />
             </div>
@@ -259,7 +272,7 @@ function SidebarBody({
             <p className="truncate text-xs text-ink-500">{user.email}</p>
           </div>
           <button
-            title="Back to dashboard"
+            title="Sign out"
             onClick={onSignOut}
             className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
           >
