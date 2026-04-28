@@ -138,9 +138,9 @@ export default function LoginPage() {
                   Email isn't verified yet
                 </div>
                 <div className="mt-0.5 text-ink-600">
-                  We sent a verification link to{" "}
+                  We sent a verification link to
                   <span className="font-medium text-ink-900">
-                    {unverified.email}
+                    {" "}{unverified.email}
                   </span>
                   . Click it to activate your account, or request a new one
                   below.
@@ -167,9 +167,9 @@ export default function LoginPage() {
         <div className="flex items-center justify-between text-xs">
           <label className="inline-flex items-center gap-2 text-ink-500">
             <input type="checkbox" className="size-3.5 rounded border-ink-300" />
-            Remember me
+            <span>Remember me</span>
           </label>
-          <Link href="#" className="text-ink-700 hover:underline">
+          <Link href="/forgot-password" className="text-ink-700 hover:underline">
             Forgot password?
           </Link>
         </div>

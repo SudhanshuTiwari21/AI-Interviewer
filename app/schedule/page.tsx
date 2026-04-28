@@ -22,6 +22,22 @@ import {
   AlertTriangle,
 } from "lucide-react";
 
+const TECHNOLOGY_OPTIONS = [
+  "Frontend",
+  "Backend",
+  "Full Stack",
+  "Java",
+  "Python",
+  "DevOps",
+  "Data Engineering",
+  "Data Science",
+  "AI/ML",
+  "Product Management",
+  "System Design",
+  "Cloud",
+  "QA Automation",
+] as const;
+
 function startOfWeek(d: Date) {
   const date = new Date(d);
   const day = (date.getDay() + 6) % 7; // Mon = 0
@@ -92,11 +108,7 @@ function ScheduleInner() {
     if (!selectedDay) setSelectedDay(days[0] ?? null);
   }, [days, selectedDay]);
 
-  const techAreas = useMemo(() => {
-    const all = new Set<string>();
-    coaches.forEach((c) => c.techAreas.forEach((x) => all.add(x)));
-    return Array.from(all).sort((a, b) => a.localeCompare(b));
-  }, [coaches]);
+  const techAreas = useMemo(() => Array.from(TECHNOLOGY_OPTIONS), []);
 
   useEffect(() => {
     if (!selectedTechArea && techAreas[0]) setSelectedTechArea(techAreas[0]);
@@ -104,7 +116,10 @@ function ScheduleInner() {
 
   const filteredCoaches = useMemo(() => {
     if (!selectedTechArea) return coaches;
-    return coaches.filter((c) => c.techAreas.includes(selectedTechArea));
+    const selected = selectedTechArea.toLowerCase();
+    return coaches.filter((c) =>
+      c.techAreas.some((area) => area.toLowerCase().includes(selected) || selected.includes(area.toLowerCase())),
+    );
   }, [coaches, selectedTechArea]);
 
   useEffect(() => {
@@ -387,47 +402,53 @@ function ScheduleInner() {
               <p className="px-1 text-xs font-medium uppercase tracking-wide text-ink-400">
                 Choose a coach
               </p>
-              {filteredCoaches.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => setCoachId(c.id)}
-                  className={cn(
-                    "w-full rounded-2xl border p-4 text-left transition-all",
-                    coachId === c.id
-                      ? "border-ink-900 bg-white shadow-pop"
-                      : "border-ink-200 bg-white hover:border-ink-300",
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar name={c.name} />
-                    <div>
-                      <p className="text-sm font-medium text-ink-900">
-                        {c.name}
-                      </p>
-                      <p className="text-xs text-ink-500">{c.title}</p>
+              {filteredCoaches.length === 0 ? (
+                <div className="rounded-2xl border border-ink-200 bg-white p-4 text-sm text-ink-600">
+                  No coach is available currently for <span className="font-medium">{selectedTechArea}</span>.
+                </div>
+              ) : (
+                filteredCoaches.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setCoachId(c.id)}
+                    className={cn(
+                      "w-full rounded-2xl border p-4 text-left transition-all",
+                      coachId === c.id
+                        ? "border-ink-900 bg-white shadow-pop"
+                        : "border-ink-200 bg-white hover:border-ink-300",
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Avatar name={c.name} />
+                      <div>
+                        <p className="text-sm font-medium text-ink-900">
+                          {c.name}
+                        </p>
+                        <p className="text-xs text-ink-500">{c.title}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {c.focus.map((f) => (
-                      <span
-                        key={f}
-                        className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-700"
-                      >
-                        {f}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="mt-3 text-xs text-ink-500">
-                    ★ {c.rating} · {c.sessions} sessions · ₹{c.hourlyRateInr}/hour
-                  </p>
-                </button>
-              ))}
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {c.focus.map((f) => (
+                        <span
+                          key={f}
+                          className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-700"
+                        >
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-xs text-ink-500">
+                      ★ {c.rating} · {c.sessions} sessions · ₹{c.hourlyRateInr}/hour
+                    </p>
+                  </button>
+                ))
+              )}
             </div>
 
             <Card>
               <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
                 <p className="text-sm font-semibold text-ink-900">
-                  {coach?.name}'s availability
+                  {coach ? `${coach.name}'s availability` : "Availability"}
                 </p>
                 <div className="flex items-center gap-1">
                   <button
@@ -459,6 +480,8 @@ function ScheduleInner() {
                 </div>
               </div>
               <CardBody>
+                {coach ? (
+                  <>
                 <div className="grid grid-cols-5 gap-2">
                   {days.map((d) => {
                     const isSelected =
@@ -517,6 +540,12 @@ function ScheduleInner() {
                     })}
                   </div>
                 </div>
+                  </>
+                ) : (
+                  <div className="rounded-xl border border-ink-100 bg-ink-50 px-4 py-8 text-center text-sm text-ink-600">
+                    No coach is available currently for this technology.
+                  </div>
+                )}
               </CardBody>
               <div className="flex flex-col items-stretch justify-between gap-3 border-t border-ink-100 bg-ink-50/50 px-5 py-4 sm:flex-row sm:items-center">
                 <p className="text-xs text-ink-500">
@@ -531,7 +560,7 @@ function ScheduleInner() {
                       {error}
                     </p>
                   )}
-                  <Button onClick={confirm} disabled={!selectedSlot || isSubmitting}>
+                  <Button onClick={confirm} disabled={!selectedSlot || isSubmitting || !coach}>
                     {isSubmitting ? "Processing payment..." : "Pay & request booking"}
                   </Button>
                 </div>

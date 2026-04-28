@@ -22,7 +22,17 @@ export function buildVerificationUrl(token: string): string {
   return `${base}/verify-email?token=${encodeURIComponent(token)}`;
 }
 
+export function buildPasswordResetUrl(token: string): string {
+  const base = (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+  return `${base}/reset-password?token=${encodeURIComponent(token)}`;
+}
+
 export function verificationTokenTtlMs(): number {
   const hours = Number(process.env.EMAIL_VERIFICATION_TTL_HOURS ?? 24);
   return hours * 60 * 60 * 1000;
+}
+
+export function passwordResetTokenTtlMs(): number {
+  const minutes = Number(process.env.PASSWORD_RESET_TTL_MINUTES ?? 30);
+  return minutes * 60 * 1000;
 }

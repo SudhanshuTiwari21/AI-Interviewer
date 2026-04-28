@@ -320,10 +320,32 @@ export const emailVerificationTokens = pgTable(
   }),
 );
 
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    userIdIdx: index("password_reset_tokens_user_id_idx").on(t.userId),
+    expiresAtIdx: index("password_reset_tokens_expires_at_idx").on(t.expiresAt),
+  }),
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type NewUserRow = typeof users.$inferInsert;
 export type EmailVerificationTokenRow = typeof emailVerificationTokens.$inferSelect;
 export type NewEmailVerificationTokenRow = typeof emailVerificationTokens.$inferInsert;
+export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;
+export type NewPasswordResetTokenRow = typeof passwordResetTokens.$inferInsert;
 export type AuditLogRow = typeof auditLogs.$inferSelect;
 export type NewAuditLogRow = typeof auditLogs.$inferInsert;
 export type AdminSettingsRow = typeof adminSettings.$inferSelect;

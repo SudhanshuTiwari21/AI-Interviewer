@@ -78,6 +78,22 @@ export const authClient = {
       { email },
     );
   },
+  forgotPassword(email: string) {
+    return postJson<{ status: "sent"; message: string }>(
+      "/api/auth/forgot-password",
+      { email },
+    );
+  },
+  resetPassword(input: {
+    token: string;
+    password: string;
+    confirmPassword: string;
+  }) {
+    return postJson<{ status: "reset"; message: string }>(
+      "/api/auth/reset-password",
+      input,
+    );
+  },
   async me(): Promise<AuthUser | null> {
     try {
       const res = await fetch("/api/auth/me", {

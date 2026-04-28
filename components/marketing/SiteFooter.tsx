@@ -20,13 +20,12 @@ export function SiteFooter() {
                 ["Features", "/#features"],
                 ["Pricing", "/#pricing"],
                 ["How it works", "/#how"],
-                ["Coaching", "/schedule"],
               ],
             },
             {
               title: "Company",
               items: [
-                ["About", "#"],
+                ["About", "/about"],
                 ["Careers", "#"],
                 ["Blog", "#"],
                 ["Contact", "#"],
@@ -35,9 +34,9 @@ export function SiteFooter() {
             {
               title: "Legal",
               items: [
-                ["Privacy", "#"],
-                ["Terms", "#"],
-                ["Security", "#"],
+                ["Privacy", "/privacy-policy"],
+                ["Terms", "/terms-and-conditions"],
+                ["Security", "/security-policy"],
               ],
             },
           ].map((col) => (
