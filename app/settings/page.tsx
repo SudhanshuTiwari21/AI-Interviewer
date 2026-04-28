@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/app/AppShell";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -16,20 +17,34 @@ type UserSettings = {
 };
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
         const res = await fetch("/api/user/settings", { cache: "no-store" });
-        const data = await res.json();
-        if (!cancelled && data.ok) {
-          setSettings(data.settings);
+        if (res.status === 401) {
+          if (!cancelled) {
+            router.replace("/login?next=/settings");
+          }
+          return;
         }
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.ok) {
+          setSettings(data.settings);
+          setLoadError(null);
+          return;
+        }
+        setLoadError(data.message ?? "Could not load settings.");
+      } catch {
+        if (!cancelled) setLoadError("Could not load settings right now.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -38,7 +53,7 @@ export default function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   async function save(patch: Partial<UserSettings>) {
     setSaving(true);
@@ -63,10 +78,29 @@ export default function SettingsPage() {
     }
   }
 
-  if (loading || !settings) {
+  if (loading) {
     return (
       <div className="container max-w-5xl px-4 py-10 text-sm text-ink-500">
         Loading settings...
+      </div>
+    );
+  }
+
+  if (loadError || !settings) {
+    return (
+      <div className="container max-w-5xl px-4 py-10">
+        <p className="text-sm text-danger-600">{loadError ?? "Could not load settings."}</p>
+        <div className="mt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              router.refresh();
+            }}
+          >
+            Retry
+          </Button>
+        </div>
       </div>
     );
   }
@@ -84,7 +118,7 @@ export default function SettingsPage() {
           <CardBody className="space-y-3">
             <p className="text-sm font-semibold text-ink-900">Preferences</p>
             <label className="block text-xs text-ink-600">
-              Timezone
+              <span>Timezone</span>
               <input
                 value={settings.timezone}
                 onChange={(e) =>
@@ -94,7 +128,7 @@ export default function SettingsPage() {
               />
             </label>
             <label className="block text-xs text-ink-600">
-              Default interview type
+              <span>Default interview type</span>
               <input
                 value={settings.defaultInterviewType ?? ""}
                 onChange={(e) =>
@@ -107,7 +141,7 @@ export default function SettingsPage() {
               />
             </label>
             <label className="block text-xs text-ink-600">
-              Default company type
+              <span>Default company type</span>
               <input
                 value={settings.defaultCompanyType ?? ""}
                 onChange={(e) =>
