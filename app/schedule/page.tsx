@@ -17,6 +17,7 @@ import {
   CalendarClock,
   CheckCircle2,
   Globe,
+  Search,
   ChevronLeft,
   ChevronRight,
   IndianRupee,
@@ -54,6 +55,7 @@ function ScheduleInner() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [selectedTechArea, setSelectedTechArea] = useState<string>("");
+  const [techSearch, setTechSearch] = useState("");
   const [confirmed, setConfirmed] = useState<{
     id: string;
     coachName: string;
@@ -74,7 +76,6 @@ function ScheduleInner() {
       .then((d) => {
         const all = (d.ok ? d.coaches : []).filter((c: Coach) => c.active);
         setCoaches(all);
-        if (!coachId && all[0]) setCoachId(all[0].id);
       })
       .catch(() => {
         setCoaches([]);
@@ -96,7 +97,9 @@ function ScheduleInner() {
   const techAreas = TARGET_ROLES;
 
   useEffect(() => {
-    if (!selectedTechArea && techAreas[0]) setSelectedTechArea(techAreas[0]);
+    if (!selectedTechArea && techAreas[0]) {
+      setSelectedTechArea(techAreas[0]);
+    }
   }, [selectedTechArea, techAreas]);
 
   const filteredCoaches = useMemo(() => {
@@ -108,10 +111,14 @@ function ScheduleInner() {
   }, [coaches, selectedTechArea]);
 
   useEffect(() => {
-    if (!filteredCoaches.some((c) => c.id === coachId)) {
-      setCoachId(filteredCoaches[0]?.id ?? "");
-    }
+    if (!filteredCoaches.some((c) => c.id === coachId)) setCoachId("");
   }, [coachId, filteredCoaches]);
+
+  const visibleTechAreas = useMemo(() => {
+    const q = techSearch.trim().toLowerCase();
+    if (!q) return techAreas;
+    return techAreas.filter((area) => area.toLowerCase().includes(q));
+  }, [techAreas, techSearch]);
 
   const coach = filteredCoaches.find((c) => c.id === coachId) ?? null;
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
@@ -362,27 +369,41 @@ function ScheduleInner() {
               <p className="px-1 text-xs font-medium uppercase tracking-wide text-ink-400">
                 Tech area
               </p>
-              <div className="flex flex-wrap gap-1.5">
-                {techAreas.map((area) => {
-                  const active = area === selectedTechArea;
-                  return (
-                    <button
-                      key={area}
-                      onClick={() => {
-                        setSelectedTechArea(area);
-                        setSelectedSlot(null);
-                      }}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs",
-                        active
-                          ? "border-ink-900 bg-ink-900 text-white"
-                          : "border-ink-200 bg-white text-ink-700",
-                      )}
-                    >
-                      {area}
-                    </button>
-                  );
-                })}
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-ink-400" />
+                <input
+                  value={techSearch}
+                  onChange={(e) => setTechSearch(e.target.value)}
+                  placeholder="Search role..."
+                  className="h-10 w-full rounded-lg border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-800"
+                />
+              </div>
+              <div className="max-h-[420px] overflow-y-auto rounded-xl border border-ink-200 bg-white p-1.5">
+                {visibleTechAreas.length === 0 ? (
+                  <p className="px-2 py-2 text-xs text-ink-500">No matching roles found.</p>
+                ) : (
+                  visibleTechAreas.map((area) => {
+                    const active = area === selectedTechArea;
+                    return (
+                      <button
+                        key={area}
+                        onClick={() => {
+                          setSelectedTechArea(area);
+                          setCoachId("");
+                          setSelectedSlot(null);
+                        }}
+                        className={cn(
+                          "mb-1 block w-full rounded-lg px-2.5 py-2 text-left text-xs transition-colors last:mb-0",
+                          active
+                            ? "bg-ink-900 text-white"
+                            : "text-ink-700 hover:bg-ink-50",
+                        )}
+                      >
+                        {area}
+                      </button>
+                    );
+                  })
+                )}
               </div>
               <p className="px-1 text-xs font-medium uppercase tracking-wide text-ink-400">
                 Choose a coach
@@ -433,102 +454,104 @@ function ScheduleInner() {
             <Card>
               <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
                 <p className="text-sm font-semibold text-ink-900">
-                  {coach ? `${coach.name}'s availability` : "Availability"}
+                  {coach ? `${coach.name}'s availability` : "Select a coach to see availability"}
                 </p>
-                <div className="flex items-center gap-1">
-                  <button
-                    aria-label="Previous week"
-                    onClick={() => {
-                      const d = new Date(weekStart);
-                      d.setDate(d.getDate() - 7);
-                      setWeekStart(d);
-                      setSelectedDay(null);
-                      setSelectedSlot(null);
-                    }}
-                    className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
-                  >
-                    <ChevronLeft className="size-4" />
-                  </button>
-                  <button
-                    aria-label="Next week"
-                    onClick={() => {
-                      const d = new Date(weekStart);
-                      d.setDate(d.getDate() + 7);
-                      setWeekStart(d);
-                      setSelectedDay(null);
-                      setSelectedSlot(null);
-                    }}
-                    className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
-                  >
-                    <ChevronRight className="size-4" />
-                  </button>
-                </div>
+                {coach && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      aria-label="Previous week"
+                      onClick={() => {
+                        const d = new Date(weekStart);
+                        d.setDate(d.getDate() - 7);
+                        setWeekStart(d);
+                        setSelectedDay(null);
+                        setSelectedSlot(null);
+                      }}
+                      className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
+                    >
+                      <ChevronLeft className="size-4" />
+                    </button>
+                    <button
+                      aria-label="Next week"
+                      onClick={() => {
+                        const d = new Date(weekStart);
+                        d.setDate(d.getDate() + 7);
+                        setWeekStart(d);
+                        setSelectedDay(null);
+                        setSelectedSlot(null);
+                      }}
+                      className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
+                    >
+                      <ChevronRight className="size-4" />
+                    </button>
+                  </div>
+                )}
               </div>
               <CardBody>
                 {coach ? (
                   <>
-                <div className="grid grid-cols-5 gap-2">
-                  {days.map((d) => {
-                    const isSelected =
-                      selectedDay?.toDateString() === d.toDateString();
-                    return (
-                      <button
-                        key={d.toISOString()}
-                        onClick={() => {
-                          setSelectedDay(d);
-                          setSelectedSlot(null);
-                        }}
-                        className={cn(
-                          "rounded-xl border px-3 py-3 text-center transition-all",
-                          isSelected
-                            ? "border-ink-900 bg-ink-900 text-white"
-                            : "border-ink-200 bg-white text-ink-700 hover:border-ink-300",
-                        )}
-                      >
-                        <p className="text-[10px] uppercase tracking-wide opacity-70">
-                          {d.toLocaleDateString("en-US", { weekday: "short" })}
-                        </p>
-                        <p className="mt-1 text-base font-semibold">
-                          {d.getDate()}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="mt-6">
-                  <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
-                    {selectedDay
-                      ? `Slots for ${selectedDay.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`
-                      : "Pick a day"}
-                  </p>
-                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                    {slots.map((iso) => {
-                      const t = new Date(iso);
-                      const isSelected = selectedSlot === iso;
-                      return (
-                        <button
-                          key={iso}
-                          onClick={() => setSelectedSlot(iso)}
-                          className={cn(
-                            "rounded-lg border px-3 py-2 text-sm font-medium transition-all",
-                            isSelected
-                              ? "border-accent-500 bg-accent-50 text-accent-700"
-                              : "border-ink-200 bg-white text-ink-700 hover:border-ink-300",
-                          )}
-                        >
-                          {t.toLocaleTimeString("en-US", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                    <div className="grid grid-cols-5 gap-2">
+                      {days.map((d) => {
+                        const isSelected =
+                          selectedDay?.toDateString() === d.toDateString();
+                        return (
+                          <button
+                            key={d.toISOString()}
+                            onClick={() => {
+                              setSelectedDay(d);
+                              setSelectedSlot(null);
+                            }}
+                            className={cn(
+                              "rounded-xl border px-3 py-3 text-center transition-all",
+                              isSelected
+                                ? "border-ink-900 bg-ink-900 text-white"
+                                : "border-ink-200 bg-white text-ink-700 hover:border-ink-300",
+                            )}
+                          >
+                            <p className="text-[10px] uppercase tracking-wide opacity-70">
+                              {d.toLocaleDateString("en-US", { weekday: "short" })}
+                            </p>
+                            <p className="mt-1 text-base font-semibold">
+                              {d.getDate()}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-6">
+                      <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
+                        {selectedDay
+                          ? `Slots for ${selectedDay.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}`
+                          : "Pick a day"}
+                      </p>
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                        {slots.map((iso) => {
+                          const t = new Date(iso);
+                          const isSelected = selectedSlot === iso;
+                          return (
+                            <button
+                              key={iso}
+                              onClick={() => setSelectedSlot(iso)}
+                              className={cn(
+                                "rounded-lg border px-3 py-2 text-sm font-medium transition-all",
+                                isSelected
+                                  ? "border-accent-500 bg-accent-50 text-accent-700"
+                                  : "border-ink-200 bg-white text-ink-700 hover:border-ink-300",
+                              )}
+                            >
+                              {t.toLocaleTimeString("en-US", {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </>
                 ) : (
                   <div className="rounded-xl border border-ink-100 bg-ink-50 px-4 py-8 text-center text-sm text-ink-600">
-                    No coach is available currently for this technology.
+                    Pick a coach from the left to view calendar and time slots.
                   </div>
                 )}
               </CardBody>
