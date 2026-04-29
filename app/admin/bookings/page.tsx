@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -18,8 +18,22 @@ type CoachingBooking = {
   startsAt: string;
   durationMin: number;
   amountInr: number;
+  calendarMeetingUrl?: string | null;
   status: "pending" | "approved" | "cancelled" | "rejected";
 };
+
+function hasUsableJoinUrl(url: string | null | undefined) {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === "meet.google.com") {
+      return !parsed.pathname.startsWith("/_meet/whoops");
+    }
+    return parsed.hostname === "calendar.google.com";
+  } catch {
+    return false;
+  }
+}
 
 export default function AdminBookingsPage() {
   const { has } = useAdmin();
@@ -27,20 +41,28 @@ export default function AdminBookingsPage() {
 
   const [bookings, setBookings] = useState<CoachingBooking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+
+  const loadBookings = useCallback(async (cancelled = false) => {
+    try {
+      const res = await fetch("/api/coaching/bookings", { cache: "no-store" });
+      const data = await res.json();
+      if (!cancelled && data.ok) setBookings(data.bookings);
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const res = await fetch("/api/coaching/bookings", { cache: "no-store" });
-      const data = await res.json();
-      if (!cancelled && data.ok) setBookings(data.bookings);
-      if (!cancelled) setLoading(false);
+      await loadBookings(cancelled);
     }
     void load();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadBookings]);
 
   const upcoming = bookings.filter(
     (b) => new Date(b.startsAt).getTime() > Date.now(),
@@ -49,10 +71,43 @@ export default function AdminBookingsPage() {
     (b) => new Date(b.startsAt).getTime() <= Date.now(),
   );
 
-  function cancel(id: string) {
+  async function cancel(id: string) {
     if (!confirm("Cancel this booking?")) return;
-    void fetch(`/api/coaching/bookings/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "cancelled" }) });
-    setBookings((prev) => prev.map((b) => (b.id === id ? { ...b, status: "cancelled" } : b)));
+    const res = await fetch(`/api/coaching/bookings/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+    const data = await res.json();
+    if (!data?.ok) return;
+    await loadBookings();
+  }
+
+  async function approve(id: string) {
+    const res = await fetch(`/api/coaching/bookings/${id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "approved" }),
+    });
+    const data = await res.json();
+    if (!data?.ok) return;
+    await loadBookings();
+  }
+
+  async function regenerateMeetingLink(id: string) {
+    setRegeneratingId(id);
+    try {
+      const res = await fetch(`/api/coaching/bookings/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "regenerate_meeting_link" }),
+      });
+      const data = await res.json();
+      if (!data?.ok) return;
+      await loadBookings();
+    } finally {
+      setRegeneratingId(null);
+    }
   }
 
   return (
@@ -83,7 +138,20 @@ export default function AdminBookingsPage() {
               No upcoming bookings yet.
             </div>
           ) : (
-            <BookingsTable bookings={upcoming} canCancel={canCancel} onCancel={cancel} />
+            <BookingsTable
+              bookings={upcoming}
+              canCancel={canCancel}
+              onCancel={(id) => {
+                void cancel(id);
+              }}
+              onApprove={(id) => {
+                void approve(id);
+              }}
+              onRegenerateMeetingLink={(id) => {
+                void regenerateMeetingLink(id);
+              }}
+              regeneratingId={regeneratingId}
+            />
           )}
         </CardBody>
       </Card>
@@ -98,7 +166,14 @@ export default function AdminBookingsPage() {
               Past coaching sessions will appear here.
             </div>
           ) : (
-            <BookingsTable bookings={past} canCancel={false} onCancel={() => {}} />
+            <BookingsTable
+              bookings={past}
+              canCancel={false}
+              onCancel={() => {}}
+              onApprove={() => {}}
+              onRegenerateMeetingLink={() => {}}
+              regeneratingId={regeneratingId}
+            />
           )}
         </CardBody>
       </Card>
@@ -110,10 +185,16 @@ function BookingsTable({
   bookings,
   canCancel,
   onCancel,
+  onApprove,
+  onRegenerateMeetingLink,
+  regeneratingId,
 }: Readonly<{
   bookings: CoachingBooking[];
   canCancel: boolean;
   onCancel: (id: string) => void;
+  onApprove: (id: string) => void;
+  onRegenerateMeetingLink: (id: string) => void;
+  regeneratingId: string | null;
 }>) {
   return (
     <div className="overflow-x-auto">
@@ -175,26 +256,36 @@ function BookingsTable({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() =>
-                        void fetch(`/api/coaching/bookings/${b.id}`, {
-                          method: "PATCH",
-                          headers: { "content-type": "application/json" },
-                          body: JSON.stringify({ status: "approved" }),
-                        })
-                      }
+                      onClick={() => onApprove(b.id)}
                     >
                       Approve
                     </Button>
                   )}
                   {b.status === "approved" && (
-                    <a
-                      href={"https://meet.google.com/apx-mock-coaching"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs text-ink-700 hover:bg-ink-50"
+                    hasUsableJoinUrl(b.calendarMeetingUrl) ? (
+                      <a
+                        href={b.calendarMeetingUrl!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs text-ink-700 hover:bg-ink-50"
+                      >
+                        Join <ExternalLink className="size-3" />
+                      </a>
+                    ) : (
+                      <span className="inline-flex items-center rounded-lg border border-ink-200 bg-ink-50 px-3 py-1.5 text-xs text-ink-500">
+                        Meeting link pending
+                      </span>
+                    )
+                  )}
+                  {b.status === "approved" && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={regeneratingId === b.id}
+                      onClick={() => onRegenerateMeetingLink(b.id)}
                     >
-                      Join <ExternalLink className="size-3" />
-                    </a>
+                      {regeneratingId === b.id ? "Regenerating..." : "Regenerate link"}
+                    </Button>
                   )}
                   {canCancel && (
                     <Button
@@ -202,6 +293,7 @@ function BookingsTable({
                       variant="ghost"
                       leftIcon={<X className="size-3.5" />}
                       className="text-danger-600 hover:bg-danger-50"
+                      disabled={b.status !== "pending"}
                       onClick={() => onCancel(b.id)}
                     >
                       Cancel

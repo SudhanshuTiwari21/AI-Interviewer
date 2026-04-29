@@ -17,6 +17,19 @@ type CreatedCalendarEvent = {
   meetLink: string | null;
 };
 
+function isUsableMeetLink(url: string | null | undefined): url is string {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== "meet.google.com") return false;
+    // Google returns this placeholder on invalid conference links.
+    if (parsed.pathname.startsWith("/_meet/whoops")) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function getCalendarConfig() {
   const calendarId = process.env.GOOGLE_CALENDAR_ID;
   const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -84,9 +97,20 @@ export async function createCoachingCalendarEvent(
   const meetEntry = event.conferenceData?.entryPoints?.find(
     (x) => x.entryPointType === "video",
   );
+  const conferenceId = event.conferenceData?.conferenceId;
+  const fallbackMeetByConferenceId = conferenceId
+    ? `https://meet.google.com/${conferenceId}`
+    : null;
+  const meetLinkCandidates = [
+    event.hangoutLink ?? null,
+    meetEntry?.uri ?? null,
+    fallbackMeetByConferenceId,
+  ];
+  const meetLink = meetLinkCandidates.find((url) => isUsableMeetLink(url)) ?? null;
+
   return {
     eventId: event.id ?? "",
     htmlLink: event.htmlLink ?? null,
-    meetLink: meetEntry?.uri ?? null,
+    meetLink,
   };
 }

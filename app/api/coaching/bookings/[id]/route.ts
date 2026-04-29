@@ -22,6 +22,17 @@ function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+function hasUsableMeetLink(url: string | null | undefined) {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== "meet.google.com") return false;
+    return !parsed.pathname.startsWith("/_meet/whoops");
+  } catch {
+    return false;
+  }
+}
+
 const Body = z.object({
   status: z
     .enum([
@@ -35,7 +46,9 @@ const Body = z.object({
       "refunded",
     ])
     .optional(),
-  action: z.enum(["approve_refund", "reject_refund"]).optional(),
+  action: z
+    .enum(["approve_refund", "reject_refund", "regenerate_meeting_link"])
+    .optional(),
   refundAmountInr: z.number().int().positive().optional(),
   refundAdminNote: z.string().trim().max(500).optional(),
   notes: z.string().trim().max(500).optional(),
@@ -70,6 +83,52 @@ export async function PATCH(
     .limit(1);
   const booking = rows[0];
   if (!booking) return fail("user_not_found", "Booking not found.", 404);
+
+  if (parsed.data.action === "regenerate_meeting_link") {
+    if (booking.status !== "approved") {
+      return fail(
+        "validation_error",
+        "Meeting link can be regenerated only for approved bookings.",
+        400,
+      );
+    }
+    try {
+      const calendarEvent = await createCoachingCalendarEvent({
+        summary: `SelectWise Coaching · ${booking.techArea}`,
+        description: `Candidate: ${booking.candidateName}\nCoach: ${booking.coachName}\nBooking ID: ${booking.id}`,
+        startsAtIso: booking.startsAt.toISOString(),
+        durationMin: booking.durationMin,
+        timezone: booking.coachTimezone || "Asia/Kolkata",
+        attendeeEmails: [
+          booking.candidateEmail,
+          booking.coachEmail,
+          process.env.ADMIN_EMAIL ?? "",
+        ],
+      });
+      const meetingUrl = calendarEvent.meetLink ?? calendarEvent.htmlLink ?? null;
+      await db
+        .update(schema.coachingBookings)
+        .set({
+          calendarMeetingUrl: meetingUrl,
+          calendarEventId: calendarEvent.eventId || booking.calendarEventId,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.coachingBookings.id, booking.id));
+      return ok({
+        updated: true,
+        regenerated: true,
+        meetingUrl,
+        meetingUrlUsable: hasUsableMeetLink(meetingUrl),
+      });
+    } catch (err) {
+      console.error("[coaching/calendar:regenerate]", err);
+      return fail(
+        "validation_error",
+        "Could not regenerate meeting link. Please try again.",
+        500,
+      );
+    }
+  }
 
   if (parsed.data.action === "reject_refund") {
     if (booking.status !== "refund_requested" && booking.status !== "refund_pending") {
