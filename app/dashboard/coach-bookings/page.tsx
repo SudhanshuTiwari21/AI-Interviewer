@@ -101,7 +101,7 @@ export default function CoachBookingsPage() {
                 <Badge tone={b.paymentStatus === "paid" ? "success" : "neutral"}>
                   {b.paymentStatus}
                 </Badge>
-                {b.calendarMeetingUrl ? (
+                {b.status === "approved" && b.calendarMeetingUrl ? (
                   <Button href={b.calendarMeetingUrl} size="sm" variant="outline">
                     Join
                   </Button>

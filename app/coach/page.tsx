@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/utils";
 
 type CoachBooking = {
@@ -12,6 +13,7 @@ type CoachBooking = {
   techArea: string;
   startsAt: string;
   status: string;
+  calendarMeetingUrl?: string | null;
 };
 
 export default function CoachOverviewPage() {
@@ -70,6 +72,11 @@ export default function CoachOverviewPage() {
                 <Badge tone="success" dot>
                   {b.status}
                 </Badge>
+                {b.calendarMeetingUrl ? (
+                  <Button href={b.calendarMeetingUrl} size="sm" variant="outline">
+                    Join
+                  </Button>
+                ) : null}
               </div>
             ))
           )}

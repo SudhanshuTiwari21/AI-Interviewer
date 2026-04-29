@@ -13,6 +13,7 @@ type CoachBooking = {
   techArea: string;
   startsAt: string;
   status: string;
+  calendarMeetingUrl?: string | null;
 };
 
 export default function CoachSessionsPage() {
@@ -88,6 +89,10 @@ export default function CoachSessionsPage() {
                           Approve
                         </Button>
                       </div>
+                    ) : row.status === "approved" && row.calendarMeetingUrl ? (
+                      <Button href={row.calendarMeetingUrl} size="sm" variant="outline">
+                        Join
+                      </Button>
                     ) : (
                       <span className="text-xs text-ink-400">No action</span>
                     )}

@@ -710,18 +710,34 @@ export default function SetupPage() {
                 </select>
               </Field>
               <Field label="Interview intensity">
-                <button
-                  type="button"
-                  onClick={() => setStressTest((v) => !v)}
-                  className={cn(
-                    "inline-flex rounded-full border px-3 py-1.5 text-xs font-medium",
-                    stressTest
-                      ? "border-ink-900 bg-ink-900 text-white"
-                      : "border-ink-200 bg-white text-ink-700",
-                  )}
-                >
-                  {stressTest ? "High Pressure Simulation" : "Standard Simulation"}
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStressTest(false)}
+                    className={cn(
+                      "inline-flex rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                      stressTest === false
+                        ? "border-ink-900 bg-ink-900 text-white"
+                        : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50",
+                    )}
+                    aria-pressed={stressTest === false}
+                  >
+                    Standard Simulation
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStressTest(true)}
+                    className={cn(
+                      "inline-flex rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                      stressTest
+                        ? "border-ink-900 bg-ink-900 text-white"
+                        : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50",
+                    )}
+                    aria-pressed={stressTest}
+                  >
+                    High Pressure Simulation
+                  </button>
+                </div>
               </Field>
             </CardBody>
           </Card>

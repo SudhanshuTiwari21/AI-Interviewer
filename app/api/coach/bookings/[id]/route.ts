@@ -19,6 +19,10 @@ function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+function normalizeEmail(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
+}
+
 const Body = z.object({
   action: z.enum(["approve", "reject"]),
 });
@@ -136,31 +140,46 @@ export async function PATCH(
     meetingUrl,
     coachTimezone: booking.coachTimezone,
   });
-  await sendMail({
-    to: booking.candidateEmail,
-    subject: mail.subject,
-    html: mail.html,
-    text: mail.text,
-  });
-  await sendMail({
-    to: booking.coachEmail,
-    subject: coachMail.subject,
-    html: coachMail.html,
-    text: coachMail.text,
-  });
-  if (process.env.ADMIN_EMAIL) {
-    const adminEmail = process.env.ADMIN_EMAIL.trim().toLowerCase();
-    const coachEmail = booking.coachEmail.trim().toLowerCase();
-    const candidateEmail = booking.candidateEmail.trim().toLowerCase();
-    if (adminEmail === coachEmail || adminEmail === candidateEmail) {
-      return ok({ updated: true, status: "approved" });
-    }
+  try {
     await sendMail({
-      to: process.env.ADMIN_EMAIL,
-      subject: `[Admin Copy] ${mail.subject}`,
+      to: booking.candidateEmail,
+      subject: mail.subject,
       html: mail.html,
       text: mail.text,
     });
+  } catch (err) {
+    console.error("[coach/approved-email:candidate]", err);
+  }
+  try {
+    await sendMail({
+      to: booking.coachEmail,
+      subject: coachMail.subject,
+      html: coachMail.html,
+      text: coachMail.text,
+    });
+  } catch (err) {
+    console.error("[coach/approved-email:coach]", err);
+  }
+  if (process.env.ADMIN_EMAIL) {
+    const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
+    const coachEmail = normalizeEmail(booking.coachEmail);
+    const candidateEmail = normalizeEmail(booking.candidateEmail);
+    const shouldSendAdminMail =
+      Boolean(adminEmail) &&
+      adminEmail !== coachEmail &&
+      adminEmail !== candidateEmail;
+    if (shouldSendAdminMail) {
+      try {
+        await sendMail({
+          to: process.env.ADMIN_EMAIL,
+          subject: `[Admin Copy] ${mail.subject}`,
+          html: mail.html,
+          text: mail.text,
+        });
+      } catch (err) {
+        console.error("[coach/approved-email:admin]", err);
+      }
+    }
   }
 
   return ok({ updated: true, status: "approved" });

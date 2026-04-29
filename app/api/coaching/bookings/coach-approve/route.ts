@@ -20,29 +20,33 @@ function appBase() {
   return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
 }
 
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const token = url.searchParams.get("token");
-  if (!token) {
-    return Response.redirect(`${appBase()}/schedule?approved=invalid`, 302);
-  }
-  const tokenHash = hashToken(token);
-  const rows = await db
-    .select()
-    .from(schema.coachingBookings)
-    .where(eq(schema.coachingBookings.coachApprovalTokenHash, tokenHash))
-    .limit(1);
-  const booking = rows[0];
-  if (!booking) {
-    return Response.redirect(`${appBase()}/schedule?approved=invalid`, 302);
-  }
+function normalizeEmail(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
+}
 
+export async function GET(req: Request) {
   try {
-    if (booking.status !== "approved") {
-      const feedbackToken = randomBytes(24).toString("base64url");
-      const feedbackTokenHash = booking.feedbackTokenHash ?? hashToken(feedbackToken);
-      let meetingUrl: string | null = booking.calendarMeetingUrl ?? null;
-      let calendarEventId: string | null = booking.calendarEventId ?? null;
+    const url = new URL(req.url);
+    const token = url.searchParams.get("token");
+    if (!token) {
+      return Response.redirect(`${appBase()}/schedule?approved=invalid`, 302);
+    }
+    const tokenHash = hashToken(token);
+    const rows = await db
+      .select()
+      .from(schema.coachingBookings)
+      .where(eq(schema.coachingBookings.coachApprovalTokenHash, tokenHash))
+      .limit(1);
+    const booking = rows[0];
+    if (!booking) {
+      return Response.redirect(`${appBase()}/schedule?approved=invalid`, 302);
+    }
+
+    const justApproved = booking.status !== "approved";
+    let meetingUrl: string | null = booking.calendarMeetingUrl ?? null;
+    let calendarEventId: string | null = booking.calendarEventId ?? null;
+
+    if (!meetingUrl) {
       try {
         const calendarEvent = await createCoachingCalendarEvent({
           summary: `SelectWise Coaching · ${booking.techArea}`,
@@ -61,7 +65,11 @@ export async function GET(req: Request) {
       } catch (err) {
         console.error("[coaching/calendar:create]", err);
       }
+    }
 
+    if (justApproved) {
+      const feedbackToken = randomBytes(24).toString("base64url");
+      const feedbackTokenHash = booking.feedbackTokenHash ?? hashToken(feedbackToken);
       await db
         .update(schema.coachingBookings)
         .set({
@@ -74,7 +82,18 @@ export async function GET(req: Request) {
           updatedAt: new Date(),
         })
         .where(eq(schema.coachingBookings.id, booking.id));
+    } else if (meetingUrl && !booking.calendarMeetingUrl) {
+      await db
+        .update(schema.coachingBookings)
+        .set({
+          calendarMeetingUrl: meetingUrl,
+          calendarEventId,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.coachingBookings.id, booking.id));
+    }
 
+    if (justApproved || (meetingUrl && !booking.calendarMeetingUrl)) {
       const mail = coachingApprovedEmail({
         bookingId: booking.id,
         candidateName: booking.candidateName,
@@ -118,21 +137,24 @@ export async function GET(req: Request) {
         console.error("[coaching/approved-email:coach]", err);
       }
       if (process.env.ADMIN_EMAIL) {
-        const adminEmail = process.env.ADMIN_EMAIL.trim().toLowerCase();
-        const coachEmail = booking.coachEmail.trim().toLowerCase();
-        const candidateEmail = booking.candidateEmail.trim().toLowerCase();
-        if (adminEmail === coachEmail || adminEmail === candidateEmail) {
-          return Response.redirect(`${appBase()}/schedule?approved=1`, 302);
-        }
-        try {
-          await sendMail({
-            to: process.env.ADMIN_EMAIL,
-            subject: `[Admin Copy] ${mail.subject}`,
-            html: mail.html,
-            text: mail.text,
-          });
-        } catch (err) {
-          console.error("[coaching/approved-email:admin]", err);
+        const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
+        const coachEmail = normalizeEmail(booking.coachEmail);
+        const candidateEmail = normalizeEmail(booking.candidateEmail);
+        const shouldSendAdminMail =
+          Boolean(adminEmail) &&
+          adminEmail !== coachEmail &&
+          adminEmail !== candidateEmail;
+        if (shouldSendAdminMail) {
+          try {
+            await sendMail({
+              to: process.env.ADMIN_EMAIL,
+              subject: `[Admin Copy] ${mail.subject}`,
+              html: mail.html,
+              text: mail.text,
+            });
+          } catch (err) {
+            console.error("[coaching/approved-email:admin]", err);
+          }
         }
       }
     }
