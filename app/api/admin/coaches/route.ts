@@ -86,7 +86,7 @@ export async function POST(req: Request) {
   }
 
   if (promotedToCoach) {
-    const dashboardUrl = `${appBase()}/coach/bookings`;
+    const dashboardUrl = `${appBase()}/coach`;
     const mail = coachOnboardingEmail({
       coachName: coach.name,
       coachEmail: coach.email,
