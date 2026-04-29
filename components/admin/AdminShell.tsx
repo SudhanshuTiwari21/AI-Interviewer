@@ -288,6 +288,13 @@ function SidebarBody({
             active={isActive(pathname, item.href)}
           />
         ))}
+        <button
+          onClick={onSignOut}
+          className="mt-2 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900"
+        >
+          <LogOut className="size-4" />
+          Sign out
+        </button>
       </nav>
       <div className="border-t border-ink-100 p-3">
         <div className="flex items-center gap-3 rounded-xl px-2 py-2">
@@ -296,13 +303,6 @@ function SidebarBody({
             <p className="truncate text-sm font-medium text-ink-900">{user.name}</p>
             <p className="truncate text-xs text-ink-500">{user.email}</p>
           </div>
-          <button
-            title="Sign out"
-            onClick={onSignOut}
-            className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
-          >
-            <LogOut className="size-4" />
-          </button>
         </div>
       </div>
     </>
