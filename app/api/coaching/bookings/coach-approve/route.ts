@@ -11,13 +11,16 @@ import {
 import { createCoachingCalendarEvent } from "@/lib/integrations/google-calendar";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
 function appBase() {
-  return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+  const raw = (process.env.APP_URL ?? "http://localhost:3000").trim();
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  return withProtocol.replace(/\/+$/, "");
 }
 
 function normalizeEmail(value: string | null | undefined) {
