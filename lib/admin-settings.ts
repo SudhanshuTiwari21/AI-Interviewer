@@ -2,6 +2,7 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
+import { TARGET_ROLES } from "@/lib/target-roles";
 
 export type AdminSettings = {
   /** Flat per-interview price in INR. */
@@ -20,6 +21,8 @@ export type AdminSettings = {
   allowSignups: boolean;
   /** Coaching technologies shown on schedule page. */
   coachingTechnologyCategories: string[];
+  /** Shared role list used across interview + coaching flows. */
+  targetRoles: string[];
 };
 
 export const DEFAULT_SETTINGS: AdminSettings = {
@@ -43,6 +46,7 @@ export const DEFAULT_SETTINGS: AdminSettings = {
     "Cloud",
     "QA Automation",
   ],
+  targetRoles: [...TARGET_ROLES],
 };
 
 const ROW_ID = "singleton";

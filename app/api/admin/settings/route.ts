@@ -30,6 +30,7 @@ const Patch = z.object({
     .array(z.string().trim().min(1).max(80))
     .max(100)
     .optional(),
+  targetRoles: z.array(z.string().trim().min(1).max(120)).max(300).optional(),
 });
 
 export async function GET() {

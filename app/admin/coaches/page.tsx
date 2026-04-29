@@ -65,6 +65,7 @@ export default function AdminCoachesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [availableRoles, setAvailableRoles] = useState<string[]>([...TARGET_ROLES]);
   const formAlertRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -75,6 +76,17 @@ export default function AdminCoachesPage() {
         else setCoaches([]);
       })
       .catch(() => setCoaches([]));
+    void fetch("/api/settings/public", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        const roles = d?.settings?.targetRoles;
+        if (Array.isArray(roles) && roles.length > 0) {
+          setAvailableRoles(roles);
+        }
+      })
+      .catch(() => {
+        setAvailableRoles([...TARGET_ROLES]);
+      });
   }, []);
 
   useEffect(() => {
@@ -327,7 +339,7 @@ export default function AdminCoachesPage() {
               <Field label="Tech areas">
                 <div className="max-h-44 overflow-y-auto rounded-lg border border-ink-200 bg-white p-2">
                   <div className="flex flex-wrap gap-1.5">
-                    {TARGET_ROLES.map((role) => {
+                    {availableRoles.map((role) => {
                       const active = form.techAreas.includes(role);
                       return (
                         <button

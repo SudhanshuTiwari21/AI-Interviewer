@@ -192,6 +192,7 @@ export default function SetupPage() {
   const [rolePickerOpen, setRolePickerOpen] = useState(false);
   const [roleQuery, setRoleQuery] = useState("");
   const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
+  const [availableRoles, setAvailableRoles] = useState<string[]>([...TARGET_ROLES]);
   const rolePickerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -199,7 +200,25 @@ export default function SetupPage() {
     if (!user) router.replace("/login?next=/interview/setup");
     const draft = store.getInterviewDraft();
     setDraftSessionId(draft?.sessionId ?? null);
+    void fetch("/api/settings/public", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        const roles = d?.settings?.targetRoles;
+        if (Array.isArray(roles) && roles.length > 0) {
+          setAvailableRoles(roles);
+        }
+      })
+      .catch(() => {
+        setAvailableRoles([...TARGET_ROLES]);
+      });
   }, [router]);
+
+  useEffect(() => {
+    if (availableRoles.length === 0) return;
+    if (!availableRoles.includes(targetRole)) {
+      setTargetRole(availableRoles[0]);
+    }
+  }, [availableRoles, targetRole]);
 
   useEffect(() => {
     function handleDocumentClick(event: MouseEvent) {
@@ -360,7 +379,7 @@ export default function SetupPage() {
   }
 
   const canStart = !!resume || !!draftSessionId;
-  const filteredRoles = TARGET_ROLES.filter((item) =>
+  const filteredRoles = availableRoles.filter((item) =>
     item.toLowerCase().includes(roleQuery.trim().toLowerCase()),
   );
   let startButtonLabel = "Pay and Start";

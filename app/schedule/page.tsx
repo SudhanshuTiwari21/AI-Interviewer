@@ -62,6 +62,7 @@ function ScheduleInner() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [selectedTechArea, setSelectedTechArea] = useState<string>("");
   const [techSearch, setTechSearch] = useState("");
+  const [techAreas, setTechAreas] = useState<string[]>([...TARGET_ROLES]);
   const [confirmed, setConfirmed] = useState<{
     id: string;
     coachName: string;
@@ -86,6 +87,17 @@ function ScheduleInner() {
       .catch(() => {
         setCoaches([]);
       });
+    void fetch("/api/settings/public", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => {
+        const roles = d?.settings?.targetRoles;
+        if (Array.isArray(roles) && roles.length > 0) {
+          setTechAreas(roles);
+        }
+      })
+      .catch(() => {
+        setTechAreas([...TARGET_ROLES]);
+      });
   }, [coachId, router]);
 
   const days = useMemo(() => {
@@ -103,8 +115,6 @@ function ScheduleInner() {
       setSelectedDay(days[0] ?? null);
     }
   }, [days, selectedDay]);
-
-  const techAreas = TARGET_ROLES;
 
   useEffect(() => {
     if (!selectedTechArea && techAreas[0]) {

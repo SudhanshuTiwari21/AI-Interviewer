@@ -33,6 +33,7 @@ import {
   MousePointerClick,
   CalendarClock,
   Settings,
+  List,
   ScrollText,
   LifeBuoy,
   ArrowLeft,
@@ -84,6 +85,7 @@ const NAV: NavItem[] = [
   { href: "/admin/analytics", label: "Freshers vs Pros", icon: PieChart, permission: "analytics.freshers_vs_professionals" },
   { href: "/admin/conversion", label: "Conversion", icon: Filter, permission: "analytics.conversion" },
   { href: "/admin/lead-sources", label: "Lead sources", icon: MousePointerClick, permission: "analytics.lead_sources" },
+  { href: "/admin/roles", label: "Roles", icon: List, permission: "settings.view" },
   { href: "/admin/settings", label: "Settings", icon: Settings, permission: "settings.view" },
   { href: "/admin/audit", label: "Audit log", icon: ScrollText, permission: "audit.view" },
 ];
