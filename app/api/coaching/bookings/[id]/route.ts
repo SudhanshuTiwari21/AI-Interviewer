@@ -10,6 +10,7 @@ import { findUserById } from "@/lib/auth/verification-service";
 import { sendMail } from "@/lib/email/transporter";
 import {
   coachingApprovedEmail,
+  coachingApprovedEmailToCoach,
   coachingRefundApprovedEmail,
   coachingRefundRejectedEmail,
 } from "@/lib/email/templates/coaching";
@@ -355,13 +356,36 @@ export async function PATCH(
         meetingUrl,
         coachTimezone: booking.coachTimezone,
       });
+      const coachMail = coachingApprovedEmailToCoach({
+        bookingId: booking.id,
+        candidateName: booking.candidateName,
+        candidateEmail: booking.candidateEmail,
+        techArea: booking.techArea,
+        coachName: booking.coachName,
+        startsAt: booking.startsAt.toISOString(),
+        amountInr: booking.amountInr,
+        meetingUrl,
+        coachTimezone: booking.coachTimezone,
+      });
       await sendMail({
         to: booking.candidateEmail,
         subject: mail.subject,
         html: mail.html,
         text: mail.text,
       });
+      await sendMail({
+        to: booking.coachEmail,
+        subject: coachMail.subject,
+        html: coachMail.html,
+        text: coachMail.text,
+      });
       if (process.env.ADMIN_EMAIL) {
+        const adminEmail = process.env.ADMIN_EMAIL.trim().toLowerCase();
+        const coachEmail = booking.coachEmail.trim().toLowerCase();
+        const candidateEmail = booking.candidateEmail.trim().toLowerCase();
+        if (adminEmail === coachEmail || adminEmail === candidateEmail) {
+          return ok({ updated: true });
+        }
         await sendMail({
           to: process.env.ADMIN_EMAIL,
           subject: `[Admin Copy] ${mail.subject}`,

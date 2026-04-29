@@ -168,6 +168,30 @@ export function coachingApprovedEmail(args: ApprovedArgs) {
   };
 }
 
+export function coachingApprovedEmailToCoach(args: ApprovedArgs) {
+  const when = fmtDate(args.startsAt, args.coachTimezone);
+  return {
+    subject: `Session confirmed: ${args.candidateName} (${args.techArea})`,
+    html: `<p>Hi ${args.coachName},</p>
+<p>Your coaching session is confirmed on SelectWise.</p>
+<ul>
+  <li><strong>Candidate:</strong> ${args.candidateName} (${args.candidateEmail})</li>
+  <li><strong>Tech area:</strong> ${args.techArea}</li>
+  <li><strong>Session:</strong> ${when}</li>
+  <li><strong>Booking ID:</strong> ${args.bookingId}</li>
+  ${args.meetingUrl ? `<li><strong>Join link:</strong> <a href="${args.meetingUrl}">${args.meetingUrl}</a></li>` : ""}
+</ul>
+<p>Thanks,<br/>SelectWise</p>`,
+    text: `Hi ${args.coachName},
+Your coaching session is confirmed.
+- Candidate: ${args.candidateName} (${args.candidateEmail})
+- Tech area: ${args.techArea}
+- Session: ${when}
+- Booking ID: ${args.bookingId}
+- Join link: ${args.meetingUrl ?? "Will be shared shortly"}`,
+  };
+}
+
 export function coachingRefundApprovedEmail(args: RefundApprovedArgs) {
   const statusLabel =
     args.status === "refunded"

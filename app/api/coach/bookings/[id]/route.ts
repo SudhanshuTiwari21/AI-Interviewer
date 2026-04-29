@@ -7,7 +7,10 @@ import { db, schema } from "@/lib/db/client";
 import { fail, ok } from "@/lib/api/response";
 import { requireCoach } from "@/lib/auth/coach";
 import { sendMail } from "@/lib/email/transporter";
-import { coachingApprovedEmail } from "@/lib/email/templates/coaching";
+import {
+  coachingApprovedEmail,
+  coachingApprovedEmailToCoach,
+} from "@/lib/email/templates/coaching";
 import { createCoachingCalendarEvent } from "@/lib/integrations/google-calendar";
 
 export const runtime = "nodejs";
@@ -122,13 +125,36 @@ export async function PATCH(
     meetingUrl,
     coachTimezone: booking.coachTimezone,
   });
+  const coachMail = coachingApprovedEmailToCoach({
+    bookingId: booking.id,
+    candidateName: booking.candidateName,
+    candidateEmail: booking.candidateEmail,
+    techArea: booking.techArea,
+    coachName: booking.coachName,
+    startsAt: booking.startsAt.toISOString(),
+    amountInr: booking.amountInr,
+    meetingUrl,
+    coachTimezone: booking.coachTimezone,
+  });
   await sendMail({
     to: booking.candidateEmail,
     subject: mail.subject,
     html: mail.html,
     text: mail.text,
   });
+  await sendMail({
+    to: booking.coachEmail,
+    subject: coachMail.subject,
+    html: coachMail.html,
+    text: coachMail.text,
+  });
   if (process.env.ADMIN_EMAIL) {
+    const adminEmail = process.env.ADMIN_EMAIL.trim().toLowerCase();
+    const coachEmail = booking.coachEmail.trim().toLowerCase();
+    const candidateEmail = booking.candidateEmail.trim().toLowerCase();
+    if (adminEmail === coachEmail || adminEmail === candidateEmail) {
+      return ok({ updated: true, status: "approved" });
+    }
     await sendMail({
       to: process.env.ADMIN_EMAIL,
       subject: `[Admin Copy] ${mail.subject}`,

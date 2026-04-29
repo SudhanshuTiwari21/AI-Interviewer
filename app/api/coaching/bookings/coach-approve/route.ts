@@ -4,7 +4,10 @@ import { createHash, randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { sendMail } from "@/lib/email/transporter";
-import { coachingApprovedEmail } from "@/lib/email/templates/coaching";
+import {
+  coachingApprovedEmail,
+  coachingApprovedEmailToCoach,
+} from "@/lib/email/templates/coaching";
 import { createCoachingCalendarEvent } from "@/lib/integrations/google-calendar";
 
 export const runtime = "nodejs";
@@ -83,6 +86,17 @@ export async function GET(req: Request) {
         meetingUrl,
         coachTimezone: booking.coachTimezone,
       });
+      const coachMail = coachingApprovedEmailToCoach({
+        bookingId: booking.id,
+        candidateName: booking.candidateName,
+        candidateEmail: booking.candidateEmail,
+        techArea: booking.techArea,
+        coachName: booking.coachName,
+        startsAt: booking.startsAt.toISOString(),
+        amountInr: booking.amountInr,
+        meetingUrl,
+        coachTimezone: booking.coachTimezone,
+      });
       try {
         await sendMail({
           to: booking.candidateEmail,
@@ -93,7 +107,23 @@ export async function GET(req: Request) {
       } catch (err) {
         console.error("[coaching/approved-email:candidate]", err);
       }
+      try {
+        await sendMail({
+          to: booking.coachEmail,
+          subject: coachMail.subject,
+          html: coachMail.html,
+          text: coachMail.text,
+        });
+      } catch (err) {
+        console.error("[coaching/approved-email:coach]", err);
+      }
       if (process.env.ADMIN_EMAIL) {
+        const adminEmail = process.env.ADMIN_EMAIL.trim().toLowerCase();
+        const coachEmail = booking.coachEmail.trim().toLowerCase();
+        const candidateEmail = booking.candidateEmail.trim().toLowerCase();
+        if (adminEmail === coachEmail || adminEmail === candidateEmail) {
+          return Response.redirect(`${appBase()}/schedule?approved=1`, 302);
+        }
         try {
           await sendMail({
             to: process.env.ADMIN_EMAIL,
