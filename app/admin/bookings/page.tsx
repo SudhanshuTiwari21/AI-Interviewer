@@ -146,7 +146,7 @@ function BookingsTable({
                 <p className="text-xs text-ink-500">{b.candidateEmail}</p>
               </Td>
               <Td>{b.techArea}</Td>
-              <Td>1-hour coaching</Td>
+              <Td>{`${b.durationMin}-minute coaching`}</Td>
               <Td className="whitespace-nowrap text-xs text-ink-500">
                 {formatDate(b.startsAt)}
               </Td>
