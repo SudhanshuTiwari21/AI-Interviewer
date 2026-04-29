@@ -148,7 +148,9 @@ export async function POST(req: Request) {
   }
 
   const approvalUrl = `${baseUrl()}/api/coaching/bookings/coach-approve?token=${encodeURIComponent(rawToken)}`;
-  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase() ?? "";
+  const coachEmail = body.coachEmail.trim().toLowerCase();
+  const candidateEmail = me.email.trim().toLowerCase();
 
   const coachMail = coachingRequestEmailToCoach({
     bookingId: created.id,
@@ -163,7 +165,7 @@ export async function POST(req: Request) {
   });
   try {
     await sendMail({
-      to: body.coachEmail,
+      to: coachEmail,
       subject: coachMail.subject,
       html: coachMail.html,
       text: coachMail.text,
@@ -185,7 +187,7 @@ export async function POST(req: Request) {
   });
   try {
     await sendMail({
-      to: me.email,
+      to: candidateEmail,
       subject: candidateMail.subject,
       html: candidateMail.html,
       text: candidateMail.text,
@@ -194,7 +196,12 @@ export async function POST(req: Request) {
     // Non-blocking email failure.
   }
 
-  if (adminEmail) {
+  const shouldSendAdminMail =
+    Boolean(adminEmail) &&
+    adminEmail !== coachEmail &&
+    adminEmail !== candidateEmail;
+
+  if (shouldSendAdminMail) {
     const adminMail = coachingRequestEmailToAdmin({
       bookingId: created.id,
       candidateName: me.name,
