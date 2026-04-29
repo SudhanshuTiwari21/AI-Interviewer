@@ -13,9 +13,16 @@ import { sendMail } from "@/lib/email/transporter";
 import { coachOnboardingEmail } from "@/lib/email/templates/coaching";
 
 export const runtime = "nodejs";
+const MAX_COACH_DESCRIPTION_WORDS = 40;
 
 function appBase() {
   return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+}
+
+function descriptionWordCount(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return 0;
+  return normalized.split(/\s+/).length;
 }
 
 const CoachSchema = z.object({
@@ -23,7 +30,13 @@ const CoachSchema = z.object({
   name: z.string(),
   email: z.string().email(),
   title: z.string(),
-  description: z.string().max(2000),
+  description: z
+    .string()
+    .max(2000)
+    .refine(
+      (value) => descriptionWordCount(value) <= MAX_COACH_DESCRIPTION_WORDS,
+      `Description can have at most ${MAX_COACH_DESCRIPTION_WORDS} words.`,
+    ),
   sessions: z.number(),
   focus: z.array(z.string()),
   techAreas: z.array(z.string()),

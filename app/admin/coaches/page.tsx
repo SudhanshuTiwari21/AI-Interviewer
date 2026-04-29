@@ -35,6 +35,7 @@ const WEEKDAYS = [
   { value: 6, label: "Sat" },
   { value: 0, label: "Sun" },
 ];
+const MAX_COACH_DESCRIPTION_WORDS = 40;
 
 const DEFAULT_FORM: CoachForm = {
   name: "",
@@ -242,6 +243,13 @@ export default function AdminCoachesPage() {
                 e.preventDefault();
                 setSaveMessage(null);
                 setSaveError(null);
+                const descriptionWords = wordCount(form.description);
+                if (descriptionWords > MAX_COACH_DESCRIPTION_WORDS) {
+                  setSaveError(
+                    `Description is too long. Please keep it within ${MAX_COACH_DESCRIPTION_WORDS} words.`,
+                  );
+                  return;
+                }
                 const next = toCoach(form, editingId);
                 if (!next) return;
                 setIsSaving(true);
@@ -327,6 +335,16 @@ export default function AdminCoachesPage() {
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   placeholder="Brief coach bio and expertise summary"
                 />
+                <p
+                  className={cn(
+                    "mt-1 text-[11px]",
+                    wordCount(form.description) > MAX_COACH_DESCRIPTION_WORDS
+                      ? "text-danger-600"
+                      : "text-ink-500",
+                  )}
+                >
+                  {wordCount(form.description)}/{MAX_COACH_DESCRIPTION_WORDS} words
+                </p>
               </Field>
               <Field label="Focus areas (comma separated)">
                 <input
@@ -580,6 +598,12 @@ function toHourMinuteLabel(totalMinutes: number) {
   const suffix = hours24 >= 12 ? "PM" : "AM";
   const hours12 = hours24 % 12 || 12;
   return `${hours12}:${String(minutes).padStart(2, "0")} ${suffix}`;
+}
+
+function wordCount(text: string) {
+  const normalized = text.trim();
+  if (!normalized) return 0;
+  return normalized.split(/\s+/).length;
 }
 
 function TimePicker({
