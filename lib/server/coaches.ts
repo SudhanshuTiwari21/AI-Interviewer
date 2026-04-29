@@ -49,7 +49,7 @@ function rowToCoach(row: typeof schema.coaches.$inferSelect): Coach {
     sessions: row.sessions,
     focus: (row.focus as string[]) ?? [],
     techAreas: (row.techAreas as string[]) ?? [],
-    hourlyRateInr: row.hourlyRateInr,
+    perSessionRateInr: row.perSessionRateInr,
     active: row.active,
     timezone: row.timezone,
     availability: {
@@ -69,7 +69,7 @@ function coachToInsert(coach: Coach): typeof schema.coaches.$inferInsert {
     sessions: coach.sessions,
     focus: coach.focus as unknown as Record<string, unknown>,
     techAreas: coach.techAreas as unknown as Record<string, unknown>,
-    hourlyRateInr: coach.hourlyRateInr,
+    perSessionRateInr: coach.perSessionRateInr,
     active: coach.active,
     timezone: coach.timezone,
     availability: coach.availability as unknown as Record<string, unknown>,

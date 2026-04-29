@@ -63,6 +63,7 @@ function ScheduleInner() {
   const [selectedTechArea, setSelectedTechArea] = useState<string>("");
   const [techSearch, setTechSearch] = useState("");
   const [techAreas, setTechAreas] = useState<string[]>([...TARGET_ROLES]);
+  const [coachPickerOpen, setCoachPickerOpen] = useState(false);
   const [confirmed, setConfirmed] = useState<{
     id: string;
     coachName: string;
@@ -189,7 +190,7 @@ function ScheduleInner() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           productType: "coaching",
-          amountInr: coach.hourlyRateInr,
+          amountInr: coach.perSessionRateInr,
           metadata: {
             coachId: coach.id,
             techArea: selectedTechArea,
@@ -254,7 +255,7 @@ function ScheduleInner() {
           coachEmail: coach.email,
           coachTimezone: coach.timezone,
           startsAt: selectedSlot,
-          amountInr: coach.hourlyRateInr,
+          amountInr: coach.perSessionRateInr,
           paymentTransactionId: verifyData.transaction.id,
           razorpayOrderId: paymentResult.razorpay_order_id,
           razorpayPaymentId: paymentResult.razorpay_payment_id,
@@ -270,7 +271,7 @@ function ScheduleInner() {
         coachName: coach.name,
         techArea: selectedTechArea,
         startsAt: selectedSlot,
-        amountInr: coach.hourlyRateInr,
+        amountInr: coach.perSessionRateInr,
       });
       setSelectedSlot(null);
     } catch {
@@ -414,6 +415,7 @@ function ScheduleInner() {
                           setSelectedTechArea(area);
                           setCoachId("");
                           setSelectedSlot(null);
+                          setCoachPickerOpen(true);
                         }}
                         className={cn(
                           "mb-1 block w-full rounded-lg px-2.5 py-2 text-left text-xs transition-colors last:mb-0",
@@ -431,63 +433,43 @@ function ScheduleInner() {
               <p className="px-1 text-xs font-medium uppercase tracking-wide text-ink-400">
                 Choose a coach
               </p>
-              {filteredCoaches.length === 0 ? (
+              {!selectedTechArea ? (
                 <div className="rounded-2xl border border-ink-200 bg-white p-4 text-sm text-ink-600">
-                  No coach is available currently for <span className="font-medium">{selectedTechArea}</span>.
+                  Select a role first to view available coaches.
                 </div>
+              ) : !coach ? (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setCoachPickerOpen(true)}
+                >
+                  {filteredCoaches.length === 0 ? "No coaches available for this role" : "Select coach"}
+                </Button>
               ) : (
-                filteredCoaches.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => setCoachId(c.id)}
-                    className={cn(
-                      "w-full rounded-2xl border p-4 text-left transition-all",
-                      coachId === c.id
-                        ? "border-ink-900 bg-white shadow-pop"
-                        : "border-ink-200 bg-white hover:border-ink-300",
-                    )}
+                <div className="rounded-2xl border border-ink-200 bg-white p-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={coach.name} />
+                    <div>
+                      <p className="text-sm font-medium text-ink-900">{coach.name}</p>
+                      <p className="text-xs text-ink-500">{coach.title}</p>
+                    </div>
+                  </div>
+                  {coach.description ? (
+                    <p className="mt-2 line-clamp-3 text-xs text-ink-600">{coach.description}</p>
+                  ) : null}
+                  <p className="mt-2 text-xs text-ink-500">
+                    ★ {coach.rating.toFixed(2)} ({coach.reviewCount ?? 0} reviews) · ₹
+                    {coach.perSessionRateInr} per session
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => setCoachPickerOpen(true)}
                   >
-                    <div className="flex items-center gap-3">
-                      <Avatar name={c.name} />
-                      <div>
-                        <p className="text-sm font-medium text-ink-900">
-                          {c.name}
-                        </p>
-                        <p className="text-xs text-ink-500">{c.title}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {c.focus.map((f) => (
-                        <span
-                          key={f}
-                          className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-700"
-                        >
-                          {f}
-                        </span>
-                      ))}
-                    </div>
-                    {c.description ? <p className="mt-2 text-xs text-ink-600">{c.description}</p> : null}
-                    <p className="mt-3 text-xs text-ink-500">
-                      ★ {c.rating.toFixed(2)} ({c.reviewCount ?? 0} reviews) · {c.sessions} sessions · ₹
-                      {c.hourlyRateInr}/hour
-                    </p>
-                    {c.recentFeedbacks && c.recentFeedbacks.length > 0 ? (
-                      <div className="mt-2 space-y-1.5">
-                        {c.recentFeedbacks.slice(0, 2).map((feedback) => (
-                          <p
-                            key={`${feedback.createdAt}-${feedback.candidateName}`}
-                            className="text-[11px] text-ink-600"
-                          >
-                            <span className="font-medium text-ink-700">
-                              {feedback.rating.toFixed(1)}★
-                            </span>{" "}
-                            "{feedback.feedbackText}"
-                          </p>
-                        ))}
-                      </div>
-                    ) : null}
-                  </button>
-                ))
+                    Change coach
+                  </Button>
+                </div>
               )}
             </div>
 
@@ -601,7 +583,7 @@ function ScheduleInner() {
               <div className="flex flex-col items-stretch justify-between gap-3 border-t border-ink-100 bg-ink-50/50 px-5 py-4 sm:flex-row sm:items-center">
                 <p className="text-xs text-ink-500">
                   {selectedSlot
-                    ? `${formatDate(selectedSlot)} at ${new Date(selectedSlot).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} · 30 min · ₹${coach?.hourlyRateInr ?? 0}`
+                    ? `${formatDate(selectedSlot)} at ${new Date(selectedSlot).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} · 30 min · ₹${coach?.perSessionRateInr ?? 0} per session`
                     : "Pick a slot to continue"}
                 </p>
                 <div className="flex flex-col items-stretch gap-2">
@@ -620,6 +602,67 @@ function ScheduleInner() {
           </div>
         )}
       </main>
+
+      {coachPickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 px-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-ink-100 px-4 py-3">
+              <p className="text-sm font-semibold text-ink-900">
+                {selectedTechArea
+                  ? `Available coaches for ${selectedTechArea}`
+                  : "Select a role first"}
+              </p>
+              <button
+                className="rounded-lg px-2 py-1 text-sm text-ink-500 hover:bg-ink-100 hover:text-ink-900"
+                onClick={() => setCoachPickerOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-y-auto p-4">
+              {filteredCoaches.length === 0 ? (
+                <div className="rounded-xl border border-ink-100 bg-ink-50 p-4 text-sm text-ink-600">
+                  No coach is available currently for <span className="font-medium">{selectedTechArea}</span>.
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {filteredCoaches.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        setCoachId(c.id);
+                        setSelectedSlot(null);
+                        setCoachPickerOpen(false);
+                      }}
+                      className={cn(
+                        "rounded-xl border p-3 text-left transition-all",
+                        coachId === c.id
+                          ? "border-ink-900 bg-ink-50"
+                          : "border-ink-200 bg-white hover:border-ink-300",
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Avatar name={c.name} />
+                        <div>
+                          <p className="text-sm font-medium text-ink-900">{c.name}</p>
+                          <p className="text-xs text-ink-500">{c.title}</p>
+                        </div>
+                      </div>
+                      {c.description ? (
+                        <p className="mt-2 line-clamp-3 text-xs text-ink-600">{c.description}</p>
+                      ) : null}
+                      <p className="mt-2 text-xs text-ink-500">
+                        ★ {c.rating.toFixed(2)} ({c.reviewCount ?? 0} reviews) · {c.sessions} sessions · ₹
+                        {c.perSessionRateInr} per session
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

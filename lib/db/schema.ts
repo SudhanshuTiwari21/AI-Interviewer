@@ -238,7 +238,7 @@ export const coaches = pgTable(
     sessions: integer("sessions").notNull().default(0),
     focus: jsonb("focus").notNull().default(sql`'[]'::jsonb`),
     techAreas: jsonb("tech_areas").notNull().default(sql`'[]'::jsonb`),
-    hourlyRateInr: integer("hourly_rate_inr").notNull().default(999),
+    perSessionRateInr: integer("per_session_rate_inr").notNull().default(999),
     active: boolean("active").notNull().default(true),
     timezone: text("timezone").notNull().default("Asia/Kolkata"),
     availability: jsonb("availability").notNull().default(sql`'{}'::jsonb`),

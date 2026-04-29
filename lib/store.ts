@@ -61,7 +61,7 @@ function normalizeCoach(raw: Coach): Coach {
     recentFeedbacks: raw.recentFeedbacks ?? [],
     techAreas:
       raw.techAreas && raw.techAreas.length > 0 ? raw.techAreas : raw.focus ?? [],
-    hourlyRateInr: raw.hourlyRateInr ?? 999,
+    perSessionRateInr: raw.perSessionRateInr ?? 999,
   };
 }
 

@@ -23,7 +23,7 @@ export type Coach = {
   }>;
   focus: string[];
   techAreas: string[];
-  hourlyRateInr: number;
+  perSessionRateInr: number;
   active: boolean;
   timezone: string;
   availability: CoachAvailability;

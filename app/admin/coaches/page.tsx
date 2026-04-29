@@ -18,7 +18,7 @@ type CoachForm = {
   description: string;
   focus: string;
   techAreas: string[];
-  hourlyRateInr: string;
+  perSessionRateInr: string;
   sessions: string;
   timezone: string;
   weekdays: number[];
@@ -43,7 +43,7 @@ const DEFAULT_FORM: CoachForm = {
   description: "",
   focus: "",
   techAreas: [],
-  hourlyRateInr: "999",
+  perSessionRateInr: "999",
   sessions: "0",
   timezone: "Asia/Kolkata",
   weekdays: [1, 2, 3, 4, 5],
@@ -143,7 +143,7 @@ export default function AdminCoachesPage() {
                 </div>
                 <p className="mt-2 text-xs text-ink-500">
                   ★ {coach.rating.toFixed(2)} ({coach.reviewCount ?? 0} reviews) · {coach.sessions} sessions ·{" "}
-                  {coach.timezone} · ₹{coach.hourlyRateInr}/hour
+                  {coach.timezone} · ₹{coach.perSessionRateInr} per session
                 </p>
                 {coach.description ? (
                   <p className="mt-2 text-xs text-ink-600">{coach.description}</p>
@@ -194,7 +194,7 @@ export default function AdminCoachesPage() {
                           description: coach.description ?? "",
                           focus: coach.focus.join(", "),
                           techAreas: coach.techAreas,
-                          hourlyRateInr: String(coach.hourlyRateInr),
+                          perSessionRateInr: String(coach.perSessionRateInr),
                           sessions: String(coach.sessions),
                           timezone: coach.timezone,
                           weekdays: coach.availability.weekdays,
@@ -379,14 +379,14 @@ export default function AdminCoachesPage() {
                     }
                   />
                 </Field>
-                <Field label="Hourly rate (INR)">
+                <Field label="Per session rate (INR)">
                   <input
                     type="number"
                     min="1"
                     className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
-                    value={form.hourlyRateInr}
+                    value={form.perSessionRateInr}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, hourlyRateInr: e.target.value }))
+                      setForm((f) => ({ ...f, perSessionRateInr: e.target.value }))
                     }
                   />
                 </Field>
@@ -659,7 +659,7 @@ function toCoach(form: CoachForm, editingId: string | null): Coach | null {
     description: form.description.trim(),
     focus,
     techAreas,
-    hourlyRateInr: Number(form.hourlyRateInr) || 999,
+    perSessionRateInr: Number(form.perSessionRateInr) || 999,
     rating: 0,
     sessions: Number(form.sessions) || 0,
     timezone: form.timezone.trim() || "Asia/Kolkata",

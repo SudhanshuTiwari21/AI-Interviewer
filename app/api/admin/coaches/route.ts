@@ -27,7 +27,7 @@ const CoachSchema = z.object({
   sessions: z.number(),
   focus: z.array(z.string()),
   techAreas: z.array(z.string()),
-  hourlyRateInr: z.number().int().positive(),
+  perSessionRateInr: z.number().int().positive(),
   active: z.boolean(),
   timezone: z.string(),
   availability: z.object({
