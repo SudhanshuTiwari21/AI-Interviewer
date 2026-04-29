@@ -433,35 +433,27 @@ export default function AdminCoachesPage() {
                 <div className="space-y-2">
                   {form.windows.map((win, idx) => (
                     <div key={`${idx}-${win.startMinute}-${win.endMinute}`} className="grid grid-cols-[1fr,1fr,auto] gap-2">
-                      <input
-                        type="time"
-                        step="60"
-                        className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
+                      <TimePicker
                         value={win.startMinute}
-                        onChange={(e) =>
+                        onChange={(nextValue) =>
                           setForm((f) => ({
                             ...f,
                             windows: f.windows.map((w, i) =>
-                              i === idx ? { ...w, startMinute: e.target.value } : w,
+                              i === idx ? { ...w, startMinute: nextValue } : w,
                             ),
                           }))
                         }
-                        placeholder="Start time"
                       />
-                      <input
-                        type="time"
-                        step="60"
-                        className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
+                      <TimePicker
                         value={win.endMinute}
-                        onChange={(e) =>
+                        onChange={(nextValue) =>
                           setForm((f) => ({
                             ...f,
                             windows: f.windows.map((w, i) =>
-                              i === idx ? { ...w, endMinute: e.target.value } : w,
+                              i === idx ? { ...w, endMinute: nextValue } : w,
                             ),
                           }))
                         }
-                        placeholder="End time"
                       />
                       <Button
                         type="button"
@@ -588,6 +580,52 @@ function toHourMinuteLabel(totalMinutes: number) {
   const suffix = hours24 >= 12 ? "PM" : "AM";
   const hours12 = hours24 % 12 || 12;
   return `${hours12}:${String(minutes).padStart(2, "0")} ${suffix}`;
+}
+
+function TimePicker({
+  value,
+  onChange,
+}: Readonly<{
+  value: string;
+  onChange: (value: string) => void;
+}>) {
+  const [hourRaw = "00", minuteRaw = "00"] = value.split(":");
+  const hour = Number.isNaN(Number(hourRaw)) ? "00" : hourRaw.padStart(2, "0");
+  const minute = Number.isNaN(Number(minuteRaw)) ? "00" : minuteRaw.padStart(2, "0");
+
+  return (
+    <div className="grid grid-cols-[1fr,auto,1fr] items-center gap-2">
+      <select
+        className="h-10 w-full rounded-lg border border-ink-200 bg-white px-2 text-sm"
+        value={hour}
+        onChange={(e) => onChange(`${e.target.value}:${minute}`)}
+      >
+        {Array.from({ length: 24 }, (_, i) => {
+          const next = String(i).padStart(2, "0");
+          return (
+            <option key={next} value={next}>
+              {next}
+            </option>
+          );
+        })}
+      </select>
+      <span className="text-sm text-ink-500">:</span>
+      <select
+        className="h-10 w-full rounded-lg border border-ink-200 bg-white px-2 text-sm"
+        value={minute}
+        onChange={(e) => onChange(`${hour}:${e.target.value}`)}
+      >
+        {Array.from({ length: 60 }, (_, i) => {
+          const next = String(i).padStart(2, "0");
+          return (
+            <option key={next} value={next}>
+              {next}
+            </option>
+          );
+        })}
+      </select>
+    </div>
+  );
 }
 
 function toCoach(form: CoachForm, editingId: string | null): Coach | null {
