@@ -20,6 +20,7 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [hydrated, setHydrated] = useState(false);
 
   const enforceSession = useCallback(async () => {
     const sessionUser = await authClient.me();
@@ -37,16 +38,43 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
   }
 
   useEffect(() => {
-    const u = store.getUser();
-    if (!u) {
-      router.replace("/login?next=/coach");
-      return;
+    let cancelled = false;
+    async function load() {
+      setHydrated(true);
+      const localUser = store.getUser();
+      if (localUser) {
+        if (localUser.role !== "coach") {
+          router.replace("/dashboard");
+          return;
+        }
+        if (!cancelled) setUser(localUser);
+        return;
+      }
+
+      const sessionUser = await authClient.me();
+      if (!sessionUser) {
+        router.replace("/login?next=/coach");
+        return;
+      }
+      if (sessionUser.role !== "coach") {
+        router.replace("/dashboard");
+        return;
+      }
+      const hydratedUser: User = {
+        id: sessionUser.id,
+        name: sessionUser.name,
+        email: sessionUser.email,
+        createdAt: new Date().toISOString(),
+        plan: (sessionUser.plan as User["plan"]) ?? "free",
+        role: (sessionUser.role as User["role"]) ?? "coach",
+      };
+      store.setUser(hydratedUser);
+      if (!cancelled) setUser(hydratedUser);
     }
-    if (u.role !== "coach") {
-      router.replace("/dashboard");
-      return;
-    }
-    setUser(u);
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   useEffect(() => {
@@ -64,7 +92,7 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
     };
   }, [enforceSession]);
 
-  if (!user) {
+  if (!hydrated || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-ink-500">
         Loading coach workspace...
