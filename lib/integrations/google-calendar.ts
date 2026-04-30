@@ -76,6 +76,14 @@ function isServiceAccountInviteRestriction(err: unknown) {
   );
 }
 
+function isInvalidConferenceType(err: unknown) {
+  const msg =
+    typeof err === "object" && err !== null
+      ? String((err as { message?: unknown }).message ?? "")
+      : "";
+  return msg.includes("Invalid conference type value.");
+}
+
 export async function createCoachingCalendarEvent(
   args: CreateCoachingEventArgs,
 ): Promise<CreatedCalendarEvent> {
@@ -109,6 +117,15 @@ export async function createCoachingCalendarEvent(
     },
   };
 
+  const requestBodyWithoutConferenceType = {
+    ...requestBody,
+    conferenceData: {
+      createRequest: {
+        requestId: `selectwise-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      },
+    },
+  };
+
   let response;
   try {
     response = await calendar.events.insert({
@@ -117,19 +134,37 @@ export async function createCoachingCalendarEvent(
       sendUpdates: "all",
       requestBody,
     });
-  } catch (err) {
-    if (!isServiceAccountInviteRestriction(err)) throw err;
-    // Service account lacks domain-wide delegation for attendee invites.
-    // Fallback: create event + Meet link without attendees.
-    response = await calendar.events.insert({
-      calendarId,
-      conferenceDataVersion: 1,
-      sendUpdates: "none",
-      requestBody: {
-        ...requestBody,
-        attendees: [],
-      },
-    });
+  } catch (primaryErr) {
+    const needsNoAttendees = isServiceAccountInviteRestriction(primaryErr);
+    const needsNoConferenceType = isInvalidConferenceType(primaryErr);
+
+    if (!needsNoAttendees && !needsNoConferenceType) throw primaryErr;
+
+    const fallbackBody = {
+      ...(needsNoConferenceType ? requestBodyWithoutConferenceType : requestBody),
+      attendees: needsNoAttendees ? [] : attendees,
+    };
+
+    try {
+      response = await calendar.events.insert({
+        calendarId,
+        conferenceDataVersion: 1,
+        sendUpdates: needsNoAttendees ? "none" : "all",
+        requestBody: fallbackBody,
+      });
+    } catch (secondaryErr) {
+      // Final fallback for mixed constraints: no attendees + no explicit conference type.
+      if (!needsNoAttendees || !isInvalidConferenceType(secondaryErr)) throw secondaryErr;
+      response = await calendar.events.insert({
+        calendarId,
+        conferenceDataVersion: 1,
+        sendUpdates: "none",
+        requestBody: {
+          ...requestBodyWithoutConferenceType,
+          attendees: [],
+        },
+      });
+    }
   }
 
   const event = response.data;
