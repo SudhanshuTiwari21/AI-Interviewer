@@ -18,7 +18,6 @@ export function SiteFooter() {
               title: "Product",
               items: [
                 ["Features", "/#features"],
-                ["Pricing", "/#pricing"],
                 ["How it works", "/#how"],
               ],
             },

@@ -34,6 +34,8 @@ type CoachingBooking = {
   refundReason: string | null;
 };
 
+const BOOKINGS_PAGE_SIZE = 3;
+
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [reports, setReports] = useState<InterviewReport[]>([]);
@@ -42,6 +44,7 @@ export default function DashboardPage() {
   const [refundLoadingId, setRefundLoadingId] = useState<string | null>(null);
   const [refundError, setRefundError] = useState<string | null>(null);
   const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
+  const [bookingsPage, setBookingsPage] = useState(1);
 
   useEffect(() => {
     const u = store.getUser();
@@ -61,6 +64,13 @@ export default function DashboardPage() {
         if (d.ok) setBookings(d.bookings);
       });
   }, []);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(bookings.length / BOOKINGS_PAGE_SIZE));
+    if (bookingsPage > totalPages) {
+      setBookingsPage(totalPages);
+    }
+  }, [bookings.length, bookingsPage]);
 
   async function requestRefund(bookingId: string) {
     const reason = (refundReasonById[bookingId] ?? "").trim();
@@ -114,6 +124,11 @@ export default function DashboardPage() {
   const trendDeltaLabel =
     trendDelta === null ? "N/A" : trendDelta > 0 ? `+${trendDelta}` : `${trendDelta}`;
   const paidCoachingBookings = bookings.filter((b) => b.paymentStatus === "paid").length;
+  const totalBookingsPages = Math.max(1, Math.ceil(bookings.length / BOOKINGS_PAGE_SIZE));
+  const paginatedBookings = bookings.slice(
+    (bookingsPage - 1) * BOOKINGS_PAGE_SIZE,
+    bookingsPage * BOOKINGS_PAGE_SIZE,
+  );
 
   return (
     <div className="container max-w-6xl px-4 py-8 sm:py-10">
@@ -358,7 +373,7 @@ export default function DashboardPage() {
               {bookings.length === 0 ? (
                 <p className="text-sm text-ink-500">No coaching bookings yet.</p>
               ) : (
-                bookings.slice(0, 4).map((b) => {
+                paginatedBookings.map((b) => {
                   const canRequestRefund =
                     b.paymentStatus === "paid" &&
                     b.status !== "refund_requested" &&
@@ -406,6 +421,33 @@ export default function DashboardPage() {
                   );
                 })
               )}
+              {bookings.length > BOOKINGS_PAGE_SIZE ? (
+                <div className="flex items-center justify-between border-t border-ink-100 pt-2">
+                  <p className="text-xs text-ink-500">
+                    Page {bookingsPage} of {totalBookingsPages}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={bookingsPage <= 1}
+                      onClick={() => setBookingsPage((prev) => Math.max(1, prev - 1))}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={bookingsPage >= totalBookingsPages}
+                      onClick={() =>
+                        setBookingsPage((prev) => Math.min(totalBookingsPages, prev + 1))
+                      }
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               {refundError && <p className="text-xs text-danger-600">{refundError}</p>}
             </CardBody>
           </Card>
