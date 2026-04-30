@@ -111,6 +111,13 @@ export async function PATCH(
         ],
       });
       const meetingUrl = calendarEvent.meetLink ?? calendarEvent.htmlLink ?? null;
+      if (!meetingUrl) {
+        return fail(
+          "validation_error",
+          "Google Calendar event was created but no join link was returned. Please verify Google Calendar + Meet permissions for the connected account.",
+          500,
+        );
+      }
       await db
         .update(schema.coachingBookings)
         .set({
@@ -119,17 +126,62 @@ export async function PATCH(
           updatedAt: new Date(),
         })
         .where(eq(schema.coachingBookings.id, booking.id));
+
+      // Resend confirmation with the refreshed link so candidate and coach both receive it.
+      const candidateMail = coachingApprovedEmail({
+        bookingId: booking.id,
+        candidateName: booking.candidateName,
+        candidateEmail: booking.candidateEmail,
+        techArea: booking.techArea,
+        coachName: booking.coachName,
+        startsAt: booking.startsAt.toISOString(),
+        amountInr: booking.amountInr,
+        meetingUrl,
+        coachTimezone: booking.coachTimezone,
+      });
+      const coachMail = coachingApprovedEmailToCoach({
+        bookingId: booking.id,
+        candidateName: booking.candidateName,
+        candidateEmail: booking.candidateEmail,
+        techArea: booking.techArea,
+        coachName: booking.coachName,
+        startsAt: booking.startsAt.toISOString(),
+        amountInr: booking.amountInr,
+        meetingUrl,
+        coachTimezone: booking.coachTimezone,
+      });
+      try {
+        await sendMail({
+          to: booking.candidateEmail,
+          subject: candidateMail.subject,
+          html: candidateMail.html,
+          text: candidateMail.text,
+        });
+      } catch (err) {
+        console.error("[coaching/regenerate-email:candidate]", err);
+      }
+      try {
+        await sendMail({
+          to: booking.coachEmail,
+          subject: coachMail.subject,
+          html: coachMail.html,
+          text: coachMail.text,
+        });
+      } catch (err) {
+        console.error("[coaching/regenerate-email:coach]", err);
+      }
       return ok({
         updated: true,
         regenerated: true,
         meetingUrl,
         meetingUrlUsable: hasUsableMeetLink(meetingUrl),
+        notificationsSent: true,
       });
     } catch (err) {
       console.error("[coaching/calendar:regenerate]", err);
       return fail(
         "validation_error",
-        "Could not regenerate meeting link. Please try again.",
+        "Could not regenerate meeting link. Check Google Calendar env/permissions and try again.",
         500,
       );
     }

@@ -42,6 +42,8 @@ export default function AdminBookingsPage() {
   const [bookings, setBookings] = useState<CoachingBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadBookings = useCallback(async (cancelled = false) => {
     try {
@@ -95,6 +97,8 @@ export default function AdminBookingsPage() {
   }
 
   async function regenerateMeetingLink(id: string) {
+    setNotice(null);
+    setError(null);
     setRegeneratingId(id);
     try {
       const res = await fetch(`/api/coaching/bookings/${id}`, {
@@ -103,7 +107,11 @@ export default function AdminBookingsPage() {
         body: JSON.stringify({ action: "regenerate_meeting_link" }),
       });
       const data = await res.json();
-      if (!data?.ok) return;
+      if (!data?.ok) {
+        setError(data?.message ?? "Could not regenerate meeting link.");
+        return;
+      }
+      setNotice("Meeting link regenerated and confirmation emails resent to candidate + coach.");
       await loadBookings();
     } finally {
       setRegeneratingId(null);
@@ -116,6 +124,16 @@ export default function AdminBookingsPage() {
         title="Bookings"
         description="Coaching sessions scheduled by candidates."
       />
+      {notice ? (
+        <div className="mb-4 rounded-lg border border-success-200 bg-success-50 px-4 py-2 text-sm text-success-800">
+          {notice}
+        </div>
+      ) : null}
+      {error ? (
+        <div className="mb-4 rounded-lg border border-danger-200 bg-danger-50 px-4 py-2 text-sm text-danger-700">
+          {error}
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-4 mb-6">
         <Stat label="Total bookings" value={String(bookings.length)} />

@@ -26,6 +26,7 @@ export function SiteFooter() {
               title: "Company",
               items: [
                 ["About", "/about"],
+                ["Careers", "/careers"],
                 ["Blog", "/blog"],
                 ["Contact", "/contact"],
               ],
