@@ -54,6 +54,28 @@ function getCalendarClient() {
   return google.calendar({ version: "v3", auth });
 }
 
+function normalizeEmails(emails: string[]) {
+  const seen = new Set<string>();
+  const cleaned: string[] = [];
+  for (const raw of emails) {
+    const email = raw.trim().toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    cleaned.push(email);
+  }
+  return cleaned;
+}
+
+function isServiceAccountInviteRestriction(err: unknown) {
+  const msg =
+    typeof err === "object" && err !== null
+      ? String((err as { message?: unknown }).message ?? "")
+      : "";
+  return msg.includes(
+    "Service accounts cannot invite attendees without Domain-Wide Delegation of Authority.",
+  );
+}
+
 export async function createCoachingCalendarEvent(
   args: CreateCoachingEventArgs,
 ): Promise<CreatedCalendarEvent> {
@@ -63,35 +85,52 @@ export async function createCoachingCalendarEvent(
   const startDate = new Date(args.startsAtIso);
   const endDate = new Date(startDate.getTime() + args.durationMin * 60_000);
 
-  const response = await calendar.events.insert({
-    calendarId,
-    conferenceDataVersion: 1,
-    sendUpdates: "all",
-    requestBody: {
-      summary: args.summary,
-      description: args.description,
-      start: {
-        dateTime: startDate.toISOString(),
-        timeZone: args.timezone || "Asia/Kolkata",
-      },
-      end: {
-        dateTime: endDate.toISOString(),
-        timeZone: args.timezone || "Asia/Kolkata",
-      },
-      attendees: args.attendeeEmails
-        .filter(Boolean)
-        .map((email) => ({ email })),
-      conferenceData: {
-        createRequest: {
-          requestId: `selectwise-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          conferenceSolutionKey: { type: "hangoutsMeet" },
-        },
-      },
-      reminders: {
-        useDefault: true,
+  const attendees = normalizeEmails(args.attendeeEmails).map((email) => ({ email }));
+  const requestBody = {
+    summary: args.summary,
+    description: args.description,
+    start: {
+      dateTime: startDate.toISOString(),
+      timeZone: args.timezone || "Asia/Kolkata",
+    },
+    end: {
+      dateTime: endDate.toISOString(),
+      timeZone: args.timezone || "Asia/Kolkata",
+    },
+    attendees,
+    conferenceData: {
+      createRequest: {
+        requestId: `selectwise-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        conferenceSolutionKey: { type: "hangoutsMeet" },
       },
     },
-  });
+    reminders: {
+      useDefault: true,
+    },
+  };
+
+  let response;
+  try {
+    response = await calendar.events.insert({
+      calendarId,
+      conferenceDataVersion: 1,
+      sendUpdates: "all",
+      requestBody,
+    });
+  } catch (err) {
+    if (!isServiceAccountInviteRestriction(err)) throw err;
+    // Service account lacks domain-wide delegation for attendee invites.
+    // Fallback: create event + Meet link without attendees.
+    response = await calendar.events.insert({
+      calendarId,
+      conferenceDataVersion: 1,
+      sendUpdates: "none",
+      requestBody: {
+        ...requestBody,
+        attendees: [],
+      },
+    });
+  }
 
   const event = response.data;
   const meetEntry = event.conferenceData?.entryPoints?.find(
