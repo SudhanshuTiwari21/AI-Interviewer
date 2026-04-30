@@ -63,7 +63,7 @@ export async function GET(req: Request) {
             process.env.ADMIN_EMAIL ?? "",
           ],
         });
-        meetingUrl = calendarEvent.meetLink ?? calendarEvent.htmlLink ?? null;
+        meetingUrl = calendarEvent.meetLink ?? null;
         calendarEventId = calendarEvent.eventId || null;
       } catch (err) {
         console.error("[coaching/calendar:create]", err);

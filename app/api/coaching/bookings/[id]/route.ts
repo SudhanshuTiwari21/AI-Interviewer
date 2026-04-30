@@ -110,7 +110,7 @@ export async function PATCH(
           process.env.ADMIN_EMAIL ?? "",
         ],
       });
-      const meetingUrl = calendarEvent.meetLink ?? calendarEvent.htmlLink ?? null;
+      const meetingUrl = calendarEvent.meetLink ?? null;
       if (!meetingUrl) {
         return fail(
           "validation_error",
@@ -376,7 +376,7 @@ export async function PATCH(
               process.env.ADMIN_EMAIL ?? "",
             ],
           });
-          meetingUrl = calendarEvent.meetLink ?? calendarEvent.htmlLink ?? null;
+          meetingUrl = calendarEvent.meetLink ?? null;
           calendarEventId = calendarEvent.eventId || null;
           await db
             .update(schema.coachingBookings)
