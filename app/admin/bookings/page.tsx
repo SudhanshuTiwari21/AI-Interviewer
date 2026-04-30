@@ -111,6 +111,14 @@ export default function AdminBookingsPage() {
         setError(data?.message ?? "Could not regenerate meeting link.");
         return;
       }
+      if (!data?.meetingUrlUsable) {
+        setError(
+          data?.message ??
+            "Calendar event was created, but no Meet join link is available for this account.",
+        );
+        await loadBookings();
+        return;
+      }
       setNotice("Meeting link regenerated and confirmation emails resent to candidate + coach.");
       await loadBookings();
     } finally {

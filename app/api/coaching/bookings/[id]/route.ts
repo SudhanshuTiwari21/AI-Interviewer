@@ -112,11 +112,23 @@ export async function PATCH(
       });
       const meetingUrl = calendarEvent.meetLink ?? null;
       if (!meetingUrl) {
-        return fail(
-          "validation_error",
-          "Google Calendar event was created but no join link was returned. Please verify Google Calendar + Meet permissions for the connected account.",
-          500,
-        );
+        await db
+          .update(schema.coachingBookings)
+          .set({
+            calendarMeetingUrl: null,
+            calendarEventId: calendarEvent.eventId || booking.calendarEventId,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.coachingBookings.id, booking.id));
+        return ok({
+          updated: false,
+          regenerated: false,
+          meetingUrl: null,
+          meetingUrlUsable: false,
+          notificationsSent: false,
+          message:
+            "Calendar event created, but Google did not return a Meet join link for this account. Enable Meet on the calendar owner account (or Workspace delegated user) and try regenerate again.",
+        });
       }
       await db
         .update(schema.coachingBookings)
