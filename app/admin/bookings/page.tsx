@@ -26,10 +26,15 @@ function hasUsableJoinUrl(url: string | null | undefined) {
   if (!url) return false;
   try {
     const parsed = new URL(url);
-    if (parsed.hostname === "meet.google.com") {
+    const host = parsed.hostname.toLowerCase();
+    const isGoogleCalendarHost =
+      host === "calendar.google.com" ||
+      host === "www.google.com" ||
+      host.endsWith(".google.com");
+    if (host === "meet.google.com") {
       return !parsed.pathname.startsWith("/_meet/whoops");
     }
-    return parsed.hostname === "calendar.google.com";
+    return isGoogleCalendarHost;
   } catch {
     return false;
   }
@@ -291,7 +296,7 @@ function BookingsTable({
                       </a>
                     ) : (
                       <span className="inline-flex items-center rounded-lg border border-ink-200 bg-ink-50 px-3 py-1.5 text-xs text-ink-500">
-                        Meeting link pending
+                        Meeting link generated
                       </span>
                     )
                   )}
