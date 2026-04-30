@@ -14,11 +14,21 @@ export default function CareersPage() {
               Careers
             </p>
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-ink-900 sm:text-5xl">
-              Join our coaching team
+              Join Our Coaching Network
             </h1>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-ink-600 sm:text-base">
-              If anyone wants to be a part of an excellent coaching team, please feel free
-              to share your profile at{" "}
+              Help candidates practice smarter, improve faster, and get selected.
+            </p>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-ink-600 sm:text-base">
+              At SelectWise, we are building a curated network of experienced professionals
+              who can deliver real interview insights and actionable feedback.
+            </p>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-ink-600 sm:text-base">
+              If you have strong industry experience and a passion for mentoring, we would
+              love to work with you.
+            </p>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-ink-600 sm:text-base">
+              Send your profile to{" "}
               <Link href="mailto:hello@selectwise.in" className="font-medium underline">
                 hello@selectwise.in
               </Link>
@@ -31,12 +41,13 @@ export default function CareersPage() {
           <div className="rounded-2xl border border-ink-200 bg-white p-6 sm:p-8">
             <h2 className="text-xl font-semibold text-ink-900">How to apply</h2>
             <ul className="mt-4 space-y-2 text-sm text-ink-700">
-              <li>Share your profile and coaching experience.</li>
-              <li>Include your core interview domains and years of expertise.</li>
-              <li>Add your preferred availability and timezone.</li>
+              <li>Share your professional profile and coaching/interview experience.</li>
+              <li>Mention your core domains (e.g., Scrum Master, QA, Product, etc.).</li>
+              <li>Include years of experience and key achievements.</li>
+              <li>Add your availability and timezone.</li>
             </ul>
             <div className="mt-6">
-              <Button href="mailto:hello@selectwise.in">Send profile</Button>
+              <Button href="mailto:hello@selectwise.in">Apply as a Coach</Button>
             </div>
           </div>
         </section>
