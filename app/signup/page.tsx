@@ -6,8 +6,6 @@ import Link from "next/link";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { store } from "@/lib/store";
-import { uid } from "@/lib/utils";
 import { authClient } from "@/lib/auth/client";
 import { Mail, Lock, User, CheckCircle2 } from "lucide-react";
 import { isAdminRole, isCoachRole } from "@/lib/auth/permissions";
@@ -39,7 +37,6 @@ type PublicSettings = {
 function SignupInner() {
   const router = useRouter();
   const search = useSearchParams();
-  const next = search.get("next");
   const leadSourceFromUrl =
     search.get("utm_source") ?? search.get("source") ?? "direct";
 
@@ -257,32 +254,6 @@ function SignupInner() {
             Sign in
           </Link>
         </p>
-        <div className="relative py-1">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-ink-100" />
-          </div>
-          <div className="relative flex justify-center">
-            <span className="bg-white px-2 text-xs text-ink-400">or</span>
-          </div>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          size="lg"
-          onClick={() => {
-            store.setUser({
-              id: uid("user"),
-              name: "Alex Morgan",
-              email: "alex@hiro.demo",
-              createdAt: new Date().toISOString(),
-            });
-            const target = next || "/dashboard";
-            router.push(target);
-          }}
-        >
-          Continue with demo account
-        </Button>
       </form>
     </AuthShell>
   );
