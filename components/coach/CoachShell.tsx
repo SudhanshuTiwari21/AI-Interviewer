@@ -145,7 +145,26 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
           </div>
         </div>
       </aside>
-      <main className="min-h-screen bg-ink-50/40 p-4 lg:p-8">{children}</main>
+      <div className="min-h-screen bg-ink-50/40">
+        <div className="flex h-14 items-center justify-between border-b border-ink-100 bg-white px-4 lg:hidden">
+          <Logo size={24} />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                void handleLogout();
+              }}
+              className="inline-flex size-9 items-center justify-center rounded-lg text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="size-4" />
+            </button>
+            <Avatar name={user.name} size="sm" />
+          </div>
+        </div>
+        <main className="p-4 lg:p-8">{children}</main>
+      </div>
     </div>
   );
 }
