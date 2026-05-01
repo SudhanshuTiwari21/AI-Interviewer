@@ -14,6 +14,7 @@ type CoachBooking = {
   startsAt: string;
   status: string;
   calendarMeetingUrl?: string | null;
+  meetingProvider?: string | null;
 };
 
 export default function CoachSessionsPage() {
@@ -89,8 +90,17 @@ export default function CoachSessionsPage() {
                           Approve
                         </Button>
                       </div>
-                    ) : row.status === "approved" && row.calendarMeetingUrl ? (
-                      <Button href={row.calendarMeetingUrl} size="sm" variant="outline">
+                    ) : row.status === "approved" &&
+                      (row.calendarMeetingUrl || row.meetingProvider === "livekit") ? (
+                      <Button
+                        href={
+                          row.meetingProvider === "livekit"
+                            ? `/meeting/${row.id}`
+                            : (row.calendarMeetingUrl as string)
+                        }
+                        size="sm"
+                        variant="outline"
+                      >
                         Join
                       </Button>
                     ) : (

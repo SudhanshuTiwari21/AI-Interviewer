@@ -9,6 +9,7 @@ import {
   coachingApprovedEmailToCoach,
 } from "@/lib/email/templates/coaching";
 import { createCoachingCalendarEvent } from "@/lib/integrations/google-calendar";
+import { ensureMeetingForBooking, meetingProviderName } from "@/lib/meeting/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,20 +52,26 @@ export async function GET(req: Request) {
 
     if (!meetingUrl) {
       try {
-        const calendarEvent = await createCoachingCalendarEvent({
-          summary: `SelectWise Coaching · ${booking.techArea}`,
-          description: `Candidate: ${booking.candidateName}\nCoach: ${booking.coachName}\nBooking ID: ${booking.id}`,
-          startsAtIso: booking.startsAt.toISOString(),
-          durationMin: booking.durationMin,
-          timezone: booking.coachTimezone || "Asia/Kolkata",
-          attendeeEmails: [
-            booking.candidateEmail,
-            booking.coachEmail,
-            process.env.ADMIN_EMAIL ?? "",
-          ],
-        });
-        meetingUrl = calendarEvent.meetLink ?? null;
-        calendarEventId = calendarEvent.eventId || null;
+        if (meetingProviderName() === "livekit") {
+          const ensured = await ensureMeetingForBooking(booking.id);
+          meetingUrl = ensured.joinUrl;
+          calendarEventId = null;
+        } else {
+          const calendarEvent = await createCoachingCalendarEvent({
+            summary: `SelectWise Coaching · ${booking.techArea}`,
+            description: `Candidate: ${booking.candidateName}\nCoach: ${booking.coachName}\nBooking ID: ${booking.id}`,
+            startsAtIso: booking.startsAt.toISOString(),
+            durationMin: booking.durationMin,
+            timezone: booking.coachTimezone || "Asia/Kolkata",
+            attendeeEmails: [
+              booking.candidateEmail,
+              booking.coachEmail,
+              process.env.ADMIN_EMAIL ?? "",
+            ],
+          });
+          meetingUrl = calendarEvent.meetLink ?? null;
+          calendarEventId = calendarEvent.eventId || null;
+        }
       } catch (err) {
         console.error("[coaching/calendar:create]", err);
       }
@@ -82,6 +89,7 @@ export async function GET(req: Request) {
           feedbackTokenHash,
           calendarMeetingUrl: meetingUrl,
           calendarEventId,
+          meetingProvider: meetingProviderName(),
           updatedAt: new Date(),
         })
         .where(eq(schema.coachingBookings.id, booking.id));
@@ -91,6 +99,7 @@ export async function GET(req: Request) {
         .set({
           calendarMeetingUrl: meetingUrl,
           calendarEventId,
+          meetingProvider: meetingProviderName(),
           updatedAt: new Date(),
         })
         .where(eq(schema.coachingBookings.id, booking.id));

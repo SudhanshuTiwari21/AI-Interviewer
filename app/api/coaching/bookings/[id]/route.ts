@@ -15,6 +15,7 @@ import {
   coachingRefundRejectedEmail,
 } from "@/lib/email/templates/coaching";
 import { createCoachingCalendarEvent } from "@/lib/integrations/google-calendar";
+import { ensureMeetingForBooking, meetingProviderName } from "@/lib/meeting/service";
 import { getRazorpayClient } from "@/lib/payments/razorpay";
 
 export const runtime = "nodejs";
@@ -98,25 +99,34 @@ export async function PATCH(
       );
     }
     try {
-      const calendarEvent = await createCoachingCalendarEvent({
-        summary: `SelectWise Coaching · ${booking.techArea}`,
-        description: `Candidate: ${booking.candidateName}\nCoach: ${booking.coachName}\nBooking ID: ${booking.id}`,
-        startsAtIso: booking.startsAt.toISOString(),
-        durationMin: booking.durationMin,
-        timezone: booking.coachTimezone || "Asia/Kolkata",
-        attendeeEmails: [
-          booking.candidateEmail,
-          booking.coachEmail,
-          process.env.ADMIN_EMAIL ?? "",
-        ],
-      });
-      const meetingUrl = calendarEvent.meetLink ?? null;
+      let meetingUrl: string | null = null;
+      let calendarEventId: string | null = booking.calendarEventId;
+      if (meetingProviderName() === "livekit") {
+        const ensured = await ensureMeetingForBooking(booking.id);
+        meetingUrl = ensured.joinUrl;
+        calendarEventId = null;
+      } else {
+        const calendarEvent = await createCoachingCalendarEvent({
+          summary: `SelectWise Coaching · ${booking.techArea}`,
+          description: `Candidate: ${booking.candidateName}\nCoach: ${booking.coachName}\nBooking ID: ${booking.id}`,
+          startsAtIso: booking.startsAt.toISOString(),
+          durationMin: booking.durationMin,
+          timezone: booking.coachTimezone || "Asia/Kolkata",
+          attendeeEmails: [
+            booking.candidateEmail,
+            booking.coachEmail,
+            process.env.ADMIN_EMAIL ?? "",
+          ],
+        });
+        meetingUrl = calendarEvent.meetLink ?? null;
+        calendarEventId = calendarEvent.eventId || booking.calendarEventId;
+      }
       if (!meetingUrl) {
         await db
           .update(schema.coachingBookings)
           .set({
             calendarMeetingUrl: null,
-            calendarEventId: calendarEvent.eventId || booking.calendarEventId,
+            calendarEventId,
             updatedAt: new Date(),
           })
           .where(eq(schema.coachingBookings.id, booking.id));
@@ -134,7 +144,8 @@ export async function PATCH(
         .update(schema.coachingBookings)
         .set({
           calendarMeetingUrl: meetingUrl,
-          calendarEventId: calendarEvent.eventId || booking.calendarEventId,
+          calendarEventId,
+          meetingProvider: meetingProviderName(),
           updatedAt: new Date(),
         })
         .where(eq(schema.coachingBookings.id, booking.id));
@@ -376,25 +387,32 @@ export async function PATCH(
         booking.feedbackTokenHash ?? hashToken(feedbackToken);
       if (!meetingUrl) {
         try {
-          const calendarEvent = await createCoachingCalendarEvent({
-            summary: `SelectWise Coaching · ${booking.techArea}`,
-            description: `Candidate: ${booking.candidateName}\nCoach: ${booking.coachName}\nBooking ID: ${booking.id}`,
-            startsAtIso: booking.startsAt.toISOString(),
-            durationMin: booking.durationMin,
-            timezone: booking.coachTimezone || "Asia/Kolkata",
-            attendeeEmails: [
-              booking.candidateEmail,
-              booking.coachEmail,
-              process.env.ADMIN_EMAIL ?? "",
-            ],
-          });
-          meetingUrl = calendarEvent.meetLink ?? null;
-          calendarEventId = calendarEvent.eventId || null;
+          if (meetingProviderName() === "livekit") {
+            const ensured = await ensureMeetingForBooking(booking.id);
+            meetingUrl = ensured.joinUrl;
+            calendarEventId = null;
+          } else {
+            const calendarEvent = await createCoachingCalendarEvent({
+              summary: `SelectWise Coaching · ${booking.techArea}`,
+              description: `Candidate: ${booking.candidateName}\nCoach: ${booking.coachName}\nBooking ID: ${booking.id}`,
+              startsAtIso: booking.startsAt.toISOString(),
+              durationMin: booking.durationMin,
+              timezone: booking.coachTimezone || "Asia/Kolkata",
+              attendeeEmails: [
+                booking.candidateEmail,
+                booking.coachEmail,
+                process.env.ADMIN_EMAIL ?? "",
+              ],
+            });
+            meetingUrl = calendarEvent.meetLink ?? null;
+            calendarEventId = calendarEvent.eventId || null;
+          }
           await db
             .update(schema.coachingBookings)
             .set({
               calendarMeetingUrl: meetingUrl,
               calendarEventId,
+              meetingProvider: meetingProviderName(),
               coachApprovedAt: new Date(),
               feedbackTokenHash,
               updatedAt: new Date(),

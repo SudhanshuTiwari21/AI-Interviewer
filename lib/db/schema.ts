@@ -100,6 +100,15 @@ export const coachingBookings = pgTable(
     coachApprovedAt: timestamp("coach_approved_at", { withTimezone: true }),
     calendarEventId: text("calendar_event_id"),
     calendarMeetingUrl: text("calendar_meeting_url"),
+    meetingProvider: text("meeting_provider"),
+    meetingRoomName: text("meeting_room_name"),
+    meetingStatus: text("meeting_status").notNull().default("not_started"), // not_started | active | ended
+    meetingStartedAt: timestamp("meeting_started_at", { withTimezone: true }),
+    meetingEndedAt: timestamp("meeting_ended_at", { withTimezone: true }),
+    meetingAccessTokenHash: text("meeting_access_token_hash"),
+    meetingTokenExpiresAt: timestamp("meeting_token_expires_at", { withTimezone: true }),
+    recordingStatus: text("recording_status").notNull().default("not_started"), // not_started | recording | completed | failed
+    recordingUrl: text("recording_url"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -124,6 +133,10 @@ export const coachingBookings = pgTable(
     feedbackTokenIdx: uniqueIndex("coaching_bookings_feedback_token_hash_idx").on(
       t.feedbackTokenHash,
     ),
+    roomNameIdx: uniqueIndex("coaching_bookings_meeting_room_name_unique_idx").on(
+      t.meetingRoomName,
+    ),
+    meetingStatusIdx: index("coaching_bookings_meeting_status_idx").on(t.meetingStatus),
   }),
 );
 
@@ -223,6 +236,66 @@ export const refundEvents = pgTable(
   (t) => ({
     bookingIdx: index("refund_events_booking_id_idx").on(t.bookingId),
     typeIdx: index("refund_events_event_type_idx").on(t.eventType),
+  }),
+);
+
+export const meetingTranscripts = pgTable(
+  "meeting_transcripts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => coachingBookings.id, { onDelete: "cascade" }),
+    speakerRole: text("speaker_role").notNull(), // coach | candidate | system
+    speakerName: text("speaker_name"),
+    transcriptText: text("transcript_text").notNull(),
+    chunkIndex: integer("chunk_index").notNull().default(0),
+    confidence: integer("confidence"), // 0-100
+    startsAtMs: integer("starts_at_ms"),
+    endsAtMs: integer("ends_at_ms"),
+    source: text("source").notNull().default("live"), // live | post_session
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    bookingIdx: index("meeting_transcripts_booking_id_idx").on(t.bookingId),
+    chunkIdx: index("meeting_transcripts_chunk_index_idx").on(t.chunkIndex),
+    roleIdx: index("meeting_transcripts_speaker_role_idx").on(t.speakerRole),
+  }),
+);
+
+export const meetingModerationAlerts = pgTable(
+  "meeting_moderation_alerts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bookingId: uuid("booking_id")
+      .notNull()
+      .references(() => coachingBookings.id, { onDelete: "cascade" }),
+    transcriptId: uuid("transcript_id").references(() => meetingTranscripts.id, {
+      onDelete: "set null",
+    }),
+    severity: text("severity").notNull().default("medium"), // low | medium | high
+    category: text("category").notNull(), // poaching | contact_sharing | policy
+    title: text("title").notNull(),
+    evidenceText: text("evidence_text").notNull(),
+    confidence: integer("confidence").notNull().default(0),
+    status: text("status").notNull().default("open"), // open | resolved | dismissed
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedBy: uuid("resolved_by"),
+    metadata: jsonb("metadata").notNull().default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    bookingIdx: index("meeting_moderation_alerts_booking_id_idx").on(t.bookingId),
+    statusIdx: index("meeting_moderation_alerts_status_idx").on(t.status),
+    severityIdx: index("meeting_moderation_alerts_severity_idx").on(t.severity),
+    categoryIdx: index("meeting_moderation_alerts_category_idx").on(t.category),
   }),
 );
 
@@ -393,5 +466,7 @@ export type PaymentTransactionRow = typeof paymentTransactions.$inferSelect;
 export type RazorpayWebhookEventRow = typeof razorpayWebhookEvents.$inferSelect;
 export type RefundEventRow = typeof refundEvents.$inferSelect;
 export type CoachingFeedbackRow = typeof coachingFeedback.$inferSelect;
+export type MeetingTranscriptRow = typeof meetingTranscripts.$inferSelect;
+export type MeetingModerationAlertRow = typeof meetingModerationAlerts.$inferSelect;
 export type UserSettingsRow = typeof userSettings.$inferSelect;
 export type SupportTicketRow = typeof supportTickets.$inferSelect;

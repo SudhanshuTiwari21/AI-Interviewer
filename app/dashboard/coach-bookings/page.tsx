@@ -18,6 +18,7 @@ type Booking = {
   status: string;
   paymentStatus: string;
   calendarMeetingUrl?: string | null;
+  meetingProvider?: string | null;
 };
 
 function toneForStatus(status: string): "success" | "warn" | "danger" | "neutral" {
@@ -101,8 +102,12 @@ export default function CoachBookingsPage() {
                 <Badge tone={b.paymentStatus === "paid" ? "success" : "neutral"}>
                   {b.paymentStatus}
                 </Badge>
-                {b.status === "approved" && b.calendarMeetingUrl ? (
-                  <Button href={b.calendarMeetingUrl} size="sm" variant="outline">
+                {b.status === "approved" && (b.calendarMeetingUrl || b.meetingProvider === "livekit") ? (
+                  <Button
+                    href={b.meetingProvider === "livekit" ? `/meeting/${b.id}` : (b.calendarMeetingUrl as string)}
+                    size="sm"
+                    variant="outline"
+                  >
                     Join
                   </Button>
                 ) : null}

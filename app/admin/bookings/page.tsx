@@ -19,6 +19,7 @@ type CoachingBooking = {
   durationMin: number;
   amountInr: number;
   calendarMeetingUrl?: string | null;
+  meetingProvider?: string | null;
   status: "pending" | "approved" | "cancelled" | "rejected";
 };
 
@@ -288,9 +289,9 @@ function BookingsTable({
                     </Button>
                   )}
                   {b.status === "approved" && (
-                    hasUsableJoinUrl(b.calendarMeetingUrl) ? (
+                    b.meetingProvider === "livekit" || hasUsableJoinUrl(b.calendarMeetingUrl) ? (
                       <a
-                        href={b.calendarMeetingUrl!}
+                        href={b.meetingProvider === "livekit" ? `/meeting/${b.id}` : b.calendarMeetingUrl!}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs text-ink-700 hover:bg-ink-50"

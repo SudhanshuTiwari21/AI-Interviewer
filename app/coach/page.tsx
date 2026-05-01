@@ -14,6 +14,7 @@ type CoachBooking = {
   startsAt: string;
   status: string;
   calendarMeetingUrl?: string | null;
+  meetingProvider?: string | null;
 };
 
 export default function CoachOverviewPage() {
@@ -72,8 +73,12 @@ export default function CoachOverviewPage() {
                 <Badge tone="success" dot>
                   {b.status}
                 </Badge>
-                {b.calendarMeetingUrl ? (
-                  <Button href={b.calendarMeetingUrl} size="sm" variant="outline">
+                {b.calendarMeetingUrl || b.meetingProvider === "livekit" ? (
+                  <Button
+                    href={b.meetingProvider === "livekit" ? `/meeting/${b.id}` : (b.calendarMeetingUrl as string)}
+                    size="sm"
+                    variant="outline"
+                  >
                     Join
                   </Button>
                 ) : null}
