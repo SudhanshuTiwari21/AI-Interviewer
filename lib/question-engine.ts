@@ -36,7 +36,7 @@ export type InterviewConfig = {
     | "Managerial Round"
     | "Leadership Round"
     | "HR Round"
-    | "Behavioral Round"
+    | "Behavioural Round"
     | "Scenario Based Round";
   companyType?:
     | "Startup"

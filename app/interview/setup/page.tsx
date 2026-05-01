@@ -46,7 +46,7 @@ const INTERVIEW_TYPES = [
   "Managerial Round",
   "Leadership Round",
   "HR Round",
-  "Behavioral Round",
+  "Behavioural Round",
   "Scenario Based Round",
 ] as const;
 
@@ -167,7 +167,7 @@ export default function SetupPage() {
   const [targetRole, setTargetRole] = useState<string>("Scrum Master");
   const [experienceBand, setExperienceBand] = useState<string>("3-5 Years");
   const [interviewType, setInterviewType] = useState<
-    "Technical Round" | "Managerial Round" | "Leadership Round" | "HR Round" | "Behavioral Round" | "Scenario Based Round"
+    "Technical Round" | "Managerial Round" | "Leadership Round" | "HR Round" | "Behavioural Round" | "Scenario Based Round"
   >("Technical Round");
   const [companyType, setCompanyType] = useState<
     "Startup" | "Product Company" | "Service Company" | "MNC" | "Leadership/Internal Promotion"
@@ -674,7 +674,7 @@ export default function SetupPage() {
                         | "Managerial Round"
                         | "Leadership Round"
                         | "HR Round"
-                        | "Behavioral Round"
+                        | "Behavioural Round"
                         | "Scenario Based Round",
                     )
                   }

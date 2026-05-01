@@ -637,7 +637,7 @@ function labelFor(c: InterviewQuestion["category"]) {
     case "intro":
       return "Intro";
     case "behavioral":
-      return "Behavioral";
+      return "Behavioural";
     case "technical":
       return "Technical";
     case "wrap":

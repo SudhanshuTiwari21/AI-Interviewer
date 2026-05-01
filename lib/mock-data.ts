@@ -21,7 +21,7 @@ export const LEVELS: Level[] = ["Junior", "Mid", "Senior", "Staff"];
 
 export const FOCUS_AREAS = [
   "System design",
-  "Behavioral",
+  "Behavioural",
   "Coding fundamentals",
   "Product sense",
   "Leadership",
