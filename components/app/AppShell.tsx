@@ -191,7 +191,12 @@ export function AppShell({
         </div>
       </aside>
       <div className="flex min-h-screen flex-col bg-ink-50/40">
-        <MobileTopBar user={user} />
+        <MobileTopBar
+          user={user}
+          onLogout={() => {
+            void handleLogout();
+          }}
+        />
         <main className="flex-1 pb-20 lg:pb-0">{children}</main>
         <MobileBottomNav pathname={pathname} items={mobileNav} />
       </div>
@@ -231,11 +236,25 @@ function isActive(pathname: string, href: string) {
   return pathname.startsWith(href);
 }
 
-function MobileTopBar({ user }: Readonly<{ user: User }>) {
+function MobileTopBar({
+  user,
+  onLogout,
+}: Readonly<{ user: User; onLogout: () => void }>) {
   return (
     <div className="flex h-14 items-center justify-between border-b border-ink-100 bg-white px-4 lg:hidden">
       <Logo size={24} />
-      <Avatar name={user.name} size="sm" />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onLogout}
+          className="inline-flex size-9 items-center justify-center rounded-lg text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900"
+          aria-label="Sign out"
+          title="Sign out"
+        >
+          <LogOut className="size-4" />
+        </button>
+        <Avatar name={user.name} size="sm" />
+      </div>
     </div>
   );
 }
