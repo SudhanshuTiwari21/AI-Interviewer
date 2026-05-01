@@ -163,7 +163,31 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
             <Avatar name={user.name} size="sm" />
           </div>
         </div>
-        <main className="p-4 lg:p-8">{children}</main>
+        <main className="p-4 pb-20 lg:p-8 lg:pb-8">{children}</main>
+        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
+          <ul className="mx-auto grid max-w-lg grid-cols-2 gap-1">
+            {NAV.map((item) => {
+              const active = pathname === item.href;
+              const Icon = item.icon;
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium",
+                      active
+                        ? "bg-ink-900 text-white"
+                        : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
+                    )}
+                  >
+                    <Icon className="size-4" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
       </div>
     </div>
   );
