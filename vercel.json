@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/meeting-lifecycle",
-      "schedule": "0 * * * *"
-    }
-  ]
-}
