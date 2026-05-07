@@ -102,9 +102,13 @@ export default function CoachBookingsPage() {
                 <Badge tone={b.paymentStatus === "paid" ? "success" : "neutral"}>
                   {b.paymentStatus}
                 </Badge>
-                {b.status === "approved" && (b.calendarMeetingUrl || b.meetingProvider === "livekit") ? (
+                {b.status === "approved" && b.paymentStatus === "paid" ? (
                   <Button
-                    href={b.meetingProvider === "livekit" ? `/meeting/${b.id}` : (b.calendarMeetingUrl as string)}
+                    href={
+                      b.meetingProvider === "livekit" || !b.calendarMeetingUrl
+                        ? `/meeting/${b.id}`
+                        : (b.calendarMeetingUrl as string)
+                    }
                     size="sm"
                     variant="outline"
                   >

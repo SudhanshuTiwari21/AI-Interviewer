@@ -42,9 +42,6 @@ export default function AdminBookingsPage() {
 
   const [bookings, setBookings] = useState<CoachingBooking[]>([]);
   const [loading, setLoading] = useState(true);
-  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const loadBookings = useCallback(async (cancelled = false) => {
     try {
@@ -97,35 +94,8 @@ export default function AdminBookingsPage() {
     await loadBookings();
   }
 
-  async function regenerateMeetingLink(id: string) {
-    setNotice(null);
-    setError(null);
-    setRegeneratingId(id);
-    try {
-      const res = await fetch(`/api/coaching/bookings/${id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "regenerate_meeting_link" }),
-      });
-      const data = await res.json();
-      if (!data?.ok) {
-        setError(data?.message ?? "Could not regenerate meeting link.");
-        return;
-      }
-      if (!data?.meetingUrlUsable) {
-        setError(
-          data?.message ??
-            "Calendar event was created, but no Meet join link is available for this account.",
-        );
-        await loadBookings();
-        return;
-      }
-      setNotice("Meeting link regenerated and confirmation emails resent to candidate + coach.");
-      await loadBookings();
-    } finally {
-      setRegeneratingId(null);
-    }
-  }
+  // Meeting links are now handled via `/meeting/:bookingId` (LiveKit),
+  // so we don't need a regenerate-link control in admin.
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -133,16 +103,6 @@ export default function AdminBookingsPage() {
         title="Bookings"
         description="Coaching sessions scheduled by candidates."
       />
-      {notice ? (
-        <div className="mb-4 rounded-lg border border-success-200 bg-success-50 px-4 py-2 text-sm text-success-800">
-          {notice}
-        </div>
-      ) : null}
-      {error ? (
-        <div className="mb-4 rounded-lg border border-danger-200 bg-danger-50 px-4 py-2 text-sm text-danger-700">
-          {error}
-        </div>
-      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-4 mb-6">
         <Stat label="Total bookings" value={String(bookings.length)} />
@@ -174,10 +134,8 @@ export default function AdminBookingsPage() {
               onApprove={(id) => {
                 void approve(id);
               }}
-              onRegenerateMeetingLink={(id) => {
-                void regenerateMeetingLink(id);
-              }}
-              regeneratingId={regeneratingId}
+              onRegenerateMeetingLink={() => {}}
+              regeneratingId={null}
             />
           )}
         </CardBody>
@@ -199,7 +157,7 @@ export default function AdminBookingsPage() {
               onCancel={() => {}}
               onApprove={() => {}}
               onRegenerateMeetingLink={() => {}}
-              regeneratingId={regeneratingId}
+              regeneratingId={null}
             />
           )}
         </CardBody>
@@ -289,30 +247,14 @@ function BookingsTable({
                     </Button>
                   )}
                   {b.status === "approved" && (
-                    b.meetingProvider === "livekit" || hasUsableJoinUrl(b.calendarMeetingUrl) ? (
-                      <a
-                        href={b.meetingProvider === "livekit" ? `/meeting/${b.id}` : b.calendarMeetingUrl!}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs text-ink-700 hover:bg-ink-50"
-                      >
-                        Join <ExternalLink className="size-3" />
-                      </a>
-                    ) : (
-                      <span className="inline-flex items-center rounded-lg border border-ink-200 bg-ink-50 px-3 py-1.5 text-xs text-ink-500">
-                        Meeting link unavailable
-                      </span>
-                    )
-                  )}
-                  {b.status === "approved" && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={regeneratingId === b.id}
-                      onClick={() => onRegenerateMeetingLink(b.id)}
+                    <a
+                      href={b.meetingProvider === "livekit" ? `/meeting/${b.id}` : b.calendarMeetingUrl!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs text-ink-700 hover:bg-ink-50"
                     >
-                      {regeneratingId === b.id ? "Regenerating..." : "Regenerate link"}
-                    </Button>
+                      Join <ExternalLink className="size-3" />
+                    </a>
                   )}
                   {canCancel && (
                     <Button
