@@ -22,7 +22,7 @@ const Body = z.object({
   coachId: z.string().trim().min(2),
   coachName: z.string().trim().min(2),
   coachEmail: z.string().trim().email(),
-  coachTimezone: z.string().trim().min(2).max(100),
+  coachTimezone: z.string().trim().min(2).max(100).optional(),
   startsAt: z.string().datetime(),
   amountInr: z.number().int().positive(),
   paymentTransactionId: z.string().uuid(),
@@ -80,6 +80,7 @@ export async function POST(req: Request) {
     );
   }
   const body = parsed.data;
+  const coachTimezone = body.coachTimezone?.trim() || "UTC";
   const tx = await db
     .select()
     .from(schema.paymentTransactions)
@@ -127,7 +128,7 @@ export async function POST(req: Request) {
         coachId: body.coachId,
         coachName: body.coachName,
         coachEmail: body.coachEmail,
-        coachTimezone: body.coachTimezone,
+        coachTimezone,
         startsAt,
         durationMin: COACHING_DURATION_MIN,
         amountInr: body.amountInr,

@@ -253,7 +253,10 @@ function ScheduleInner() {
           coachId: coach.id,
           coachName: coach.name,
           coachEmail: coach.email,
-          coachTimezone: coach.timezone,
+          coachTimezone:
+            coach.timezone ||
+            Intl.DateTimeFormat().resolvedOptions().timeZone ||
+            "UTC",
           startsAt: selectedSlot,
           amountInr: coach.perSessionRateInr,
           paymentTransactionId: verifyData.transaction.id,
