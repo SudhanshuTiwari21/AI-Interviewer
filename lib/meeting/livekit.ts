@@ -2,6 +2,11 @@ import "server-only";
 
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import type { EnsureMeetingArgs, IssueMeetingTokenArgs, MeetingProvider } from "./provider";
+import {
+  liveKitMeetingTokenTtlSec,
+  liveKitRoomDepartureTimeoutSec,
+  liveKitRoomEmptyTimeoutSec,
+} from "./livekit-room-policy";
 
 type LiveKitConfig = {
   host: string;
@@ -58,7 +63,8 @@ async function ensureRoom(args: EnsureMeetingArgs) {
       durationMin: args.durationMin,
       createdBy: "selectwise",
     }),
-    emptyTimeout: 60 * 10,
+    emptyTimeout: liveKitRoomEmptyTimeoutSec(),
+    departureTimeout: liveKitRoomDepartureTimeoutSec(),
     maxParticipants: 2,
   });
   return { roomName: room.name };
@@ -66,7 +72,7 @@ async function ensureRoom(args: EnsureMeetingArgs) {
 
 async function issueToken(args: IssueMeetingTokenArgs) {
   const cfg = getLiveKitConfig();
-  const expiresInSec = 60 * 10;
+  const expiresInSec = liveKitMeetingTokenTtlSec(args.durationMin);
   const at = new AccessToken(cfg.apiKey, cfg.apiSecret, {
     identity: args.participantId,
     name: args.participantName,

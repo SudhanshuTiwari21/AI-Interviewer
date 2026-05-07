@@ -6,6 +6,8 @@ import { db, schema } from "@/lib/db/client";
 import { fail, ok } from "@/lib/api/response";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { findUserById } from "@/lib/auth/verification-service";
+import { tryDeleteLiveKitRoom } from "@/lib/meeting/livekit-admin";
+import { meetingProviderName } from "@/lib/meeting/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,10 +50,13 @@ export async function POST(req: Request) {
     .set({
       meetingStatus: "ended",
       meetingEndedAt: new Date(),
-      recordingStatus: booking.recordingStatus === "recording" ? "completed" : booking.recordingStatus,
       updatedAt: new Date(),
     })
     .where(eq(schema.coachingBookings.id, booking.id));
+
+  if (meetingProviderName() === "livekit") {
+    await tryDeleteLiveKitRoom(booking.meetingRoomName);
+  }
 
   return ok({ ended: true });
 }

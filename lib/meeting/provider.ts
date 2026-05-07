@@ -17,6 +17,8 @@ export type IssueMeetingTokenArgs = {
   participantId: string;
   participantName: string;
   role: MeetingParticipantRole;
+  /** Scheduled session length in minutes (used for token TTL). */
+  durationMin: number;
 };
 
 export type IssuedMeetingToken = {

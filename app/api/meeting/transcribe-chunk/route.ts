@@ -7,6 +7,7 @@ import { fail, ok } from "@/lib/api/response";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { findUserById } from "@/lib/auth/verification-service";
 import { detectModerationFlags } from "@/lib/meeting/moderation";
+import { resolveMeetingParticipantForBooking } from "@/lib/meeting/participant-role";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,10 +24,13 @@ export async function POST(req: Request) {
 
   const form = await req.formData();
   const bookingId = String(form.get("bookingId") ?? "");
-  const speakerRole = String(form.get("speakerRole") ?? "system");
   const chunkIndex = Number(form.get("chunkIndex") ?? "0");
+  const participantIdentity = String(form.get("participantIdentity") ?? "").trim();
   const audio = form.get("audio");
   if (!bookingId) return fail("validation_error", "bookingId is required.", 400);
+  if (participantIdentity && participantIdentity !== me.id) {
+    return fail("validation_error", "participantIdentity does not match session.", 403);
+  }
   if (!(audio instanceof File) || audio.size === 0) {
     return fail("validation_error", "Audio file is required.", 400);
   }
@@ -38,9 +42,8 @@ export async function POST(req: Request) {
     .limit(1);
   const booking = bookingRows[0];
   if (!booking) return fail("user_not_found", "Booking not found.", 404);
-  const canAccess =
-    booking.candidateUserId === me.id || booking.coachEmail.toLowerCase() === me.email.toLowerCase();
-  if (!canAccess) return fail("validation_error", "Not allowed for this booking.", 403);
+  const attribution = await resolveMeetingParticipantForBooking(booking, me.id, me.email);
+  if (!attribution) return fail("validation_error", "Not allowed for this booking.", 403);
 
   const apiKey = getServerOpenAIKey();
   if (!apiKey) return fail("internal_error", "Transcription service is not configured.", 500);
@@ -59,8 +62,8 @@ export async function POST(req: Request) {
     .insert(schema.meetingTranscripts)
     .values({
       bookingId,
-      speakerRole,
-      speakerName: me.name,
+      speakerRole: attribution.role,
+      speakerName: attribution.speakerName,
       transcriptText,
       chunkIndex: Number.isFinite(chunkIndex) ? chunkIndex : 0,
       source: "live",

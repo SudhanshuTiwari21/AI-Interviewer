@@ -1,121 +1,104 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
-import { z } from "zod";
+import { eq, sql } from "drizzle-orm";
+import { WebhookReceiver } from "livekit-server-sdk";
 import { db, schema } from "@/lib/db/client";
 import { fail, ok } from "@/lib/api/response";
-import { detectModerationFlags } from "@/lib/meeting/moderation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const WebhookBody = z.object({
-  event: z.string().min(1),
-  roomName: z.string().trim().min(1).optional(),
-  bookingId: z.string().uuid().optional(),
-  recordingUrl: z.string().trim().optional(),
-  transcriptText: z.string().trim().optional(),
-  speakerRole: z.string().trim().optional(),
-  speakerName: z.string().trim().optional(),
-  chunkIndex: z.number().int().nonnegative().optional(),
-  confidence: z.number().int().nonnegative().max(100).optional(),
-  startsAtMs: z.number().int().nonnegative().optional(),
-  endsAtMs: z.number().int().nonnegative().optional(),
-});
+function webhookJwtFromRequest(req: Request): string | undefined {
+  const raw =
+    req.headers.get("authorization")?.trim() ||
+    req.headers.get("Authorization")?.trim() ||
+    req.headers.get("Authorize")?.trim();
+  if (!raw) return undefined;
+  if (raw.toLowerCase().startsWith("bearer ")) return raw.slice(7).trim();
+  return raw;
+}
 
-async function resolveBookingId(data: z.infer<typeof WebhookBody>) {
-  if (data.bookingId) return data.bookingId;
-  if (!data.roomName) return null;
+function parseBookingIdFromRoomMetadata(metadata: string | undefined): string | null {
+  if (!metadata?.trim()) return null;
+  try {
+    const parsed = JSON.parse(metadata) as { bookingId?: unknown };
+    const id = parsed.bookingId;
+    if (typeof id === "string" && id.length > 0) return id;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+async function resolveBookingIdFromRoom(roomName: string, metadata?: string) {
+  const fromMeta = parseBookingIdFromRoomMetadata(metadata);
+  if (fromMeta) return fromMeta;
   const rows = await db
     .select({ id: schema.coachingBookings.id })
     .from(schema.coachingBookings)
-    .where(eq(schema.coachingBookings.meetingRoomName, data.roomName))
+    .where(eq(schema.coachingBookings.meetingRoomName, roomName))
     .limit(1);
   return rows[0]?.id ?? null;
 }
 
 export async function POST(req: Request) {
-  const secret = process.env.LIVEKIT_WEBHOOK_SECRET?.trim();
-  if (secret) {
-    const incoming = req.headers.get("x-livekit-secret")?.trim();
-    if (!incoming || incoming !== secret) {
-      return fail("invalid_credentials", "Unauthorized webhook request.", 401);
-    }
+  const apiKey = process.env.LIVEKIT_API_KEY?.trim();
+  const apiSecret = process.env.LIVEKIT_API_SECRET?.trim();
+  if (!apiKey || !apiSecret) {
+    return fail("internal_error", "LiveKit webhook verification is not configured.", 500);
   }
 
-  let json: unknown;
+  const body = await req.text();
+  const jwt = webhookJwtFromRequest(req);
+  const skipAuth =
+    process.env.NODE_ENV !== "production" && process.env.LIVEKIT_SKIP_WEBHOOK_VERIFY === "true";
+
+  const receiver = new WebhookReceiver(apiKey, apiSecret);
+  let event: Awaited<ReturnType<WebhookReceiver["receive"]>>;
   try {
-    json = await req.json();
+    event = await receiver.receive(body, jwt, skipAuth);
   } catch {
-    return fail("validation_error", "Invalid JSON body", 400);
-  }
-  const parsed = WebhookBody.safeParse(json);
-  if (!parsed.success) {
-    return fail("validation_error", parsed.error.issues[0]?.message ?? "Invalid payload", 400);
-  }
-  const data = parsed.data;
-  const bookingId = await resolveBookingId(data);
-  if (!bookingId) return fail("validation_error", "Could not resolve booking.", 400);
-
-  if (data.event === "egress.ended") {
-    await db
-      .update(schema.coachingBookings)
-      .set({
-        recordingStatus: "completed",
-        recordingUrl: data.recordingUrl || null,
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.coachingBookings.id, bookingId));
-    return ok({ ingested: true, type: data.event });
+    return fail("invalid_credentials", "Invalid LiveKit webhook signature or payload.", 401);
   }
 
-  if (data.event === "room.finished") {
-    await db
-      .update(schema.coachingBookings)
-      .set({
-        meetingStatus: "ended",
-        meetingEndedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.coachingBookings.id, bookingId));
-    return ok({ ingested: true, type: data.event });
-  }
-
-  if (data.event === "transcript.chunk") {
-    if (!data.transcriptText) {
-      return fail("validation_error", "transcriptText is required.", 400);
+  switch (event.event) {
+    case "room_started": {
+      const roomName = event.room?.name?.trim();
+      if (!roomName) return ok({ ingested: true, ignored: true });
+      const bookingId = await resolveBookingIdFromRoom(roomName, event.room?.metadata);
+      if (!bookingId) return ok({ ingested: true, ignored: true });
+      await db
+        .update(schema.coachingBookings)
+        .set({
+          meetingStatus: "active",
+          meetingStartedAt: sql`COALESCE(${schema.coachingBookings.meetingStartedAt}, NOW())`,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.coachingBookings.id, bookingId));
+      return ok({ ingested: true, type: event.event });
     }
-    const inserted = await db
-      .insert(schema.meetingTranscripts)
-      .values({
-        bookingId,
-        speakerRole: data.speakerRole ?? "system",
-        speakerName: data.speakerName ?? null,
-        transcriptText: data.transcriptText,
-        chunkIndex: data.chunkIndex ?? 0,
-        confidence: data.confidence ?? null,
-        startsAtMs: data.startsAtMs ?? null,
-        endsAtMs: data.endsAtMs ?? null,
-        source: "live",
-      })
-      .returning({ id: schema.meetingTranscripts.id });
-    const transcriptId = inserted[0]?.id;
 
-    const matches = detectModerationFlags(data.transcriptText);
-    for (const match of matches) {
-      await db.insert(schema.meetingModerationAlerts).values({
-        bookingId,
-        transcriptId: transcriptId ?? null,
-        severity: match.severity,
-        category: match.category,
-        title: match.title,
-        evidenceText: data.transcriptText,
-        confidence: data.confidence ?? 70,
-        status: "open",
-      });
+    case "room_finished": {
+      const roomName = event.room?.name?.trim();
+      if (!roomName) return ok({ ingested: true, ignored: true });
+      const bookingId = await resolveBookingIdFromRoom(roomName, event.room?.metadata);
+      if (!bookingId) return ok({ ingested: true, type: event.event, ignored: true });
+      await db
+        .update(schema.coachingBookings)
+        .set({
+          meetingStatus: "ended",
+          meetingEndedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.coachingBookings.id, bookingId));
+      return ok({ ingested: true, type: event.event });
     }
-    return ok({ ingested: true, type: data.event, alertsCreated: matches.length });
-  }
 
-  return ok({ ingested: true, type: data.event, ignored: true });
+    case "egress_ended":
+      // Recording is intentionally not wired in this phase.
+      return ok({ ingested: true, type: event.event, ignored: true });
+
+    default:
+      return ok({ ingested: true, type: event.event, ignored: true });
+  }
 }

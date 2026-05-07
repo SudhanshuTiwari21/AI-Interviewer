@@ -76,6 +76,7 @@ export async function issueMeetingTokenForBooking(params: {
     participantId: params.participantId,
     participantName: params.participantName,
     role: params.role,
+    durationMin: ensured.booking.durationMin,
   });
   const tokenHash = hashToken(randomBytes(16).toString("hex"));
   await db

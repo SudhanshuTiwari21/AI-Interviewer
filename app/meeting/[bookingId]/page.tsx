@@ -42,6 +42,7 @@ export default function MeetingPage() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recorderStreamRef = useRef<MediaStream | null>(null);
   const chunkIdxRef = useRef(0);
+  const participantIdRef = useRef<string | null>(null);
   const localRef = useRef<HTMLVideoElement | null>(null);
   const remoteRef = useRef<HTMLVideoElement | null>(null);
   const screenRef = useRef<HTMLVideoElement | null>(null);
@@ -59,6 +60,7 @@ export default function MeetingPage() {
         router.replace(`/login?next=/meeting/${encodeURIComponent(bookingId)}`);
         return;
       }
+      participantIdRef.current = me.id;
       const tokenRes = await fetch("/api/meeting/token", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -138,7 +140,9 @@ export default function MeetingPage() {
           const idx = chunkIdxRef.current++;
           const form = new FormData();
           form.append("bookingId", bookingId);
-          form.append("speakerRole", role ?? "system");
+          if (participantIdRef.current) {
+            form.append("participantIdentity", participantIdRef.current);
+          }
           form.append("chunkIndex", String(idx));
           form.append("audio", new File([e.data], `meeting-chunk-${idx}.webm`, { type: e.data.type || "audio/webm" }));
           void fetch("/api/meeting/transcribe-chunk", {

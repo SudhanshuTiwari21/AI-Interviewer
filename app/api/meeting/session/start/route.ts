@@ -49,7 +49,6 @@ export async function POST(req: Request) {
     .set({
       meetingStatus: "active",
       meetingStartedAt: booking.meetingStartedAt ?? new Date(),
-      recordingStatus: "recording",
       updatedAt: new Date(),
     })
     .where(eq(schema.coachingBookings.id, booking.id));
