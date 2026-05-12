@@ -1,6 +1,7 @@
 import "server-only";
 
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { desc, eq, inArray, or, sql } from "drizzle-orm";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { db, schema } from "@/lib/db/client";
 import { type Coach } from "@/lib/coaches";
 
@@ -160,4 +161,36 @@ export async function upsertCoach(coach: Coach): Promise<void> {
 
 export async function deleteCoach(id: string): Promise<void> {
   await db.delete(schema.coaches).where(eq(schema.coaches.id, id));
+}
+
+type DbLike = Pick<NodePgDatabase<typeof schema>, "delete" | "select">;
+
+/**
+ * Deletes all coaching bookings for this coach (cascades transcripts, alerts,
+ * refund rows, etc.) and removes matching coach profile rows. Call inside a
+ * transaction with the user delete when removing an account.
+ */
+export async function deleteCoachArtifactsForUserEmail(
+  dbOrTx: DbLike,
+  email: string,
+): Promise<void> {
+  const normalized = email.trim().toLowerCase();
+  const coachRows = await dbOrTx
+    .select({ id: schema.coaches.id })
+    .from(schema.coaches)
+    .where(sql`LOWER(${schema.coaches.email}) = ${normalized}`);
+
+  const coachIds = coachRows.map((r) => r.id);
+  const bookingPredicate =
+    coachIds.length > 0
+      ? or(
+          inArray(schema.coachingBookings.coachId, coachIds),
+          sql`LOWER(${schema.coachingBookings.coachEmail}) = ${normalized}`,
+        )
+      : sql`LOWER(${schema.coachingBookings.coachEmail}) = ${normalized}`;
+
+  await dbOrTx.delete(schema.coachingBookings).where(bookingPredicate);
+  await dbOrTx
+    .delete(schema.coaches)
+    .where(sql`LOWER(${schema.coaches.email}) = ${normalized}`);
 }

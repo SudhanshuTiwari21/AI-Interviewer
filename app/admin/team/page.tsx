@@ -109,18 +109,30 @@ export default function AdminTeamPage() {
 
   async function removeMember(member: TeamRow) {
     if (member.id === me.id) {
-      setSubmitMsg({ type: "err", text: "You cannot delete your own account." });
+      setSubmitMsg({ type: "err", text: "You cannot remove yourself from the team." });
       return;
     }
-    if (!confirm(`Remove ${member.email} from admin team?`)) return;
+    if (
+      !confirm(
+        `Remove ${member.email} from the admin team? Their account stays active — they become a regular user, or a coach again if they have a coach profile.`,
+      )
+    )
+      return;
     try {
-      const res = await fetch(`/api/admin/users/${member.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/users/${member.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ demoteFromTeam: true }),
+      });
       const data = await res.json();
       if (!data.ok) {
         setSubmitMsg({ type: "err", text: data.message ?? "Could not remove teammate." });
         return;
       }
-      setSubmitMsg({ type: "ok", text: `${member.email} removed successfully.` });
+      setSubmitMsg({
+        type: "ok",
+        text: `${member.email} is no longer on the admin team.`,
+      });
       await load();
     } catch {
       setSubmitMsg({ type: "err", text: "Network error while removing teammate." });

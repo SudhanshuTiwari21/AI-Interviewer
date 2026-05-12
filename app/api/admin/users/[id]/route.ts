@@ -2,7 +2,7 @@ import "server-only";
 
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requirePermission } from "@/lib/auth/admin";
 import { db, schema } from "@/lib/db/client";
@@ -11,9 +11,11 @@ import {
   canActOnRole,
   canAssignRole,
   hasPermission,
+  isAdminRole,
   type Role,
 } from "@/lib/auth/permissions";
 import { recordAudit } from "@/lib/audit";
+import { deleteCoachArtifactsForUserEmail } from "@/lib/server/coaches";
 
 export const runtime = "nodejs";
 
@@ -21,6 +23,7 @@ const Body = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   role: z.enum(["super_admin", "admin", "sub_admin", "coach", "user"]).optional(),
   status: z.enum(["active", "suspended"]).optional(),
+  demoteFromTeam: z.boolean().optional(),
 });
 
 async function loadTarget(id: string) {
@@ -60,6 +63,60 @@ export async function PATCH(
 
   if (!canActOnRole(ctx.role, target.role as Role) && target.id !== ctx.user.id) {
     return fail("validation_error", "You cannot modify this user.", 403);
+  }
+
+  if (parsed.data.demoteFromTeam) {
+    if (
+      parsed.data.role !== undefined ||
+      parsed.data.name !== undefined ||
+      parsed.data.status !== undefined
+    ) {
+      return fail(
+        "validation_error",
+        "demoteFromTeam cannot be combined with role, name, or status.",
+        400,
+      );
+    }
+    if (!isAdminRole(target.role)) {
+      return fail("validation_error", "This user is not on the admin team.", 400);
+    }
+    if (target.id === ctx.user.id) {
+      return fail("validation_error", "You cannot remove yourself from the team.", 400);
+    }
+
+    const coachRow = await db
+      .select({ id: schema.coaches.id })
+      .from(schema.coaches)
+      .where(sql`LOWER(${schema.coaches.email}) = LOWER(${target.email})`)
+      .limit(1);
+
+    const nextRole: Role = coachRow.length > 0 ? "coach" : "user";
+    if (!canAssignRole(ctx.role, nextRole)) {
+      return fail(
+        "validation_error",
+        "You do not have permission to assign the resulting role.",
+        403,
+      );
+    }
+
+    await db
+      .update(schema.users)
+      .set({ role: nextRole, updatedAt: new Date() })
+      .where(eq(schema.users.id, target.id));
+
+    await recordAudit(ctx, {
+      action: "user.update",
+      targetType: "user",
+      targetId: target.id,
+      metadata: {
+        demoteFromTeam: true,
+        previousRole: target.role,
+        nextRole,
+      },
+    });
+
+    const next = await loadTarget(target.id);
+    return ok({ user: next });
   }
 
   const updates: Partial<typeof schema.users.$inferInsert> = {
@@ -128,7 +185,10 @@ export async function DELETE(
     return fail("validation_error", "You cannot delete this user.", 403);
   }
 
-  await db.delete(schema.users).where(eq(schema.users.id, target.id));
+  await db.transaction(async (tx) => {
+    await deleteCoachArtifactsForUserEmail(tx, target.email);
+    await tx.delete(schema.users).where(eq(schema.users.id, target.id));
+  });
 
   await recordAudit(ctx, {
     action: "user.delete",
