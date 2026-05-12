@@ -7,6 +7,7 @@ import {
   liveKitRoomDepartureTimeoutSec,
   liveKitRoomEmptyTimeoutSec,
 } from "./livekit-room-policy";
+import { liveKitHttpsBase, liveKitWssBase, readLiveKitHostRaw } from "./livekit-endpoints";
 
 type LiveKitConfig = {
   host: string;
@@ -15,34 +16,20 @@ type LiveKitConfig = {
   wsUrl: string;
 };
 
-function normalizeHost(raw: string) {
-  const v = raw.trim();
-  if (v.startsWith("http://") || v.startsWith("https://")) return v;
-  return `https://${v}`;
-}
-
-function normalizeWsUrl(raw: string) {
-  const v = raw.trim();
-  if (v.startsWith("ws://") || v.startsWith("wss://")) return v;
-  if (v.startsWith("http://")) return v.replace("http://", "ws://");
-  if (v.startsWith("https://")) return v.replace("https://", "wss://");
-  return `wss://${v}`;
-}
-
 function getLiveKitConfig(): LiveKitConfig {
-  const hostRaw = process.env.LIVEKIT_HOST;
+  const hostRaw = readLiveKitHostRaw();
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
   if (!hostRaw || !apiKey || !apiSecret) {
     throw new Error(
-      "Missing LiveKit env vars. Set LIVEKIT_HOST, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET.",
+      "Missing LiveKit env vars. Set LIVEKIT_URL (or LIVEKIT_HOST), LIVEKIT_API_KEY, and LIVEKIT_API_SECRET.",
     );
   }
   return {
-    host: normalizeHost(hostRaw),
+    host: liveKitHttpsBase(),
     apiKey,
     apiSecret,
-    wsUrl: normalizeWsUrl(hostRaw),
+    wsUrl: liveKitWssBase(),
   };
 }
 

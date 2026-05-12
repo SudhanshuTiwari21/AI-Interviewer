@@ -14,6 +14,13 @@ const Body = z.object({
   bookingId: z.string().uuid(),
 });
 
+function intEnv(name: string, fallback: number) {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 export async function POST(req: Request) {
   const session = await getSessionFromCookie();
   if (!session) return fail("invalid_credentials", "Please sign in first.", 401);
@@ -41,8 +48,10 @@ export async function POST(req: Request) {
   const now = Date.now();
   const startsAt = booking.startsAt.getTime();
   const endsAt = startsAt + booking.durationMin * 60_000;
-  const joinOpenAt = startsAt - 30 * 60_000;
-  const joinCloseAt = endsAt + 2 * 60 * 60_000;
+  const joinEarlyMin = intEnv("MEETING_JOIN_EARLY_MIN", 30);
+  const joinLateMin = intEnv("MEETING_JOIN_LATE_MIN", 120);
+  const joinOpenAt = startsAt - joinEarlyMin * 60_000;
+  const joinCloseAt = endsAt + joinLateMin * 60_000;
   if (now < joinOpenAt || now > joinCloseAt) {
     return fail("validation_error", "Meeting access window is closed.", 400);
   }

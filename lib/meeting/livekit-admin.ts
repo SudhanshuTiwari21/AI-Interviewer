@@ -1,21 +1,16 @@
 import "server-only";
 
 import { RoomServiceClient } from "livekit-server-sdk";
-
-function normalizeHost(raw: string) {
-  const v = raw.trim();
-  if (v.startsWith("http://") || v.startsWith("https://")) return v;
-  return `https://${v}`;
-}
+import { liveKitHttpsBase, readLiveKitHostRaw } from "./livekit-endpoints";
 
 function getRoomServiceClient() {
-  const hostRaw = process.env.LIVEKIT_HOST;
+  const hostRaw = readLiveKitHostRaw();
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
   if (!hostRaw || !apiKey || !apiSecret) {
-    throw new Error("Missing LiveKit env vars for room admin.");
+    throw new Error("Missing LIVEKIT_URL or LIVEKIT_HOST for room admin.");
   }
-  return new RoomServiceClient(normalizeHost(hostRaw), apiKey, apiSecret);
+  return new RoomServiceClient(liveKitHttpsBase(), apiKey, apiSecret);
 }
 
 /**
