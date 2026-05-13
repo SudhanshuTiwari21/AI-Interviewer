@@ -32,23 +32,32 @@ export async function POST(req: Request) {
 
   const { email } = parsed.data;
 
-  // Always respond 200 with the same message to avoid disclosing
-  // whether an email is registered. We only actually send if the
-  // account exists and is not already verified.
-  const genericMessage =
+  const unknownEmailMessage =
     "If an account exists for that email and isn't verified yet, we've just sent a fresh verification link.";
 
   try {
     const user = await findUserByEmail(email);
-    if (user && !user.emailVerified) {
-      await issueVerificationEmail({
-        userId: user.id,
-        email: user.email,
-        name: user.name,
+    if (!user) {
+      return ok({ status: "noop", message: unknownEmailMessage });
+    }
+    if (user.emailVerified) {
+      return ok({
+        status: "already_verified",
+        message: "This account is already verified. You can sign in with your email and password.",
       });
     }
 
-    return ok({ status: "sent", message: genericMessage });
+    await issueVerificationEmail({
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+    });
+
+    return ok({
+      status: "sent",
+      message:
+        "We've sent a fresh verification link to your inbox. Check your email (and spam folder).",
+    });
   } catch (err) {
     console.error("[auth/resend-verification]", err);
     return fail(

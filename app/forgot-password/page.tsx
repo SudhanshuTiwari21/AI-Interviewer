@@ -64,6 +64,10 @@ export default function ForgotPasswordPage() {
             Back to sign in
           </Link>
         </p>
+        <p className="text-center text-xs text-ink-500">
+          After you open the reset link, your new password must be at least 8 characters and include a
+          letter, a number, and a special character.
+        </p>
       </form>
     </AuthShell>
   );

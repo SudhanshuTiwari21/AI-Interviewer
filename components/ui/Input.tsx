@@ -51,7 +51,9 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           <p
             className={cn(
               "mt-1.5 text-xs",
-              error ? "text-danger-600" : "text-ink-500",
+              error
+                ? "whitespace-pre-line text-danger-600"
+                : cn("text-ink-500", hint?.includes("\n") && "whitespace-pre-line"),
             )}
           >
             {error || hint}
@@ -98,7 +100,9 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           <p
             className={cn(
               "mt-1.5 text-xs",
-              error ? "text-danger-600" : "text-ink-500",
+              error
+                ? "whitespace-pre-line text-danger-600"
+                : cn("text-ink-500", hint?.includes("\n") && "whitespace-pre-line"),
             )}
           >
             {error || hint}

@@ -30,7 +30,7 @@ export default function TermsAndConditionsPage() {
               <LegalBlock
                 title="1. Services"
                 body={[
-                  "SelectWise provides AI-powered mock interview simulations, personalized interview reports and scoring, resume review and interview preparation support, paid 1:1 coaching sessions, and career readiness guidance.",
+                  "SelectWise provides AI-powered mock interview simulations, personalised interview reports and scoring, CV review and interview preparation support, paid one-to-one coaching sessions, and career readiness guidance.",
                   "Our services are designed to support interview preparation and professional development.",
                   "We do not guarantee job placement, interview selection, or employment outcomes.",
                 ]}

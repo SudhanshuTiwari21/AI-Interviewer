@@ -105,7 +105,7 @@ export default function LoginPage() {
       resent: true,
       resending: false,
       info: res.ok
-        ? "Verification email re-sent. Check your inbox (and spam folder)."
+        ? res.message
         : "Could not resend right now. Please try again in a moment.",
     });
   }

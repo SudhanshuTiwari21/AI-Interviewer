@@ -7,6 +7,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { store } from "@/lib/store";
+import { formatPasswordPolicyError, PASSWORD_POLICY_BULLETS } from "@/lib/auth/password-policy";
 import { ArrowLeft } from "lucide-react";
 
 type UserSettings = {
@@ -47,6 +48,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [messageTone, setMessageTone] = useState<"success" | "danger">("success");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -99,7 +101,39 @@ export default function SettingsPage() {
     if (!settings) return;
     setSaving(true);
     setMessage(null);
+    setPasswordError(null);
     setMessageTone("success");
+
+    const pwdIntent =
+      passwordForm.currentPassword.trim() !== "" ||
+      passwordForm.newPassword.trim() !== "" ||
+      passwordForm.confirmPassword.trim() !== "";
+
+    if (pwdIntent) {
+      if (
+        !passwordForm.currentPassword.trim() ||
+        !passwordForm.newPassword.trim() ||
+        !passwordForm.confirmPassword.trim()
+      ) {
+        setPasswordError(
+          "To change your password, fill in current password, new password, and confirmation.",
+        );
+        setSaving(false);
+        return;
+      }
+      if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+        setPasswordError("New password and confirmation do not match.");
+        setSaving(false);
+        return;
+      }
+      const policyErr = formatPasswordPolicyError(passwordForm.newPassword);
+      if (policyErr) {
+        setPasswordError(policyErr);
+        setSaving(false);
+        return;
+      }
+    }
+
     try {
       const res = await fetch("/api/user/settings", {
         method: "PATCH",
@@ -122,6 +156,7 @@ export default function SettingsPage() {
       setSettings(data.settings);
       setProfile(data.profile ?? profile);
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setPasswordError(null);
       const existingUser = store.getUser();
       if (existingUser) {
         const nextName = [data.profile?.firstName, data.profile?.lastName].filter(Boolean).join(" ");
@@ -311,7 +346,7 @@ export default function SettingsPage() {
                     setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))
                   }
                   className="mt-1 h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
-                  placeholder="At least 8 characters"
+                  placeholder="New password"
                 />
               </label>
               <label className="block text-xs text-ink-600">
@@ -327,6 +362,14 @@ export default function SettingsPage() {
                 />
               </label>
             </div>
+            <ul className="list-inside list-disc text-xs text-ink-500">
+              {PASSWORD_POLICY_BULLETS.map((rule) => (
+                <li key={rule}>{rule}</li>
+              ))}
+            </ul>
+            {passwordError ? (
+              <p className="whitespace-pre-line text-xs text-danger-600">{passwordError}</p>
+            ) : null}
           </CardBody>
         </Card>
 

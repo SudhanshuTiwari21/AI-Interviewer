@@ -7,6 +7,10 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { authClient } from "@/lib/auth/client";
+import {
+  formatPasswordPolicyError,
+  PASSWORD_POLICY_BULLETS,
+} from "@/lib/auth/password-policy";
 import { Lock } from "lucide-react";
 
 export default function ResetPasswordPage() {
@@ -36,12 +40,13 @@ function ResetPasswordContent() {
       setError("Invalid reset link. Please request a new one.");
       return;
     }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
     if (password !== confirmPassword) {
       setError("Passwords do not match.");
+      return;
+    }
+    const policyError = formatPasswordPolicyError(password);
+    if (policyError) {
+      setError(policyError);
       return;
     }
 
@@ -80,12 +85,17 @@ function ResetPasswordContent() {
           label="New password"
           type="password"
           autoComplete="new-password"
-          placeholder="••••••••"
+          placeholder="Strong password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           leftIcon={<Lock className="size-4" />}
           error={error || undefined}
         />
+        <ul className="list-inside list-disc text-xs text-ink-500">
+          {PASSWORD_POLICY_BULLETS.map((rule) => (
+            <li key={rule}>{rule}</li>
+          ))}
+        </ul>
         <Input
           label="Confirm password"
           type="password"

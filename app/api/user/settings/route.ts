@@ -3,6 +3,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { passwordSchema } from "@/lib/auth/password-policy";
 import { db, schema } from "@/lib/db/client";
 import { fail, ok } from "@/lib/api/response";
 import { getSessionFromCookie, setSessionCookie } from "@/lib/auth/session";
@@ -19,9 +20,9 @@ const Patch = z.object({
   defaultCompanyType: z.string().trim().min(2).max(80).nullable().optional(),
   firstName: z.string().trim().min(1).max(60).optional(),
   lastName: z.string().trim().max(60).nullable().optional(),
-  currentPassword: z.string().min(8).max(128).optional(),
-  newPassword: z.string().min(8).max(128).optional(),
-  confirmPassword: z.string().min(8).max(128).optional(),
+  currentPassword: z.string().min(1).max(128).optional(),
+  newPassword: z.string().min(1).max(200).optional(),
+  confirmPassword: z.string().min(1).max(200).optional(),
 });
 
 async function requireSignedInUser() {
@@ -116,6 +117,14 @@ export async function PATCH(req: Request) {
       }
       if (newPassword !== confirmPassword) {
         return fail("validation_error", "New password and confirm password must match.", 400);
+      }
+      const pwdCheck = passwordSchema.safeParse(newPassword);
+      if (!pwdCheck.success) {
+        return fail(
+          "validation_error",
+          pwdCheck.error.issues[0]?.message ?? "Password does not meet requirements.",
+          400,
+        );
       }
       const passwordValid = await verifyPassword(currentPassword, user.passwordHash);
       if (passwordValid === false) {

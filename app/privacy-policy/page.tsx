@@ -20,7 +20,7 @@ export default function PrivacyPolicyPage() {
             <p className="mt-4 max-w-3xl text-sm leading-7 text-ink-600 sm:text-base">
               This Privacy Policy explains data collection, usage, storage, and protection practices
               for personal information when using the platform, including AI-powered mock interviews,
-              interview reports, resume reviews, and coaching services. Continued use of the
+              interview reports, CV reviews, and coaching services. Continued use of the
               platform indicates acceptance of the practices described in this Privacy Policy.
             </p>
           </div>
@@ -32,7 +32,7 @@ export default function PrivacyPolicyPage() {
               <PolicyBlock
                 title="1. Information We Collect"
                 body={[
-                  "Personal information: full name, email address, mobile number, professional details (role, experience level, target role, interview preferences), resume/CV uploads, and payment-related information processed via third-party providers.",
+                  "Personal information: full name, email address, mobile number, professional details (role, experience level, target role, interview preferences), CV uploads, and payment-related information processed via third-party providers.",
                   "Interview information: typed or voice answers, voice recordings/transcripts (where applicable), AI-generated reports/scores, and coaching preferences/bookings.",
                   "Technical information: IP address, browser type, device information, usage activity, and login/session details.",
                 ]}
@@ -41,17 +41,17 @@ export default function PrivacyPolicyPage() {
               <PolicyBlock
                 title="2. How We Use Your Information"
                 body={[
-                  "We use information to provide AI interview simulations, generate personalized reports, improve platform quality, schedule/manage coaching, process payments, send service communications, strengthen security, prevent fraud/abuse, and comply with legal obligations.",
+                  "We use information to provide AI interview simulations, generate personalised reports, improve platform quality, schedule/manage coaching, process payments, send service communications, strengthen security, prevent fraud/abuse, and comply with legal obligations.",
                   "We do not sell your personal data to third parties.",
                 ]}
               />
 
               <PolicyBlock
-                title="3. Resume and Uploaded Content"
+                title="3. CV and Uploaded Content"
                 body={[
-                  "Uploaded resumes/documents are used only for interview preparation, coaching, and report generation.",
+                  "Uploaded CVs and documents are used only for interview preparation, coaching, and report generation.",
                   "Documents remain confidential and are not shared publicly.",
-                  "Access is limited to authorized personnel/systems required for service delivery.",
+                  "Access is limited to authorised personnel/systems required for service delivery.",
                   "You are responsible for ensuring uploaded information is accurate and lawful.",
                 ]}
               />
@@ -60,7 +60,7 @@ export default function PrivacyPolicyPage() {
                 title="4. Voice Data and AI Processing"
                 body={[
                   "For voice interviews, responses may be processed using secure speech-to-text services.",
-                  "AI systems may analyze responses for scoring and feedback generation.",
+                  "AI systems may analyse responses for scoring and feedback generation.",
                   "Voice recordings may be retained temporarily for quality review and support purposes.",
                 ]}
               />
@@ -77,7 +77,7 @@ export default function PrivacyPolicyPage() {
               <PolicyBlock
                 title="6. Data Sharing"
                 body={[
-                  "We may share limited information with payment providers, calendar/scheduling providers, email/communication providers, AI/speech processing providers, internal coaches/authorized support personnel, and legal authorities where required by law.",
+                  "We may share limited information with payment providers, calendar/scheduling providers, email/communication providers, AI/speech processing providers, internal coaches/authorised support personnel, and legal authorities where required by law.",
                   "We share only what is necessary to deliver services safely and effectively.",
                 ]}
               />
@@ -93,7 +93,7 @@ export default function PrivacyPolicyPage() {
               <PolicyBlock
                 title="8. Data Security"
                 body={[
-                  "We use reasonable technical and organizational safeguards to protect your information from unauthorized access, misuse, or disclosure.",
+                  "We use reasonable technical and organisational safeguards to protect your information from unauthorised access, misuse, or disclosure.",
                   "No online system can guarantee absolute security; users should also take reasonable precautions.",
                 ]}
               />

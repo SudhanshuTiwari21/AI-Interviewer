@@ -9,6 +9,7 @@ import { useAdmin, AdminPageHeader } from "@/components/admin/AdminShell";
 import { type Coach } from "@/lib/coaches";
 import { TARGET_ROLES } from "@/lib/target-roles";
 import { cn, uid } from "@/lib/utils";
+import { isValidIanaTimeZone } from "@/lib/timezone";
 import { Pencil, Plus, Save, Trash2 } from "lucide-react";
 
 type CoachForm = {
@@ -250,8 +251,43 @@ export default function AdminCoachesPage() {
                   );
                   return;
                 }
+                const tz = form.timezone.trim();
+                if (!tz) {
+                  setSaveError("Timezone is required.");
+                  return;
+                }
+                if (!isValidIanaTimeZone(tz)) {
+                  setSaveError(
+                    "Invalid timezone. Use an IANA name such as Asia/Kolkata, America/New_York, or Europe/London.",
+                  );
+                  return;
+                }
+                const emailLower = form.email.trim().toLowerCase();
+                const duplicateCoachEmail = coaches.some(
+                  (c) =>
+                    c.email.trim().toLowerCase() === emailLower &&
+                    (editingId == null || c.id !== editingId),
+                );
+                if (duplicateCoachEmail) {
+                  setSaveError("Coach already exists with this email/User ID.");
+                  return;
+                }
                 const next = toCoach(form, editingId);
-                if (!next) return;
+                if (!next) {
+                  const t = form.timezone.trim();
+                  if (!t) {
+                    setSaveError("Timezone is required.");
+                  } else if (!isValidIanaTimeZone(t)) {
+                    setSaveError(
+                      "Invalid timezone. Use an IANA name such as Asia/Kolkata, America/New_York, or Europe/London.",
+                    );
+                  } else {
+                    setSaveError(
+                      "Please fill name, email, title, at least one tech area, and valid availability windows.",
+                    );
+                  }
+                  return;
+                }
                 setIsSaving(true);
                 try {
                   const res = await fetch("/api/admin/coaches", {
@@ -410,12 +446,17 @@ export default function AdminCoachesPage() {
                 </Field>
               </div>
               <Field label="Timezone">
+                <p className="mb-1 text-[11px] text-ink-500">
+                  IANA name (e.g. Asia/Kolkata, America/New_York). Invalid values cannot be saved.
+                </p>
                 <input
+                  required
                   className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
                   value={form.timezone}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, timezone: e.target.value }))
                   }
+                  placeholder="Asia/Kolkata"
                 />
               </Field>
               <Field label="Work days">
@@ -656,6 +697,8 @@ function toCoach(form: CoachForm, editingId: string | null): Coach | null {
   if (!form.name.trim() || !form.title.trim() || form.weekdays.length === 0) return null;
   if (!form.email.trim()) return null;
   if (form.techAreas.length === 0) return null;
+  const tz = form.timezone.trim();
+  if (!tz || !isValidIanaTimeZone(tz)) return null;
   const windows = form.windows
     .map((w) => ({
       startMinute: parseTimeToMinutes(w.startMinute),
@@ -686,7 +729,7 @@ function toCoach(form: CoachForm, editingId: string | null): Coach | null {
     perSessionRateInr: Number(form.perSessionRateInr) || 999,
     rating: 0,
     sessions: Number(form.sessions) || 0,
-    timezone: form.timezone.trim() || "Asia/Kolkata",
+    timezone: tz,
     active: form.active,
     availability: {
       weekdays: [...form.weekdays].sort((a, b) => a - b),

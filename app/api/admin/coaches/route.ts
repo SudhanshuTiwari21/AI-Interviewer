@@ -1,7 +1,7 @@
 import "server-only";
 
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requirePermission } from "@/lib/auth/admin";
 import { fail, ok } from "@/lib/api/response";
@@ -11,6 +11,7 @@ import { db, schema } from "@/lib/db/client";
 import { findUserByEmail } from "@/lib/auth/verification-service";
 import { sendMail } from "@/lib/email/transporter";
 import { coachOnboardingEmail } from "@/lib/email/templates/coaching";
+import { isValidIanaTimeZone } from "@/lib/timezone";
 
 export const runtime = "nodejs";
 const MAX_COACH_DESCRIPTION_WORDS = 40;
@@ -25,11 +26,36 @@ function descriptionWordCount(value: string) {
   return normalized.split(/\s+/).length;
 }
 
+/** Prefer user-facing field order so e.g. empty `name` is reported before empty `id`. */
+function coachValidationMessage(err: z.ZodError): string {
+  const issues = err.issues;
+  const pathPriority = [
+    "name",
+    "title",
+    "email",
+    "timezone",
+    "techAreas",
+    "availability",
+    "id",
+    "description",
+    "sessions",
+    "perSessionRateInr",
+    "active",
+    "focus",
+  ];
+  const sorted = [...issues].sort((a, b) => {
+    const ia = pathPriority.indexOf(String(a.path[0] ?? ""));
+    const ib = pathPriority.indexOf(String(b.path[0] ?? ""));
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+  return sorted[0]?.message ?? "Invalid input";
+}
+
 const CoachSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string().email(),
-  title: z.string(),
+  id: z.string().trim().min(1, "Coach id is required.").max(120),
+  name: z.string().trim().min(1, "Coach name is required.").max(200),
+  email: z.string().trim().toLowerCase().email("Enter a valid email address."),
+  title: z.string().trim().min(1, "Coach title is required.").max(200),
   description: z
     .string()
     .max(2000)
@@ -37,20 +63,32 @@ const CoachSchema = z.object({
       (value) => descriptionWordCount(value) <= MAX_COACH_DESCRIPTION_WORDS,
       `Description can have at most ${MAX_COACH_DESCRIPTION_WORDS} words.`,
     ),
-  sessions: z.number(),
+  sessions: z.number().int().min(0),
   focus: z.array(z.string()),
-  techAreas: z.array(z.string()),
+  techAreas: z
+    .array(z.string().trim().min(1, "Tech area cannot be empty."))
+    .min(1, "Select at least one tech area."),
   perSessionRateInr: z.number().int().positive(),
   active: z.boolean(),
-  timezone: z.string(),
+  timezone: z
+    .string()
+    .trim()
+    .min(1, "Timezone is required.")
+    .max(120, "Timezone is too long.")
+    .refine(isValidIanaTimeZone, {
+      message:
+        "Invalid timezone. Use an IANA name such as Asia/Kolkata, America/New_York, or Europe/London.",
+    }),
   availability: z.object({
-    weekdays: z.array(z.number().int()),
-    windows: z.array(
-      z.object({
-        startMinute: z.number().int(),
-        endMinute: z.number().int(),
-      }),
-    ),
+    weekdays: z.array(z.number().int()).min(1, "Select at least one weekday."),
+    windows: z
+      .array(
+        z.object({
+          startMinute: z.number().int(),
+          endMinute: z.number().int(),
+        }),
+      )
+      .min(1, "Add at least one availability window."),
   }),
 });
 
@@ -72,7 +110,7 @@ export async function POST(req: Request) {
   }
   const parsed = CoachSchema.safeParse(json);
   if (!parsed.success) {
-    return fail("validation_error", parsed.error.issues[0]?.message ?? "Invalid input", 400);
+    return fail("validation_error", coachValidationMessage(parsed.error), 400);
   }
   const coach = {
     ...parsed.data,
@@ -86,6 +124,23 @@ export async function POST(req: Request) {
       400,
     );
   }
+
+  const emailLower = coach.email.trim().toLowerCase();
+  const otherCoachSameEmail = await db
+    .select({ id: schema.coaches.id })
+    .from(schema.coaches)
+    .where(
+      and(sql`LOWER(${schema.coaches.email}) = ${emailLower}`, ne(schema.coaches.id, coach.id)),
+    )
+    .limit(1);
+  if (otherCoachSameEmail.length > 0) {
+    return fail(
+      "coach_already_exists",
+      "Coach already exists with this email/User ID.",
+      409,
+    );
+  }
+
   await upsertCoach(coach);
   const promotedToCoach = existing.role !== "coach";
   if (existing.role !== "coach") {

@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { fail, ok } from "@/lib/api/response";
 import { hashPassword } from "@/lib/auth/password";
+import { passwordSchema, PASSWORD_MAX_LENGTH } from "@/lib/auth/password-policy";
 import {
   consumePasswordResetToken,
   invalidateOtherPasswordResetTokens,
@@ -15,8 +16,8 @@ export const runtime = "nodejs";
 const Body = z
   .object({
     token: z.string().trim().min(20, "Invalid or expired reset link."),
-    password: z.string().min(8, "Password must be at least 8 characters").max(200),
-    confirmPassword: z.string().min(8, "Please confirm your password").max(200),
+    password: passwordSchema,
+    confirmPassword: z.string().min(1, "Please confirm your password").max(PASSWORD_MAX_LENGTH),
   })
   .refine((v) => v.password === v.confirmPassword, {
     path: ["confirmPassword"],

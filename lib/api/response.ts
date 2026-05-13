@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 export type ApiErrorCode =
   | "validation_error"
   | "email_already_registered"
+  | "coach_already_exists"
   | "invalid_credentials"
   | "email_not_verified"
   | "invalid_or_expired_token"

@@ -9,6 +9,10 @@ import { Button } from "@/components/ui/Button";
 import { authClient } from "@/lib/auth/client";
 import { Mail, Lock, User, CheckCircle2 } from "lucide-react";
 import { isAdminRole, isCoachRole } from "@/lib/auth/permissions";
+import {
+  formatPasswordPolicyError,
+  PASSWORD_POLICY_BULLETS,
+} from "@/lib/auth/password-policy";
 
 export default function SignupPage() {
   return (
@@ -84,8 +88,13 @@ function SignupInner() {
     e.preventDefault();
     setError(null);
 
-    if (!name.trim() || !email.includes("@") || password.length < 8) {
-      setError("Please fill in your name, a valid email, and an 8+ char password.");
+    if (!name.trim() || !email.includes("@")) {
+      setError("Please fill in your name and a valid email.");
+      return;
+    }
+    const passwordError = formatPasswordPolicyError(password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
     if (!settings.allowSignups || settings.maintenanceMode) {
@@ -127,7 +136,7 @@ function SignupInner() {
     setResending(false);
     setResendInfo(
       res.ok
-        ? "Verification email re-sent. Check your inbox (and spam folder)."
+        ? res.message
         : "Could not resend right now. Please try again in a moment.",
     );
   }
@@ -222,12 +231,17 @@ function SignupInner() {
           name="password"
           type="password"
           autoComplete="new-password"
-          placeholder="At least 8 characters"
+          placeholder="Strong password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           leftIcon={<Lock className="size-4" />}
           error={error || undefined}
         />
+        <ul className="list-inside list-disc text-xs text-ink-500">
+          {PASSWORD_POLICY_BULLETS.map((rule) => (
+            <li key={rule}>{rule}</li>
+          ))}
+        </ul>
         <Button
           type="submit"
           loading={loading}

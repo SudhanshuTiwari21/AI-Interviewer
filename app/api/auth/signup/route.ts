@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db/client";
 import { hashPassword } from "@/lib/auth/password";
+import { passwordSchema } from "@/lib/auth/password-policy";
 import { getAdminSettings } from "@/lib/admin-settings";
 import {
   findUserByEmail,
@@ -16,7 +17,7 @@ export const runtime = "nodejs";
 const Body = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
   email: z.string().trim().toLowerCase().email("Enter a valid email"),
-  password: z.string().min(8, "Password must be at least 8 characters").max(200),
+  password: passwordSchema,
   leadSource: z.string().trim().max(80).optional().default("direct"),
 });
 

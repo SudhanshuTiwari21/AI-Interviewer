@@ -1,4 +1,4 @@
-name: Meeting lifecycle cleanup
+o name: Meeting lifecycle cleanup
 
 on:
   schedule:
