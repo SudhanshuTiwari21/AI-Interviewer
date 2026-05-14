@@ -38,41 +38,52 @@ export async function POST(req: Request) {
     return fail("validation_error", parsed.error.issues[0]?.message ?? "Invalid input", 400);
   }
 
-  const { booking, role } = await resolveMeetingRoleForBooking(parsed.data.bookingId, me.id, me.email);
-  if (!booking || !role) {
-    return fail("validation_error", "You are not allowed to join this meeting.", 403);
-  }
-  if (booking.status !== "approved") {
-    return fail("validation_error", "Meeting is available only for approved bookings.", 400);
-  }
-  const now = Date.now();
-  const startsAt = booking.startsAt.getTime();
-  const endsAt = startsAt + booking.durationMin * 60_000;
-  const joinEarlyMin = intEnv("MEETING_JOIN_EARLY_MIN", 30);
-  const joinLateMin = intEnv("MEETING_JOIN_LATE_MIN", 120);
-  const joinOpenAt = startsAt - joinEarlyMin * 60_000;
-  const joinCloseAt = endsAt + joinLateMin * 60_000;
-  if (now < joinOpenAt || now > joinCloseAt) {
-    return fail("validation_error", "Meeting access window is closed.", 400);
-  }
+  try {
+    const { booking, role } = await resolveMeetingRoleForBooking(
+      parsed.data.bookingId,
+      me.id,
+      me.email,
+    );
+    if (!booking || !role) {
+      return fail("validation_error", "You are not allowed to join this meeting.", 403);
+    }
+    if (booking.status !== "approved") {
+      return fail("validation_error", "Meeting is available only for approved bookings.", 400);
+    }
+    const now = Date.now();
+    const startsAt = booking.startsAt.getTime();
+    const endsAt = startsAt + booking.durationMin * 60_000;
+    const joinEarlyMin = intEnv("MEETING_JOIN_EARLY_MIN", 30);
+    const joinLateMin = intEnv("MEETING_JOIN_LATE_MIN", 120);
+    const joinOpenAt = startsAt - joinEarlyMin * 60_000;
+    const joinCloseAt = endsAt + joinLateMin * 60_000;
+    if (now < joinOpenAt || now > joinCloseAt) {
+      return fail("validation_error", "Meeting access window is closed.", 400);
+    }
 
-  if (meetingProviderName() !== "livekit") {
-    return fail("validation_error", "Meeting provider is not configured for token mode.", 400);
+    if (meetingProviderName() !== "livekit") {
+      return fail("validation_error", "Meeting provider is not configured for token mode.", 400);
+    }
+
+    const issued = await issueMeetingTokenForBooking({
+      bookingId: booking.id,
+      participantId: me.id,
+      participantName: me.name,
+      role,
+    });
+
+    return ok({
+      provider: issued.meetingProvider,
+      roomName: issued.roomName,
+      token: issued.token,
+      wsUrl: issued.wsUrl,
+      role,
+      expiresAt: issued.expiresAtIso,
+    });
+  } catch (err: unknown) {
+    console.error("[meeting/token]", err);
+    const message =
+      err instanceof Error ? err.message : "Meeting service error. Please try again shortly.";
+    return fail("internal_error", message, 500);
   }
-
-  const issued = await issueMeetingTokenForBooking({
-    bookingId: booking.id,
-    participantId: me.id,
-    participantName: me.name,
-    role,
-  });
-
-  return ok({
-    provider: issued.meetingProvider,
-    roomName: issued.roomName,
-    token: issued.token,
-    wsUrl: issued.wsUrl,
-    role,
-    expiresAt: issued.expiresAtIso,
-  });
 }

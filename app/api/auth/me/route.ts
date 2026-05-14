@@ -25,6 +25,7 @@ export async function GET() {
       role: user.role,
       plan: user.plan,
       emailVerified: user.emailVerified,
+      status: user.status === "suspended" ? "suspended" : "active",
     },
   });
 }

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db, schema } from "@/lib/db/client";
 import { fail, ok } from "@/lib/api/response";
 import { getSessionFromCookie } from "@/lib/auth/session";
+import { suspendResponseIfNeeded } from "@/lib/auth/account-status";
 import { findUserById } from "@/lib/auth/verification-service";
 import { sendMail } from "@/lib/email/transporter";
 import {
@@ -23,7 +24,11 @@ const Body = z.object({
   coachName: z.string().trim().min(2),
   coachEmail: z.string().trim().email(),
   coachTimezone: z.string().trim().min(2).max(100).optional(),
-  startsAt: z.string().datetime(),
+  startsAt: z
+    .string()
+    .min(16)
+    .max(44)
+    .refine((s) => !Number.isNaN(Date.parse(s)), "Invalid slot time."),
   amountInr: z.number().int().positive(),
   paymentTransactionId: z.string().uuid(),
   razorpayOrderId: z.string().min(1),
@@ -64,6 +69,8 @@ export async function POST(req: Request) {
   const me = await findUserById(session.sub);
   if (!me?.emailVerified)
     return fail("invalid_credentials", "Please sign in first.", 401);
+  const suspended = suspendResponseIfNeeded(me);
+  if (suspended) return suspended;
 
   let json: unknown;
   try {
@@ -103,7 +110,7 @@ export async function POST(req: Request) {
     return fail("validation_error", "Invalid payment type for coaching.", 400);
   }
   if (
-    paymentTx.amountInr !== body.amountInr ||
+    Number(paymentTx.amountInr) !== Number(body.amountInr) ||
     paymentTx.razorpayOrderId !== body.razorpayOrderId ||
     paymentTx.razorpayPaymentId !== body.razorpayPaymentId
   ) {
@@ -141,6 +148,9 @@ export async function POST(req: Request) {
       })
       .returning();
     created = createdRows[0];
+    if (!created?.id) {
+      return fail("internal_error", "Booking could not be created. Please contact support.", 500);
+    }
   } catch (error: any) {
     if (error?.code === "23505") {
       return fail("validation_error", "This slot was just booked. Pick another slot.", 409);

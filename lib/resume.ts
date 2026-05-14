@@ -1,5 +1,7 @@
 "use client";
 
+import { FOCUS_AREAS } from "@/lib/mock-data";
+
 export type ParsedResume = {
   text: string;
   fileName?: string;
@@ -65,14 +67,82 @@ async function extractPdfText(file: File): Promise<string> {
   return chunks.join("\n\n");
 }
 
+/** Re-run validation before payment / start when resume was set earlier in the session. */
+export function reassertParsedResume(parsed: ParsedResume): void {
+  assertPlausibleResumeContent(parsed.text, parsed.highlights);
+}
+
+/** Pick a target role label from admin-configured roles using simple CV text signals. */
+export function suggestTargetRoleLabel(resumeText: string, availableRoles: string[]): string {
+  if (availableRoles.length === 0) return "";
+  const t = resumeText.toLowerCase();
+  for (const role of availableRoles) {
+    const r = role.toLowerCase();
+    if (r && t.includes(r)) return role;
+  }
+  const tokens = new Set(
+    t.split(/[^a-z0-9+.#]+/i).filter((x) => x.length > 2),
+  );
+  for (const role of availableRoles) {
+    const words = role
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length > 2);
+    if (words.some((w) => tokens.has(w))) return role;
+  }
+  return "";
+}
+
+export function suggestFocusAreasFromResume(skills: string[]): string[] {
+  const lowerSkills = skills.map((s) => s.toLowerCase());
+  const picked = FOCUS_AREAS.filter((fa) =>
+    lowerSkills.some(
+      (sk) =>
+        fa.toLowerCase().includes(sk) ||
+        sk.includes(fa.toLowerCase().split(/\s+/)[0] ?? ""),
+    ),
+  );
+  if (picked.length > 0) return [...new Set(picked)].slice(0, 5);
+  return ["Communication", "Behavioural"];
+}
+
+function assertPlausibleResumeContent(text: string, highlights: ResumeHighlights) {
+  const INVALID =
+    "Invalid resume content. Please upload a valid resume.";
+  const t = text.trim();
+  if (t.length < 120) throw new Error(INVALID);
+  const words = t.split(/\s+/).filter(Boolean);
+  if (words.length < 18) throw new Error(INVALID);
+  const lower = t.toLowerCase();
+  const sectionHint =
+    /\b(experience|employment|work history|professional experience|education|qualifications|skills|projects|summary|objective|profile|achievements)\b/i.test(
+      lower,
+    );
+  const contactHint =
+    /\S+@\S+\.\S+/.test(t) ||
+    /linkedin\.com|github\.com/i.test(t) ||
+    /\b\+?\d[\d\s().-]{8,}\d\b/.test(t);
+  const signalCount =
+    highlights.skills.length +
+    highlights.projects.length +
+    highlights.education.length +
+    highlights.companies.length +
+    highlights.achievements.length;
+  if (!(sectionHint || contactHint) || signalCount < 1) {
+    throw new Error(INVALID);
+  }
+}
+
 function finalize(text: string, fileName?: string): ParsedResume {
   const cleaned = text.replace(/\u0000/g, "").trim();
+  const highlights = extractHighlights(cleaned);
+  assertPlausibleResumeContent(cleaned, highlights);
   return {
     text: cleaned.slice(0, 16_000), // safety cap for prompt size
     fileName,
     candidateName: extractCandidateName(cleaned),
     parsedAt: new Date().toISOString(),
-    highlights: extractHighlights(cleaned),
+    highlights,
   };
 }
 

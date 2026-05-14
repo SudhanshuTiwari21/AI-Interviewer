@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db, schema } from "@/lib/db/client";
 import { fail, ok } from "@/lib/api/response";
 import { getSessionFromCookie } from "@/lib/auth/session";
+import { suspendResponseIfNeeded } from "@/lib/auth/account-status";
 import { findUserById } from "@/lib/auth/verification-service";
 import { verifyRazorpaySignature } from "@/lib/payments/razorpay";
 
@@ -22,6 +23,8 @@ export async function POST(req: Request) {
   if (!session) return fail("invalid_credentials", "Please sign in first.", 401);
   const user = await findUserById(session.sub);
   if (!user) return fail("invalid_credentials", "Please sign in first.", 401);
+  const suspended = suspendResponseIfNeeded(user);
+  if (suspended) return suspended;
 
   let json: unknown;
   try {

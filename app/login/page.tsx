@@ -34,6 +34,7 @@ export default function LoginPage() {
     let cancelled = false;
     void authClient.me().then((user) => {
       if (cancelled || !user) return;
+      if (user.status === "suspended") return;
       if (isAdminRole(user.role)) {
         router.replace("/admin");
         return;
@@ -64,6 +65,10 @@ export default function LoginPage() {
     setLoading(false);
 
     if (!res.ok) {
+      if (res.code === "account_suspended") {
+        setError(res.message || "Your account is suspended. Please contact support.");
+        return;
+      }
       if (res.code === "email_not_verified") {
         const unverifiedEmail =
           (typeof res.email === "string" && res.email) || email.trim();
@@ -88,6 +93,7 @@ export default function LoginPage() {
       role:
         (res.user.role as "user" | "coach" | "sub_admin" | "admin" | "super_admin") ??
         "user",
+      status: "active",
     });
     if (isAdminRole(res.user.role)) {
       router.push("/admin");

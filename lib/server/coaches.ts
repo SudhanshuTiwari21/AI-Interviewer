@@ -17,29 +17,51 @@ function rowToCoach(row: typeof schema.coaches.$inferSelect): Coach {
       endHour?: number;
     }>;
   }).windows;
+
+  function normalizeWindow(window: {
+    startMinute?: number;
+    endMinute?: number;
+    startHour?: number;
+    endHour?: number;
+  }): { startMinute: number; endMinute: number } | null {
+    const smRaw = window.startMinute;
+    const emRaw = window.endMinute;
+    if (smRaw !== undefined && emRaw !== undefined) {
+      const sm = Number(smRaw);
+      const em = Number(emRaw);
+      if (Number.isFinite(sm) && Number.isFinite(em)) {
+        const startMinute = Math.max(0, Math.min(23 * 60 + 59, Math.round(sm)));
+        const endMinute = Math.max(0, Math.min(23 * 60 + 59, Math.round(em)));
+        if (startMinute < endMinute && endMinute - startMinute >= 30) {
+          return { startMinute, endMinute };
+        }
+        return null;
+      }
+    }
+    const startMinute = Math.max(0, Math.min(23 * 60 + 59, (Number(window.startHour ?? 9) || 9) * 60));
+    const endMinute = Math.max(0, Math.min(23 * 60 + 59, (Number(window.endHour ?? 18) || 18) * 60));
+    if (startMinute < endMinute && endMinute - startMinute >= 30) {
+      return { startMinute, endMinute };
+    }
+    return null;
+  }
+
   const normalizedWindows =
     rawWindows && rawWindows.length > 0
-      ? rawWindows.map((window) => {
-          if (
-            typeof window.startMinute === "number" &&
-            typeof window.endMinute === "number"
-          ) {
-            return {
-              startMinute: Math.max(0, Math.min(23 * 60 + 59, window.startMinute)),
-              endMinute: Math.max(1, Math.min(23 * 60 + 59, window.endMinute)),
-            };
-          }
-          return {
-            startMinute: (window.startHour ?? 9) * 60,
-            endMinute: Math.min(23 * 60 + 59, (window.endHour ?? 18) * 60),
-          };
-        })
+      ? rawWindows.map((w) => normalizeWindow(w)).filter((w): w is NonNullable<typeof w> => w !== null)
       : [
           {
             startMinute: (legacyStartHour ?? 9) * 60,
             endMinute: Math.min(23 * 60 + 59, (legacyEndHour ?? 18) * 60),
           },
-        ];
+        ].flatMap((w) => {
+          const n = normalizeWindow(w);
+          return n ? [n] : [];
+        });
+  const windowsFinal =
+    normalizedWindows.length > 0
+      ? normalizedWindows
+      : [{ startMinute: 9 * 60, endMinute: 18 * 60 }];
   return {
     id: row.id,
     name: row.name,
@@ -55,7 +77,7 @@ function rowToCoach(row: typeof schema.coaches.$inferSelect): Coach {
     timezone: row.timezone,
     availability: {
       weekdays: availability.weekdays ?? [1, 2, 3, 4, 5],
-      windows: normalizedWindows,
+      windows: windowsFinal,
     },
   };
 }

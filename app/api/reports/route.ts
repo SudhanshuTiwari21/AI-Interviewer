@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { fail, ok } from "@/lib/api/response";
 import { getSessionFromCookie } from "@/lib/auth/session";
+import { suspendResponseIfNeeded } from "@/lib/auth/account-status";
 import { findUserById } from "@/lib/auth/verification-service";
 import { listAllReports, listReportsForUser, saveInterviewReport } from "@/lib/server/reports";
 import type { InterviewReport } from "@/lib/question-engine";
@@ -30,6 +31,8 @@ export async function POST(req: Request) {
   if (!session) return fail("invalid_credentials", "Sign in first.", 401);
   const user = await findUserById(session.sub);
   if (!user) return fail("invalid_credentials", "Sign in first.", 401);
+  const suspended = suspendResponseIfNeeded(user);
+  if (suspended) return suspended;
 
   let json: unknown;
   try {

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/app/AppShell";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { formatTicketPriority, formatTicketStatus } from "@/lib/support/ticket-labels";
 import { ArrowLeft } from "lucide-react";
 
 type Ticket = {
@@ -16,6 +17,7 @@ type Ticket = {
   priority: "low" | "medium" | "high";
   adminNote: string | null;
   createdAt: string;
+  updatedAt: string;
 };
 
 const CATEGORIES = [
@@ -77,7 +79,7 @@ export default function SupportPage() {
         description="Raise payment/refund/custom issues. Admin team resolves tickets from dashboard."
         actions={
           <Button href="/dashboard" variant="outline" size="sm" leftIcon={<ArrowLeft className="size-4" />}>
-            Back to dashboard
+            Overview
           </Button>
         }
       />
@@ -141,13 +143,21 @@ export default function SupportPage() {
                   <li key={t.id} className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-medium text-ink-900">{t.subject}</p>
-                      <Badge tone={ticketTone(t.status)}>{t.status}</Badge>
+                      <Badge tone={ticketTone(t.status)}>{formatTicketStatus(t.status)}</Badge>
                       <Badge tone={priorityTone(t.priority)}>
-                        {t.priority}
+                        {formatTicketPriority(t.priority)}
                       </Badge>
                     </div>
                     <p className="mt-1 text-xs text-ink-500">
-                      {t.category} · {new Date(t.createdAt).toLocaleString()}
+                      {t.category}
+                    </p>
+                    <p className="mt-1 text-xs text-ink-600">
+                      <span className="font-medium text-ink-800">Raised at:</span>{" "}
+                      {new Date(t.createdAt).toLocaleString()}
+                    </p>
+                    <p className="mt-0.5 text-xs text-ink-600">
+                      <span className="font-medium text-ink-800">Last updated at:</span>{" "}
+                      {new Date(t.updatedAt ?? t.createdAt).toLocaleString()}
                     </p>
                     <p className="mt-2 text-sm text-ink-700">{t.description}</p>
                     {t.adminNote && (

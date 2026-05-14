@@ -14,7 +14,7 @@ import { coachOnboardingEmail } from "@/lib/email/templates/coaching";
 import { isValidIanaTimeZone } from "@/lib/timezone";
 
 export const runtime = "nodejs";
-const MAX_COACH_DESCRIPTION_WORDS = 40;
+const MAX_COACH_DESCRIPTION_WORDS = 120;
 
 function appBase() {
   return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/+$/, "");
@@ -58,7 +58,9 @@ const CoachSchema = z.object({
   title: z.string().trim().min(1, "Coach title is required.").max(200),
   description: z
     .string()
-    .max(2000)
+    .trim()
+    .min(60, "Description must be at least 60 characters.")
+    .max(5000)
     .refine(
       (value) => descriptionWordCount(value) <= MAX_COACH_DESCRIPTION_WORDS,
       `Description can have at most ${MAX_COACH_DESCRIPTION_WORDS} words.`,
@@ -88,7 +90,25 @@ const CoachSchema = z.object({
           endMinute: z.number().int(),
         }),
       )
-      .min(1, "Add at least one availability window."),
+      .min(1, "Add at least one availability window.")
+      .superRefine((windows, ctx) => {
+        windows.forEach((w, i) => {
+          if (w.endMinute <= w.startMinute) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "End time must be greater than start time for every availability window.",
+              path: [i, "endMinute"],
+            });
+          }
+          if (w.endMinute - w.startMinute < 30) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Each availability window must be at least 30 minutes long.",
+              path: [i, "endMinute"],
+            });
+          }
+        });
+      }),
   }),
 });
 

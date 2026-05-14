@@ -5,6 +5,7 @@ import { AdminPageHeader, useAdmin } from "@/components/admin/AdminShell";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { formatTicketPriority, formatTicketStatus } from "@/lib/support/ticket-labels";
 
 type Ticket = {
   id: string;
@@ -17,6 +18,7 @@ type Ticket = {
   priority: "low" | "medium" | "high";
   adminNote: string | null;
   createdAt: string;
+  updatedAt: string;
 };
 
 export default function AdminSupportPage() {
@@ -98,11 +100,19 @@ export default function AdminSupportPage() {
               <div key={t.id} className="rounded-xl border border-ink-100 bg-white p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-semibold text-ink-900">{t.subject}</p>
-                  <Badge tone={statusTone(t.status)}>{t.status}</Badge>
-                  <Badge tone={priorityTone(t.priority)}>{t.priority}</Badge>
+                  <Badge tone={statusTone(t.status)}>{formatTicketStatus(t.status)}</Badge>
+                  <Badge tone={priorityTone(t.priority)}>{formatTicketPriority(t.priority)}</Badge>
                 </div>
                 <p className="mt-1 text-xs text-ink-500">
-                  {t.userName} ({t.userEmail}) · {t.category} · {new Date(t.createdAt).toLocaleString()}
+                  {t.userName} ({t.userEmail}) · {t.category}
+                </p>
+                <p className="mt-1 text-xs text-ink-600">
+                  <span className="font-medium text-ink-800">Raised at:</span>{" "}
+                  {new Date(t.createdAt).toLocaleString()}
+                </p>
+                <p className="mt-0.5 text-xs text-ink-600">
+                  <span className="font-medium text-ink-800">Last updated at:</span>{" "}
+                  {new Date(t.updatedAt ?? t.createdAt).toLocaleString()}
                 </p>
                 <p className="mt-2 text-sm text-ink-700">{t.description}</p>
                 <textarea

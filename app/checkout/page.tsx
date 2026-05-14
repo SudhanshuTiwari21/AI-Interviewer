@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
 import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
+import { SuspendedAccountNotice } from "@/components/auth/SuspendedAccountNotice";
+import { authClient } from "@/lib/auth/client";
 import { store } from "@/lib/store";
 import { ensureRazorpayScriptLoaded } from "@/lib/payments/client";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -35,19 +37,26 @@ function CheckoutInner() {
   const [interviewPrice, setInterviewPrice] = useState(INTERVIEW_PRICE_INR);
   const [supportEmail, setSupportEmail] = useState("hi@selectwise.app");
   const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [checkedAuth, setCheckedAuth] = useState(false);
+  const [authGate, setAuthGate] = useState<"loading" | "ready" | "suspended">("loading");
 
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const u = store.getUser();
-    if (!u) {
-      router.replace("/login?next=/checkout");
-      return;
-    }
-    setCheckedAuth(true);
+    let cancelled = false;
+    void authClient.me().then((u) => {
+      if (cancelled) return;
+      if (!u) {
+        router.replace("/login?next=/checkout");
+        return;
+      }
+      if (u.status === "suspended") {
+        setAuthGate("suspended");
+        return;
+      }
+      setAuthGate("ready");
+    });
 
     void fetch("/api/settings/public", { cache: "no-store" })
       .then((r) => r.json())
@@ -65,12 +74,16 @@ function CheckoutInner() {
       });
   }, [router]);
 
-  if (!checkedAuth) {
+  if (authGate === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-ink-500">
         Redirecting to login…
       </div>
     );
+  }
+
+  if (authGate === "suspended") {
+    return <SuspendedAccountNotice />;
   }
 
   if (maintenanceMode) {

@@ -7,10 +7,17 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { ResumeUpload } from "@/components/interview/ResumeUpload";
+import { SuspendedAccountNotice } from "@/components/auth/SuspendedAccountNotice";
+import { authClient } from "@/lib/auth/client";
 import { store } from "@/lib/store";
 import { FOCUS_AREAS, type Role, type Level } from "@/lib/mock-data";
 import { TARGET_ROLES } from "@/lib/target-roles";
 import type { ParsedResume } from "@/lib/resume";
+import {
+  reassertParsedResume,
+  suggestFocusAreasFromResume,
+  suggestTargetRoleLabel,
+} from "@/lib/resume";
 import type { Difficulty, InterviewerMode } from "@/lib/question-engine";
 import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
 import { ensureRazorpayScriptLoaded } from "@/lib/payments/client";
@@ -164,7 +171,7 @@ function mapExperienceToLevel(experience: string): Level {
 
 export default function SetupPage() {
   const router = useRouter();
-  const [targetRole, setTargetRole] = useState<string>("Scrum Master");
+  const [targetRole, setTargetRole] = useState<string>("");
   const [experienceBand, setExperienceBand] = useState<string>("3-5 Years");
   const [interviewType, setInterviewType] = useState<
     "Technical Round" | "Managerial Round" | "Leadership Round" | "HR Round" | "Behavioural Round" | "Scenario Based Round"
@@ -174,10 +181,7 @@ export default function SetupPage() {
   >("Product Company");
   const [role, setRole] = useState<Role>("Product Manager");
   const [level, setLevel] = useState<Level>("Senior");
-  const [focusAreas, setFocusAreas] = useState<string[]>([
-    "System design",
-    "Communication",
-  ]);
+  const [focusAreas, setFocusAreas] = useState<string[]>([]);
   const [resume, setResume] = useState<ParsedResume | null>(null);
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [micChecked, setMicChecked] = useState(false);
@@ -193,11 +197,33 @@ export default function SetupPage() {
   const [roleQuery, setRoleQuery] = useState("");
   const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
   const [availableRoles, setAvailableRoles] = useState<string[]>([...TARGET_ROLES]);
+  const [sessionState, setSessionState] = useState<"checking" | "ready" | "suspended">("checking");
   const rolePickerRef = useRef<HTMLDivElement | null>(null);
+  const resumeAutofillRef = useRef<string | null>(null);
 
   useEffect(() => {
-    const user = store.getUser();
-    if (!user) router.replace("/login?next=/interview/setup");
+    let cancelled = false;
+    void authClient.me().then((u) => {
+      if (cancelled) return;
+      if (!u) {
+        router.replace("/login?next=/interview/setup");
+        return;
+      }
+      if (u.status === "suspended") {
+        setSessionState("suspended");
+        return;
+      }
+      store.setUser({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        createdAt: new Date().toISOString(),
+        plan: (u.plan as never) ?? "free",
+        role: (u.role as never) ?? "user",
+        status: "active",
+      });
+      setSessionState("ready");
+    });
     const draft = store.getInterviewDraft();
     setDraftSessionId(draft?.sessionId ?? null);
     void fetch("/api/settings/public", { cache: "no-store" })
@@ -211,14 +237,30 @@ export default function SetupPage() {
       .catch(() => {
         setAvailableRoles([...TARGET_ROLES]);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   useEffect(() => {
     if (availableRoles.length === 0) return;
-    if (!availableRoles.includes(targetRole)) {
-      setTargetRole(availableRoles[0]);
+    if (targetRole && !availableRoles.includes(targetRole)) {
+      setTargetRole(availableRoles[0] ?? "");
     }
   }, [availableRoles, targetRole]);
+
+  useEffect(() => {
+    if (!resume) {
+      resumeAutofillRef.current = null;
+      return;
+    }
+    if (resumeAutofillRef.current === resume.parsedAt) return;
+    resumeAutofillRef.current = resume.parsedAt;
+    if (availableRoles.length === 0) return;
+    const rolePick = suggestTargetRoleLabel(resume.text, availableRoles);
+    if (rolePick) setTargetRole(rolePick);
+    setFocusAreas(suggestFocusAreasFromResume(resume.highlights.skills));
+  }, [resume, availableRoles]);
 
   useEffect(() => {
     function handleDocumentClick(event: MouseEvent) {
@@ -255,6 +297,7 @@ export default function SetupPage() {
   }
 
   function beginInterviewSession(parsedResume: ParsedResume) {
+    if (!targetRole.trim()) return;
     const mapped = mapTargetRole(targetRole);
     const mappedLevel = mapExperienceToLevel(experienceBand);
     setRole(mapped);
@@ -289,6 +332,12 @@ export default function SetupPage() {
       router.replace("/login?next=/interview/setup");
       return;
     }
+    try {
+      reassertParsedResume(resume);
+    } catch (e) {
+      setPayError(e instanceof Error ? e.message : "Invalid resume content.");
+      return;
+    }
 
     setPayError(null);
     setPaying(true);
@@ -309,7 +358,12 @@ export default function SetupPage() {
       });
       const orderData = await orderRes.json();
       if (!orderData.ok) {
-        setPayError(orderData.message ?? "Unable to initiate interview payment.");
+        const msg =
+          orderData.code === "account_suspended"
+            ? (orderData.message as string) ||
+              "Your account is suspended. Please contact support."
+            : (orderData.message as string) || "Unable to initiate interview payment.";
+        setPayError(msg);
         return;
       }
 
@@ -378,7 +432,7 @@ export default function SetupPage() {
     setDraftSessionId(null);
   }
 
-  const canStart = !!resume || !!draftSessionId;
+  const canStart = (!!resume && !!targetRole.trim()) || !!draftSessionId;
   const filteredRoles = availableRoles.filter((item) =>
     item.toLowerCase().includes(roleQuery.trim().toLowerCase()),
   );
@@ -386,6 +440,17 @@ export default function SetupPage() {
   if (paying) startButtonLabel = "Processing payment...";
   else if (draftSessionId) startButtonLabel = "Resume paid interview";
   else if (resume) startButtonLabel = `Pay ₹${INTERVIEW_PRICE_INR} and Start`;
+
+  if (sessionState === "checking") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-ink-50/40 text-sm text-ink-500">
+        Loading…
+      </div>
+    );
+  }
+  if (sessionState === "suspended") {
+    return <SuspendedAccountNotice />;
+  }
 
   return (
     <div className="min-h-screen bg-ink-50/40">
@@ -445,11 +510,21 @@ export default function SetupPage() {
                   </Badge>
                 )}
               </div>
-              <ResumeUpload value={resume} onChange={setResume} />
+              <ResumeUpload
+                value={resume}
+                onChange={(next) => {
+                  setResume(next);
+                  if (!next) {
+                    setTargetRole("");
+                    setFocusAreas([]);
+                    resumeAutofillRef.current = null;
+                  }
+                }}
+              />
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className={cn(!resume && "pointer-events-none opacity-[0.55]")}>
             <CardBody className="space-y-6">
               <div className="inline-flex items-center gap-2">
                 <span className="inline-flex size-8 items-center justify-center rounded-xl bg-ink-900 text-white">
@@ -460,7 +535,7 @@ export default function SetupPage() {
                     Step 2 · Role & difficulty
                   </p>
                   <p className="text-xs text-ink-500">
-                    Shapes the question bar and counter-question aggressiveness.
+                    Upload your CV in step 1 first. After parsing, we suggest a role and focus areas you can adjust.
                   </p>
                 </div>
               </div>
@@ -469,10 +544,20 @@ export default function SetupPage() {
                 <div ref={rolePickerRef} className="relative">
                   <button
                     type="button"
-                    onClick={() => setRolePickerOpen((v) => !v)}
+                    onClick={() => {
+                      if (!resume) return;
+                      setRolePickerOpen((v) => !v);
+                    }}
                     className="flex h-11 w-full items-center justify-between rounded-xl border border-ink-200 bg-white px-3 text-sm text-ink-800 outline-none ring-accent-500 transition-colors hover:border-ink-300 focus:ring-2"
                   >
-                    <span className="truncate text-left">{targetRole}</span>
+                    <span
+                      className={cn(
+                        "truncate text-left",
+                        !targetRole.trim() && "text-ink-400",
+                      )}
+                    >
+                      {targetRole.trim() ? targetRole : "Select target role"}
+                    </span>
                     <ChevronDown
                       className={cn(
                         "size-4 text-ink-500 transition-transform",

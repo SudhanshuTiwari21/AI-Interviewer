@@ -40,7 +40,7 @@ export function Pricing() {
         <ul className="mt-6 space-y-3">
           {[
             "Dynamic role-specific interview flow",
-            "Resume-driven counter questions",
+            "CV-driven counter questions",
             "All premium controls (style, company target, stress mode)",
             "Voice + text answers with instant report",
             "Detailed weak-area analysis and coaching recommendations",

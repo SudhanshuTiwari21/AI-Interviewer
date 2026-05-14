@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useAdmin, AdminPageHeader } from "@/components/admin/AdminShell";
 import { formatDate } from "@/lib/utils";
-import { CalendarClock, X, ExternalLink, IndianRupee } from "lucide-react";
+import { CalendarClock, X, ExternalLink, IndianRupee, Search } from "lucide-react";
 
 type CoachingBooking = {
   id: string;
@@ -42,6 +42,7 @@ export default function AdminBookingsPage() {
 
   const [bookings, setBookings] = useState<CoachingBooking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   const loadBookings = useCallback(async (cancelled = false) => {
     try {
@@ -70,6 +71,27 @@ export default function AdminBookingsPage() {
   const past = bookings.filter(
     (b) => new Date(b.startsAt).getTime() <= Date.now(),
   );
+
+  const matchesSearch = useCallback(
+    (b: CoachingBooking) => {
+      const q = search.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        b.id.toLowerCase().includes(q) ||
+        b.coachName.toLowerCase().includes(q) ||
+        b.candidateName.toLowerCase().includes(q) ||
+        b.candidateEmail.toLowerCase().includes(q) ||
+        b.techArea.toLowerCase().includes(q)
+      );
+    },
+    [search],
+  );
+
+  const upcomingFiltered = useMemo(
+    () => upcoming.filter(matchesSearch),
+    [upcoming, matchesSearch],
+  );
+  const pastFiltered = useMemo(() => past.filter(matchesSearch), [past, matchesSearch]);
 
   async function cancel(id: string) {
     if (!confirm("Cancel this booking?")) return;
@@ -104,6 +126,20 @@ export default function AdminBookingsPage() {
         description="Coaching sessions scheduled by candidates."
       />
 
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative max-w-md flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by coach, candidate, email, tech area, or booking ID…"
+            className="h-10 w-full rounded-lg border border-ink-200 bg-white pl-10 pr-3 text-sm text-ink-800 outline-none ring-accent-500 focus:ring-2"
+            aria-label="Filter bookings"
+          />
+        </div>
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-4 mb-6">
         <Stat label="Total bookings" value={String(bookings.length)} />
         <Stat label="Upcoming" value={String(upcoming.length)} />
@@ -120,13 +156,15 @@ export default function AdminBookingsPage() {
         <CardBody className="p-0">
           {loading ? (
             <div className="px-5 py-8 text-center text-sm text-ink-500">Loading...</div>
-          ) : upcoming.length === 0 ? (
+          ) : upcomingFiltered.length === 0 ? (
             <div className="px-5 py-8 text-center text-sm text-ink-500">
-              No upcoming bookings yet.
+              {search.trim()
+                ? "No upcoming bookings match your search."
+                : "No upcoming bookings yet."}
             </div>
           ) : (
             <BookingsTable
-              bookings={upcoming}
+              bookings={upcomingFiltered}
               canCancel={canCancel}
               onCancel={(id) => {
                 void cancel(id);
@@ -150,9 +188,13 @@ export default function AdminBookingsPage() {
             <div className="px-5 py-8 text-center text-sm text-ink-500">
               Past coaching sessions will appear here.
             </div>
+          ) : pastFiltered.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-ink-500">
+              No past bookings match your search.
+            </div>
           ) : (
             <BookingsTable
-              bookings={past}
+              bookings={pastFiltered}
               canCancel={false}
               onCancel={() => {}}
               onApprove={() => {}}

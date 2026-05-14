@@ -22,6 +22,8 @@ export type User = {
   createdAt: string;
   plan?: Plan["id"] | "free";
   role?: "user" | "coach" | "sub_admin" | "admin" | "super_admin";
+  /** Mirrors server account status when hydrated from `/api/auth/me`. */
+  status?: "active" | "suspended";
 };
 
 const KEYS = {

@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { setSessionCookie } from "@/lib/auth/session";
+import { ACCOUNT_SUSPENDED_MESSAGE, isUserSuspended } from "@/lib/auth/account-status";
 import { findUserByEmail } from "@/lib/auth/verification-service";
 import { fail, ok } from "@/lib/api/response";
 import { db, schema } from "@/lib/db/client";
@@ -136,6 +137,10 @@ export async function POST(req: Request) {
         403,
         { email: user.email },
       );
+    }
+
+    if (isUserSuspended(user)) {
+      return fail("account_suspended", ACCOUNT_SUSPENDED_MESSAGE, 403);
     }
 
     await setSessionCookie({

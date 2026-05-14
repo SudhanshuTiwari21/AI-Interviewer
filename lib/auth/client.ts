@@ -7,6 +7,7 @@ export type AuthUser = {
   role: string;
   plan: string;
   emailVerified?: boolean;
+  status?: "active" | "suspended";
 };
 
 export type ApiResult<T extends Record<string, unknown> = Record<string, unknown>> =
@@ -22,6 +23,7 @@ export type ApiResult<T extends Record<string, unknown> = Record<string, unknown
         | "invalid_or_expired_token"
         | "user_not_found"
         | "rate_limited"
+        | "account_suspended"
         | "internal_error";
       message: string;
       [extra: string]: unknown;

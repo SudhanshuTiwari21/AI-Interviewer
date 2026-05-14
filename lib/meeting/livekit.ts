@@ -40,21 +40,29 @@ function getRoomService() {
 
 async function ensureRoom(args: EnsureMeetingArgs) {
   const roomService = getRoomService();
-  const room = await roomService.createRoom({
-    name: args.roomName,
-    metadata: JSON.stringify({
-      bookingId: args.bookingId,
-      candidateName: args.candidateName,
-      coachName: args.coachName,
-      startsAtIso: args.startsAtIso,
-      durationMin: args.durationMin,
-      createdBy: "selectwise",
-    }),
-    emptyTimeout: liveKitRoomEmptyTimeoutSec(),
-    departureTimeout: liveKitRoomDepartureTimeoutSec(),
-    maxParticipants: 2,
-  });
-  return { roomName: room.name };
+  try {
+    const room = await roomService.createRoom({
+      name: args.roomName,
+      metadata: JSON.stringify({
+        bookingId: args.bookingId,
+        candidateName: args.candidateName,
+        coachName: args.coachName,
+        startsAtIso: args.startsAtIso,
+        durationMin: args.durationMin,
+        createdBy: "selectwise",
+      }),
+      emptyTimeout: liveKitRoomEmptyTimeoutSec(),
+      departureTimeout: liveKitRoomDepartureTimeoutSec(),
+      maxParticipants: 2,
+    });
+    return { roomName: room.name };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/already exists|AlreadyExists|409|duplicate/i.test(msg)) {
+      return { roomName: args.roomName };
+    }
+    throw err;
+  }
 }
 
 async function issueToken(args: IssueMeetingTokenArgs) {

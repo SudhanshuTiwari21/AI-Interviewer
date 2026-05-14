@@ -43,7 +43,7 @@ export function About() {
             platform where preparation meets opportunity.
           </p>
           <p>
-            From interview practice to expert coaching, and soon resume optimization and career
+            From interview practice to expert coaching, and soon CV optimisation and career
             readiness services, SelectWise is designed to support candidates at every stage of
             their professional journey.
           </p>

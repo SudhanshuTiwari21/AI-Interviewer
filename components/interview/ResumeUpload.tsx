@@ -23,12 +23,6 @@ export function ResumeUpload({ value, onChange }: Props) {
     setError(null);
     try {
       const parsed = await parseResumeFile(file);
-      if (!parsed.text || parsed.text.length < 40) {
-        setError(
-          "We couldn't extract enough text from that file. Try pasting the content instead.",
-        );
-        return;
-      }
       onChange(parsed);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Upload failed.";
@@ -163,8 +157,15 @@ export function ResumeUpload({ value, onChange }: Props) {
             </span>
             <Button
               size="sm"
-              disabled={pastedText.trim().length < 80}
-              onClick={() => onChange(parseResumeText(pastedText))}
+              disabled={pastedText.trim().length < 120}
+              onClick={() => {
+                setError(null);
+                try {
+                  onChange(parseResumeText(pastedText));
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Could not use that text.");
+                }
+              }}
             >
               Use this text
             </Button>

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
+import { SuspendedAccountNotice } from "@/components/auth/SuspendedAccountNotice";
 import { authClient } from "@/lib/auth/client";
 import { store, type User } from "@/lib/store";
 import { isAdminRole, isCoachRole } from "@/lib/auth/permissions";
@@ -45,10 +46,42 @@ export function AppShell({
 
   const enforceSession = useCallback(async () => {
     const sessionUser = await authClient.me();
-    if (sessionUser) return;
-    store.setUser(null);
-    router.replace("/login");
-    router.refresh();
+    if (!sessionUser) {
+      store.setUser(null);
+      router.replace("/login");
+      router.refresh();
+      return;
+    }
+    if (sessionUser.status === "suspended") {
+      const suspendedUser: User = {
+        id: sessionUser.id,
+        name: sessionUser.name,
+        email: sessionUser.email,
+        createdAt: new Date().toISOString(),
+        plan: (sessionUser.plan as User["plan"]) ?? "free",
+        role: (sessionUser.role as User["role"]) ?? "user",
+        status: "suspended",
+      };
+      store.setUser(suspendedUser);
+      setUser(suspendedUser);
+      return;
+    }
+    if (isCoachRole(sessionUser.role)) {
+      router.replace("/coach");
+      router.refresh();
+      return;
+    }
+    const hydratedUser: User = {
+      id: sessionUser.id,
+      name: sessionUser.name,
+      email: sessionUser.email,
+      createdAt: new Date().toISOString(),
+      plan: (sessionUser.plan as User["plan"]) ?? "free",
+      role: (sessionUser.role as User["role"]) ?? "user",
+      status: "active",
+    };
+    store.setUser(hydratedUser);
+    setUser(hydratedUser);
   }, [router]);
 
   async function handleLogout() {
@@ -62,22 +95,28 @@ export function AppShell({
     let cancelled = false;
     async function load() {
       setHydrated(true);
-      const localUser = store.getUser();
-      if (localUser) {
-        if (isCoachRole(localUser.role)) {
-          router.replace("/coach");
-          return;
-        }
-        if (!cancelled) setUser(localUser);
-        return;
-      }
       const sessionUser = await authClient.me();
       if (!sessionUser) {
-        router.replace("/login");
+        store.setUser(null);
+        if (!cancelled) router.replace("/login");
+        return;
+      }
+      if (sessionUser.status === "suspended") {
+        const suspendedUser: User = {
+          id: sessionUser.id,
+          name: sessionUser.name,
+          email: sessionUser.email,
+          createdAt: new Date().toISOString(),
+          plan: (sessionUser.plan as User["plan"]) ?? "free",
+          role: (sessionUser.role as User["role"]) ?? "user",
+          status: "suspended",
+        };
+        store.setUser(suspendedUser);
+        if (!cancelled) setUser(suspendedUser);
         return;
       }
       if (isCoachRole(sessionUser.role)) {
-        router.replace("/coach");
+        if (!cancelled) router.replace("/coach");
         return;
       }
       const hydratedUser: User = {
@@ -87,6 +126,7 @@ export function AppShell({
         createdAt: new Date().toISOString(),
         plan: (sessionUser.plan as User["plan"]) ?? "free",
         role: (sessionUser.role as User["role"]) ?? "user",
+        status: "active",
       };
       store.setUser(hydratedUser);
       if (!cancelled) setUser(hydratedUser);
@@ -118,6 +158,10 @@ export function AppShell({
         Loading workspace…
       </div>
     );
+  }
+
+  if (user.status === "suspended") {
+    return <SuspendedAccountNotice />;
   }
 
   const mobileNav = [

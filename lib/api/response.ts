@@ -9,6 +9,7 @@ export type ApiErrorCode =
   | "invalid_or_expired_token"
   | "user_not_found"
   | "rate_limited"
+  | "account_suspended"
   | "internal_error";
 
 export function ok<T extends Record<string, unknown>>(data: T, status = 200) {

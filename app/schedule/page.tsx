@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
 import { Card, CardBody } from "@/components/ui/Card";
@@ -13,7 +12,6 @@ import { ensureRazorpayScriptLoaded } from "@/lib/payments/client";
 import { TARGET_ROLES } from "@/lib/target-roles";
 import { cn, formatDate, uid } from "@/lib/utils";
 import {
-  ArrowLeft,
   CalendarClock,
   CheckCircle2,
   Globe,
@@ -23,6 +21,8 @@ import {
   IndianRupee,
   AlertTriangle,
 } from "lucide-react";
+
+const SCHEDULE_PICK_KEY = "selectwise.schedule.pick";
 
 function startOfWeek(d: Date) {
   const date = new Date(d);
@@ -99,7 +99,39 @@ function ScheduleInner() {
       .catch(() => {
         setTechAreas([...TARGET_ROLES]);
       });
-  }, [coachId, router]);
+  }, [router]);
+
+  useEffect(() => {
+    if (coaches.length === 0) return;
+    try {
+      const raw = sessionStorage.getItem(SCHEDULE_PICK_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { coachId?: string; techArea?: string };
+      if (saved.techArea?.trim()) {
+        const area = saved.techArea.trim();
+        if (coaches.some((c) => c.techAreas.some((t) => t.toLowerCase().includes(area.toLowerCase())))) {
+          setSelectedTechArea(area);
+        }
+      }
+      if (saved.coachId && coaches.some((c) => c.id === saved.coachId)) {
+        setCoachId(saved.coachId);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [coaches]);
+
+  useEffect(() => {
+    if (!coachId && !selectedTechArea) return;
+    try {
+      sessionStorage.setItem(
+        SCHEDULE_PICK_KEY,
+        JSON.stringify({ coachId, techArea: selectedTechArea }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [coachId, selectedTechArea]);
 
   const days = useMemo(() => {
     const today = startOfDay(new Date());
@@ -200,7 +232,12 @@ function ScheduleInner() {
       });
       const orderData = await orderRes.json();
       if (!orderData.ok) {
-        setError(orderData.message ?? "Could not start payment.");
+        const msg =
+          orderData.code === "account_suspended"
+            ? (orderData.message as string) ||
+              "Your account is suspended. Please contact support."
+            : (orderData.message as string) || "Could not start payment.";
+        setError(msg);
         return;
       }
       const paymentResult = await new Promise<{
@@ -265,7 +302,7 @@ function ScheduleInner() {
         }),
       });
       const data = await res.json();
-      if (!data.ok) {
+      if (!data.ok || !data.booking?.id) {
         setError(data.message ?? "Could not create coaching booking.");
         return;
       }
@@ -286,46 +323,21 @@ function ScheduleInner() {
 
   if (coaches.length === 0) {
     return (
-      <div className="min-h-screen bg-ink-50/40">
-        <header className="border-b border-ink-100 bg-white">
-          <div className="container flex h-16 max-w-6xl items-center justify-between">
-            <Logo />
-            <Button href="/dashboard" variant="ghost" size="sm" leftIcon={<ArrowLeft className="size-4" />}>
-              Back to dashboard
-            </Button>
-          </div>
-        </header>
-        <main className="container max-w-3xl px-4 py-16">
-          <Card>
-            <CardBody className="text-center">
-              <h1 className="text-xl font-semibold text-ink-900">No coaches available</h1>
-              <p className="mt-2 text-sm text-ink-500">
-                Admin has not added any active coaches yet. Please check back later.
-              </p>
-            </CardBody>
-          </Card>
-        </main>
+      <div className="container max-w-3xl px-4 py-10">
+        <Card>
+          <CardBody className="text-center">
+            <h1 className="text-xl font-semibold text-ink-900">No coaches available</h1>
+            <p className="mt-2 text-sm text-ink-500">
+              Admin has not added any active coaches yet. Please check back later.
+            </p>
+          </CardBody>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-ink-50/40">
-      <header className="border-b border-ink-100 bg-white">
-        <div className="container flex h-16 max-w-6xl items-center justify-between">
-          <Logo />
-          <Button
-            href="/dashboard"
-            variant="ghost"
-            size="sm"
-            leftIcon={<ArrowLeft className="size-4" />}
-          >
-            Back to dashboard
-          </Button>
-        </div>
-      </header>
-
-      <main className="container max-w-6xl px-4 py-10">
+    <div className="container max-w-6xl px-4 py-10">
         <div className="mx-auto max-w-2xl text-center">
           <Badge tone="accent" dot>
             Coaching
@@ -604,7 +616,6 @@ function ScheduleInner() {
             </Card>
           </div>
         )}
-      </main>
 
       {coachPickerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-900/50 px-4">

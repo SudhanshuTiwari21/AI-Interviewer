@@ -16,7 +16,7 @@ const QUOTES = [
   },
   {
     quote:
-      "Best $79 I've spent on prep. The dynamic follow-ups exposed gaps no friend could.",
+      "Best ₹299 I've spent on prep. The dynamic follow-ups exposed gaps no friend could.",
     name: "Aisha Patel",
     role: "Staff Backend Engineer · Datadog",
   },

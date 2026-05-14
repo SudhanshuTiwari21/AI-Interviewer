@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Logo } from "@/components/ui/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
+import { SuspendedAccountNotice } from "@/components/auth/SuspendedAccountNotice";
 import { authClient } from "@/lib/auth/client";
 import { cn } from "@/lib/utils";
 import { store, type User } from "@/lib/store";
@@ -24,10 +25,42 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
 
   const enforceSession = useCallback(async () => {
     const sessionUser = await authClient.me();
-    if (sessionUser?.role === "coach") return;
-    store.setUser(null);
-    router.replace("/login?next=/coach");
-    router.refresh();
+    if (!sessionUser) {
+      store.setUser(null);
+      router.replace("/login?next=/coach");
+      router.refresh();
+      return;
+    }
+    if (sessionUser.status === "suspended") {
+      const suspendedUser: User = {
+        id: sessionUser.id,
+        name: sessionUser.name,
+        email: sessionUser.email,
+        createdAt: new Date().toISOString(),
+        plan: (sessionUser.plan as User["plan"]) ?? "free",
+        role: (sessionUser.role as User["role"]) ?? "coach",
+        status: "suspended",
+      };
+      store.setUser(suspendedUser);
+      setUser(suspendedUser);
+      return;
+    }
+    if (sessionUser.role !== "coach") {
+      router.replace("/dashboard");
+      router.refresh();
+      return;
+    }
+    const hydratedUser: User = {
+      id: sessionUser.id,
+      name: sessionUser.name,
+      email: sessionUser.email,
+      createdAt: new Date().toISOString(),
+      plan: (sessionUser.plan as User["plan"]) ?? "free",
+      role: "coach",
+      status: "active",
+    };
+    store.setUser(hydratedUser);
+    setUser(hydratedUser);
   }, [router]);
 
   async function handleLogout() {
@@ -41,23 +74,27 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
     let cancelled = false;
     async function load() {
       setHydrated(true);
-      const localUser = store.getUser();
-      if (localUser) {
-        if (localUser.role !== "coach") {
-          router.replace("/dashboard");
-          return;
-        }
-        if (!cancelled) setUser(localUser);
-        return;
-      }
-
       const sessionUser = await authClient.me();
       if (!sessionUser) {
-        router.replace("/login?next=/coach");
+        if (!cancelled) router.replace("/login?next=/coach");
+        return;
+      }
+      if (sessionUser.status === "suspended") {
+        const suspendedUser: User = {
+          id: sessionUser.id,
+          name: sessionUser.name,
+          email: sessionUser.email,
+          createdAt: new Date().toISOString(),
+          plan: (sessionUser.plan as User["plan"]) ?? "free",
+          role: (sessionUser.role as User["role"]) ?? "coach",
+          status: "suspended",
+        };
+        store.setUser(suspendedUser);
+        if (!cancelled) setUser(suspendedUser);
         return;
       }
       if (sessionUser.role !== "coach") {
-        router.replace("/dashboard");
+        if (!cancelled) router.replace("/dashboard");
         return;
       }
       const hydratedUser: User = {
@@ -66,7 +103,8 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
         email: sessionUser.email,
         createdAt: new Date().toISOString(),
         plan: (sessionUser.plan as User["plan"]) ?? "free",
-        role: (sessionUser.role as User["role"]) ?? "coach",
+        role: "coach",
+        status: "active",
       };
       store.setUser(hydratedUser);
       if (!cancelled) setUser(hydratedUser);
@@ -98,6 +136,10 @@ export function CoachShell({ children }: Readonly<{ children: React.ReactNode }>
         Loading coach workspace...
       </div>
     );
+  }
+
+  if (user.status === "suspended") {
+    return <SuspendedAccountNotice />;
   }
 
   return (

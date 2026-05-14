@@ -18,7 +18,7 @@ export function Cta() {
             </p>
             <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button
-                href="/signup"
+                href="/interview/setup"
                 size="lg"
                 className="bg-white text-ink-900 hover:bg-ink-100"
                 rightIcon={<ArrowRight className="size-4" />}

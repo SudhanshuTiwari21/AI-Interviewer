@@ -28,7 +28,7 @@ export function HowItWorks() {
     <Section id="how" className="bg-ink-50/40">
       <SectionHeading
         eyebrow="How it works"
-        title="From sign-up to offer-ready, in four steps."
+        title="From sign up to offer-ready, in four steps."
       />
       <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {STEPS.map((s) => (

@@ -36,7 +36,7 @@ const WEEKDAYS = [
   { value: 6, label: "Sat" },
   { value: 0, label: "Sun" },
 ];
-const MAX_COACH_DESCRIPTION_WORDS = 40;
+const MAX_COACH_DESCRIPTION_WORDS = 120;
 
 const DEFAULT_FORM: CoachForm = {
   name: "",
@@ -244,6 +244,10 @@ export default function AdminCoachesPage() {
                 e.preventDefault();
                 setSaveMessage(null);
                 setSaveError(null);
+                if (form.description.trim().length < 60) {
+                  setSaveError("Description must be at least 60 characters.");
+                  return;
+                }
                 const descriptionWords = wordCount(form.description);
                 if (descriptionWords > MAX_COACH_DESCRIPTION_WORDS) {
                   setSaveError(
@@ -261,6 +265,16 @@ export default function AdminCoachesPage() {
                     "Invalid timezone. Use an IANA name such as Asia/Kolkata, America/New_York, or Europe/London.",
                   );
                   return;
+                }
+                for (const win of form.windows) {
+                  const sm = parseTimeToMinutes(win.startMinute);
+                  const em = parseTimeToMinutes(win.endMinute);
+                  if (!Number.isNaN(sm) && !Number.isNaN(em) && em <= sm) {
+                    setSaveError(
+                      "End time must be greater than start time for every availability window.",
+                    );
+                    return;
+                  }
                 }
                 const emailLower = form.email.trim().toLowerCase();
                 const duplicateCoachEmail = coaches.some(
@@ -283,7 +297,7 @@ export default function AdminCoachesPage() {
                     );
                   } else {
                     setSaveError(
-                      "Please fill name, email, title, at least one tech area, and valid availability windows.",
+                      "Please fill name, email, title, description (60+ characters), at least one tech area, and valid availability windows (end after start, at least 30 minutes per row).",
                     );
                   }
                   return;
@@ -369,16 +383,17 @@ export default function AdminCoachesPage() {
                   className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm"
                   value={form.description}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="Brief coach bio and expertise summary"
+                  placeholder="Minimum 60 characters. Summarise coaching style, domains, years of experience, and session formats you offer."
                 />
                 <p
                   className={cn(
                     "mt-1 text-[11px]",
-                    wordCount(form.description) > MAX_COACH_DESCRIPTION_WORDS
+                    form.description.trim().length > 0 && form.description.trim().length < 60
                       ? "text-danger-600"
                       : "text-ink-500",
                   )}
                 >
+                  {form.description.trim().length}/60 characters (minimum) ·{" "}
                   {wordCount(form.description)}/{MAX_COACH_DESCRIPTION_WORDS} words
                 </p>
               </Field>
