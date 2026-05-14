@@ -5,6 +5,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/utils";
+import { bookingListCategory, isBookingSessionActive } from "@/lib/coaching/booking-session";
 
 type CoachBooking = {
   id: string;
@@ -12,6 +13,7 @@ type CoachBooking = {
   candidateEmail: string;
   techArea: string;
   startsAt: string;
+  durationMin: number;
   status: string;
   calendarMeetingUrl?: string | null;
   meetingProvider?: string | null;
@@ -30,10 +32,11 @@ export default function CoachOverviewPage() {
 
   const upcoming = useMemo(
     () =>
-      bookings.filter(
-        (b) =>
-          new Date(b.startsAt).getTime() >= Date.now() && b.status === "approved",
-      ),
+      bookings.filter((b) => {
+        if (b.status !== "approved") return false;
+        const phase = bookingListCategory(b.startsAt, b.durationMin ?? 30);
+        return phase === "upcoming" || phase === "ongoing";
+      }),
     [bookings],
   );
   const pending = bookings.filter((b) => b.status === "pending").length;
@@ -67,21 +70,31 @@ export default function CoachOverviewPage() {
                 <div>
                   <p className="text-sm font-medium text-ink-900">{b.candidateName}</p>
                   <p className="text-xs text-ink-500">
-                    {b.techArea} · {formatDate(b.startsAt)}
+                    {b.techArea} · {formatDate(b.startsAt)} ·{" "}
+                    {new Date(b.startsAt).toLocaleTimeString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
                   </p>
                 </div>
-                <Badge tone="success" dot>
-                  {b.status}
-                </Badge>
-                {b.calendarMeetingUrl || b.meetingProvider === "livekit" ? (
-                  <Button
-                    href={b.meetingProvider === "livekit" ? `/meeting/${b.id}` : (b.calendarMeetingUrl as string)}
-                    size="sm"
-                    variant="outline"
-                  >
-                    Join
-                  </Button>
-                ) : null}
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge tone="success" dot>
+                    {b.status}
+                  </Badge>
+                  {b.calendarMeetingUrl || b.meetingProvider === "livekit" ? (
+                    isBookingSessionActive(b.startsAt, b.durationMin ?? 30) ? (
+                      <Button
+                        href={b.meetingProvider === "livekit" ? `/meeting/${b.id}` : (b.calendarMeetingUrl as string)}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Join
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-ink-400">Ended</span>
+                    )
+                  ) : null}
+                </div>
               </div>
             ))
           )}

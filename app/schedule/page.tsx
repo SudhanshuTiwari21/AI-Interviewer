@@ -135,7 +135,7 @@ function ScheduleInner() {
 
   const days = useMemo(() => {
     const today = startOfDay(new Date());
-    return Array.from({ length: 5 }, (_, i) => {
+    return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(weekStart);
       d.setDate(weekStart.getDate() + i);
       if (d < today) return null;
@@ -501,12 +501,11 @@ function ScheduleInner() {
                         const d = new Date(weekStart);
                         d.setDate(d.getDate() - 7);
                         const currentWeekStart = startOfWeek(new Date());
-                        if (d < currentWeekStart) return;
+                        if (d.getTime() < currentWeekStart.getTime()) return;
                         setWeekStart(d);
-                        setSelectedDay(null);
                         setSelectedSlot(null);
                       }}
-                      disabled={weekStart <= startOfWeek(new Date())}
+                      disabled={weekStart.getTime() <= startOfWeek(new Date()).getTime()}
                       className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
                     >
                       <ChevronLeft className="size-4" />
@@ -517,7 +516,6 @@ function ScheduleInner() {
                         const d = new Date(weekStart);
                         d.setDate(d.getDate() + 7);
                         setWeekStart(d);
-                        setSelectedDay(null);
                         setSelectedSlot(null);
                       }}
                       className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
@@ -530,7 +528,7 @@ function ScheduleInner() {
               <CardBody>
                 {coach ? (
                   <>
-                    <div className="grid grid-cols-5 gap-2">
+                    <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
                       {days.map((d) => {
                         const isSelected =
                           selectedDay?.toDateString() === d.toDateString();

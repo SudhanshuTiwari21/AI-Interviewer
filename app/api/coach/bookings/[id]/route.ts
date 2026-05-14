@@ -24,9 +24,17 @@ function normalizeEmail(value: string | null | undefined) {
   return (value ?? "").trim().toLowerCase();
 }
 
-const Body = z.object({
-  action: z.enum(["approve", "reject"]),
-});
+const Body = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("approve") }),
+  z.object({
+    action: z.literal("reject"),
+    rejectionReason: z
+      .string()
+      .trim()
+      .min(5, "Please add a rejection reason for the candidate (at least 5 characters).")
+      .max(500),
+  }),
+]);
 
 export async function PATCH(
   req: Request,
@@ -77,6 +85,7 @@ export async function PATCH(
       .set({
         status: "rejected",
         coachApprovalTokenHash: null,
+        notes: parsed.data.rejectionReason,
         updatedAt: new Date(),
       })
       .where(eq(schema.coachingBookings.id, booking.id));

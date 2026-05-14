@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useAdmin, AdminPageHeader } from "@/components/admin/AdminShell";
 import { formatDate } from "@/lib/utils";
+import { isBookingSessionActive } from "@/lib/coaching/booking-session";
 import { CalendarClock, X, ExternalLink, IndianRupee, Search } from "lucide-react";
 
 type CoachingBooking = {
@@ -256,11 +257,17 @@ function BookingsTable({
               <Td>{b.techArea}</Td>
               <Td>{`${b.durationMin}-minute coaching`}</Td>
               <Td className="whitespace-nowrap text-xs text-ink-500">
-                {formatDate(b.startsAt)}
+                {formatDate(b.startsAt)} ·{" "}
+                {new Date(b.startsAt).toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
               </Td>
-              <Td className="text-xs text-ink-700">
-                <IndianRupee className="mr-0.5 inline size-3.5" />
-                {b.amountInr}
+              <Td className="whitespace-nowrap text-xs text-ink-700">
+                <span className="inline-flex items-center gap-0.5">
+                  <IndianRupee className="size-3.5 shrink-0" aria-hidden />
+                  <span>{b.amountInr}</span>
+                </span>
               </Td>
               <Td className="text-xs text-ink-500">{b.durationMin} min</Td>
               <Td>
@@ -288,7 +295,8 @@ function BookingsTable({
                       Approve
                     </Button>
                   )}
-                  {b.status === "approved" && (
+                  {b.status === "approved" &&
+                    isBookingSessionActive(b.startsAt, b.durationMin) && (
                     <a
                       href={b.meetingProvider === "livekit" ? `/meeting/${b.id}` : b.calendarMeetingUrl!}
                       target="_blank"
@@ -297,6 +305,9 @@ function BookingsTable({
                     >
                       Join <ExternalLink className="size-3" />
                     </a>
+                  )}
+                  {b.status === "approved" && !isBookingSessionActive(b.startsAt, b.durationMin) && (
+                    <span className="text-xs text-ink-400">Ended</span>
                   )}
                   {canCancel && (
                     <Button

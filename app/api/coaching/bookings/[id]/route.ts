@@ -39,26 +39,37 @@ function normalizeEmail(value: string | null | undefined) {
   return (value ?? "").trim().toLowerCase();
 }
 
-const Body = z.object({
-  status: z
-    .enum([
-      "pending",
-      "approved",
-      "cancelled",
-      "rejected",
-      "refund_requested",
-      "refund_pending",
-      "partially_refunded",
-      "refunded",
-    ])
-    .optional(),
-  action: z
-    .enum(["approve_refund", "reject_refund", "regenerate_meeting_link"])
-    .optional(),
-  refundAmountInr: z.number().int().positive().optional(),
-  refundAdminNote: z.string().trim().max(500).optional(),
-  notes: z.string().trim().max(500).optional(),
-});
+const Body = z
+  .object({
+    status: z
+      .enum([
+        "pending",
+        "approved",
+        "cancelled",
+        "rejected",
+        "refund_requested",
+        "refund_pending",
+        "partially_refunded",
+        "refunded",
+      ])
+      .optional(),
+    action: z
+      .enum(["approve_refund", "reject_refund", "regenerate_meeting_link"])
+      .optional(),
+    refundAmountInr: z.number().int().positive().optional(),
+    refundAdminNote: z.string().trim().max(500).optional(),
+    notes: z.string().trim().max(500).optional(),
+    rejectionReason: z.string().trim().min(5).max(500).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.status === "rejected" && !data.rejectionReason?.trim()) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Provide a rejection reason for the candidate (at least 5 characters).",
+        path: ["rejectionReason"],
+      });
+    }
+  });
 
 export async function PATCH(
   req: Request,
@@ -358,12 +369,19 @@ export async function PATCH(
   } else if (parsed.data.status === "refunded") {
     nextPaymentStatus = "refunded";
   }
+  let nextNotes = booking.notes;
+  if (parsed.data.status === "rejected") {
+    nextNotes = parsed.data.rejectionReason?.trim() ?? booking.notes;
+  } else if (parsed.data.notes !== undefined) {
+    nextNotes = parsed.data.notes;
+  }
+
   await db
     .update(schema.coachingBookings)
     .set({
       status: parsed.data.status,
       paymentStatus: nextPaymentStatus,
-      notes: parsed.data.notes,
+      notes: nextNotes,
       updatedAt: new Date(),
     })
     .where(eq(schema.coachingBookings.id, params.id));
