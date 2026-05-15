@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Avatar";
@@ -8,7 +8,10 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { store } from "@/lib/store";
 import { buildSlotsForCoach, type Coach } from "@/lib/coaches";
-import { DEFAULT_COACHING_SESSION_MINUTES } from "@/lib/coaching/constants";
+import {
+  COACHING_SLOT_HOLD_MINUTES,
+  DEFAULT_COACHING_SESSION_MINUTES,
+} from "@/lib/coaching/constants";
 import { ensureRazorpayScriptLoaded } from "@/lib/payments/client";
 import { TARGET_ROLES } from "@/lib/target-roles";
 import { cn, formatDate, uid } from "@/lib/utils";
@@ -81,6 +84,10 @@ function ScheduleInner() {
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [holdExpiresAt, setHoldExpiresAt] = useState<string | null>(null);
+  const [isHoldingSlot, setIsHoldingSlot] = useState(false);
+  const holdCoachIdRef = useRef<string | null>(null);
+  const holdStartsAtRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!store.getUser()) {
@@ -190,25 +197,122 @@ function ScheduleInner() {
     );
   }, [coach]);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    async function loadBooked() {
-      if (!coach?.id) return;
-      const res = await fetch(
-        `/api/coaching/coach-occupancy?coachId=${encodeURIComponent(coach.id)}`,
-        { cache: "no-store" },
-      );
-      const data = await res.json();
-      if (!cancelled && data.ok) {
-        const taken = (data.slots as string[]).map((s) => new Date(s).toISOString());
-        setBookedSlots(taken);
-      }
+  const refreshOccupancy = useCallback(async (coachId: string) => {
+    const res = await fetch(
+      `/api/coaching/coach-occupancy?coachId=${encodeURIComponent(coachId)}`,
+      { cache: "no-store" },
+    );
+    const data = await res.json();
+    if (data.ok) {
+      const taken = (data.slots as string[]).map((s) => new Date(s).toISOString());
+      setBookedSlots(taken);
     }
-    void loadBooked();
+  }, []);
+
+  useEffect(() => {
+    const coachId = coach?.id;
+    if (!coachId) return;
+    let cancelled = false;
+    void refreshOccupancy(coachId);
+    const interval = window.setInterval(() => {
+      if (!cancelled) void refreshOccupancy(coachId);
+    }, 12_000);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
     };
-  }, [coach?.id]);
+  }, [coach?.id, refreshOccupancy]);
+
+  const releaseSlotHold = useCallback(async (coachId?: string | null, startsAt?: string | null) => {
+    const cId = coachId ?? holdCoachIdRef.current;
+    const slot = startsAt ?? holdStartsAtRef.current;
+    holdCoachIdRef.current = null;
+    holdStartsAtRef.current = null;
+    setHoldExpiresAt(null);
+    if (!cId || !slot) return;
+    try {
+      await fetch("/api/coaching/slot-holds", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ coachId: cId, startsAt: slot }),
+      });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const acquireSlotHold = useCallback(
+    async (coachId: string, startsAt: string) => {
+      setIsHoldingSlot(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/coaching/slot-holds", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ coachId, startsAt }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          setError((data.message as string) ?? "Could not reserve this slot.");
+          return false;
+        }
+        holdCoachIdRef.current = coachId;
+        holdStartsAtRef.current = startsAt;
+        setHoldExpiresAt((data.expiresAt as string) ?? null);
+        void refreshOccupancy(coachId);
+        return true;
+      } catch {
+        setError("Could not reserve this slot. Please try again.");
+        return false;
+      } finally {
+        setIsHoldingSlot(false);
+      }
+    },
+    [refreshOccupancy],
+  );
+
+  const selectSlot = useCallback(
+    async (iso: string) => {
+      if (!coach?.id) return;
+      if (selectedSlot === iso) return;
+      if (selectedSlot && holdCoachIdRef.current && holdStartsAtRef.current) {
+        await releaseSlotHold(holdCoachIdRef.current, holdStartsAtRef.current);
+      }
+      setSelectedSlot(iso);
+      const ok = await acquireSlotHold(coach.id, iso);
+      if (!ok) setSelectedSlot(null);
+    },
+    [acquireSlotHold, coach?.id, releaseSlotHold, selectedSlot],
+  );
+
+  const clearSelectedSlot = useCallback(async () => {
+    if (holdCoachIdRef.current && holdStartsAtRef.current) {
+      await releaseSlotHold(holdCoachIdRef.current, holdStartsAtRef.current);
+    }
+    setSelectedSlot(null);
+  }, [releaseSlotHold]);
+
+  useEffect(() => {
+    if (!selectedSlot || !coach?.id || isSubmitting) return;
+    const interval = window.setInterval(() => {
+      void acquireSlotHold(coach.id, selectedSlot);
+    }, 60_000);
+    return () => window.clearInterval(interval);
+  }, [acquireSlotHold, coach?.id, isSubmitting, selectedSlot]);
+
+  useEffect(() => {
+    return () => {
+      const cId = holdCoachIdRef.current;
+      const slot = holdStartsAtRef.current;
+      if (!cId || !slot) return;
+      void fetch("/api/coaching/slot-holds", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ coachId: cId, startsAt: slot }),
+        keepalive: true,
+      });
+    };
+  }, []);
   const bookedSet = useMemo(() => new Set(bookedSlots), [bookedSlots]);
   const slots =
     selectedDay && coach
@@ -222,6 +326,11 @@ function ScheduleInner() {
     if (!selectedSlot || !coach || !selectedTechArea) return;
     setError(null);
     setIsSubmitting(true);
+    const held = await acquireSlotHold(coach.id, selectedSlot);
+    if (!held) {
+      setIsSubmitting(false);
+      return;
+    }
     try {
       const user = store.getUser();
       if (!user) {
@@ -281,6 +390,7 @@ function ScheduleInner() {
       });
       if (!paymentResult) {
         setError("Payment was cancelled.");
+        await releaseSlotHold(coach.id, selectedSlot);
         return;
       }
       const verifyRes = await fetch("/api/payments/razorpay/verify", {
@@ -330,6 +440,7 @@ function ScheduleInner() {
         amountInr: coach.perSessionRateInr,
         durationMin: sessionMins,
       });
+      await releaseSlotHold(coach.id, selectedSlot);
       setSelectedSlot(null);
     } catch {
       setError("Network error while creating booking.");
@@ -412,7 +523,7 @@ function ScheduleInner() {
                 <Button
                   onClick={() => {
                     setConfirmed(null);
-                    setSelectedSlot(null);
+                    void clearSelectedSlot();
                   }}
                 >
                   Book another
@@ -447,7 +558,7 @@ function ScheduleInner() {
                         onClick={() => {
                           setSelectedTechArea(area);
                           setCoachId("");
-                          setSelectedSlot(null);
+                          void clearSelectedSlot();
                           setCoachPickerOpen(true);
                         }}
                         className={cn(
@@ -521,7 +632,7 @@ function ScheduleInner() {
                         const currentWeekStart = startOfWeek(new Date());
                         if (d.getTime() < currentWeekStart.getTime()) return;
                         setWeekStart(d);
-                        setSelectedSlot(null);
+                        void clearSelectedSlot();
                       }}
                       disabled={weekStart.getTime() <= startOfWeek(new Date()).getTime()}
                       className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
@@ -539,14 +650,14 @@ function ScheduleInner() {
                           weekEnd.setDate(weekStart.getDate() + 6);
                           if (nextDay >= today && nextDay <= weekEnd) {
                             setSelectedDay(nextDay);
-                            setSelectedSlot(null);
+                            void clearSelectedSlot();
                             return;
                           }
                         }
                         const d = new Date(weekStart);
                         d.setDate(d.getDate() + 7);
                         setWeekStart(d);
-                        setSelectedSlot(null);
+                        void clearSelectedSlot();
                       }}
                       className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
                     >
@@ -567,7 +678,7 @@ function ScheduleInner() {
                             key={d.toISOString()}
                             onClick={() => {
                               setSelectedDay(d);
-                              setSelectedSlot(null);
+                              void clearSelectedSlot();
                             }}
                             className={cn(
                               "rounded-xl border px-3 py-3 text-center transition-all",
@@ -599,7 +710,8 @@ function ScheduleInner() {
                           return (
                             <button
                               key={iso}
-                              onClick={() => setSelectedSlot(iso)}
+                              onClick={() => void selectSlot(iso)}
+                              disabled={isHoldingSlot}
                               className={cn(
                                 "rounded-lg border px-3 py-2 text-sm font-medium transition-all",
                                 isSelected
@@ -628,6 +740,15 @@ function ScheduleInner() {
                   {selectedSlot
                     ? `${formatDate(selectedSlot)} at ${new Date(selectedSlot).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} · ${formatSessionLengthLabel(sessionMins)} · ₹${coach?.perSessionRateInr ?? 0} per session`
                     : "Pick a slot to continue"}
+                  {selectedSlot ? (
+                    <span className="mt-1 block text-ink-400">
+                      Reserved for you for {COACHING_SLOT_HOLD_MINUTES} minutes
+                      {holdExpiresAt
+                        ? ` (until ${new Date(holdExpiresAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })})`
+                        : ""}
+                      .
+                    </span>
+                  ) : null}
                 </p>
                 <div className="flex flex-col items-stretch gap-2">
                   {error && (
@@ -636,7 +757,10 @@ function ScheduleInner() {
                       {error}
                     </p>
                   )}
-                  <Button onClick={confirm} disabled={!selectedSlot || isSubmitting || !coach}>
+                  <Button
+                    onClick={confirm}
+                    disabled={!selectedSlot || isSubmitting || isHoldingSlot || !coach}
+                  >
                     {isSubmitting ? "Processing payment..." : "Pay & request booking"}
                   </Button>
                 </div>
@@ -673,7 +797,7 @@ function ScheduleInner() {
                       key={c.id}
                       onClick={() => {
                         setCoachId(c.id);
-                        setSelectedSlot(null);
+                        void clearSelectedSlot();
                         setCoachPickerOpen(false);
                       }}
                       className={cn(

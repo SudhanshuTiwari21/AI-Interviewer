@@ -16,6 +16,10 @@ import {
 } from "@/lib/email/templates/coaching";
 import { DEFAULT_COACHING_SESSION_MINUTES } from "@/lib/coaching/constants";
 import { getCoachById } from "@/lib/server/coaches";
+import {
+  canFinalizeCoachingSlotBooking,
+  releaseCoachingSlotHold,
+} from "@/lib/server/coaching-slot-holds";
 
 export const runtime = "nodejs";
 
@@ -152,6 +156,18 @@ export async function POST(req: Request) {
     return fail("validation_error", "This slot was just booked. Pick another slot.", 409);
   }
 
+  const slotGuard = await canFinalizeCoachingSlotBooking(me.id, body.coachId, startsAt);
+  if (slotGuard === "held_by_other") {
+    return fail(
+      "validation_error",
+      "This slot is being reserved by another candidate. Pick another slot.",
+      409,
+    );
+  }
+  if (slotGuard === "booked") {
+    return fail("validation_error", "This slot was just booked. Pick another slot.", 409);
+  }
+
   const rawToken = randomBytes(24).toString("base64url");
   const tokenHash = hashToken(rawToken);
   let created: typeof schema.coachingBookings.$inferSelect;
@@ -182,6 +198,7 @@ export async function POST(req: Request) {
     if (!created?.id) {
       return fail("internal_error", "Booking could not be created. Please contact support.", 500);
     }
+    await releaseCoachingSlotHold(me.id, body.coachId, startsAt);
   } catch (error: any) {
     if (error?.code === "23505") {
       return fail("validation_error", "This slot was just booked. Pick another slot.", 409);

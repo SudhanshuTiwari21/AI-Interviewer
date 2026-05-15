@@ -230,26 +230,27 @@ function BookingsTable({
   regeneratingId: string | null;
 }>) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="text-xs text-ink-500">
+    <div className="min-w-0 overflow-x-auto overscroll-x-contain">
+      <table className="w-full min-w-[56rem] text-sm">
+        <thead className="bg-white text-xs text-ink-500">
           <tr className="border-b border-ink-100">
             <Th>Coach</Th>
             <Th>Candidate</Th>
             <Th>Tech area</Th>
-            <Th>Topic</Th>
             <Th>Starts</Th>
             <Th>Fee</Th>
             <Th>Duration</Th>
             <Th>Status</Th>
-            <Th className="text-right">Actions</Th>
+            <Th sticky className="text-right">
+              Actions
+            </Th>
           </tr>
         </thead>
         <tbody>
           {bookings.map((b) => (
             <tr
               key={b.id}
-              className="border-b border-ink-100 last:border-0 hover:bg-ink-50/60"
+              className="group border-b border-ink-100 last:border-0 hover:bg-ink-50/60"
             >
               <Td>
                 <p className="font-medium text-ink-900">{b.coachName}</p>
@@ -260,7 +261,6 @@ function BookingsTable({
                 <p className="text-xs text-ink-500">{b.candidateEmail}</p>
               </Td>
               <Td>{b.techArea}</Td>
-              <Td>{`${b.durationMin}-minute coaching`}</Td>
               <Td className="whitespace-nowrap text-xs text-ink-500">
                 {formatDate(b.startsAt)} ·{" "}
                 {new Date(b.startsAt).toLocaleTimeString("en-US", {
@@ -289,8 +289,8 @@ function BookingsTable({
                   {b.status}
                 </Badge>
               </Td>
-              <Td className="text-right">
-                <div className="flex justify-end gap-1.5">
+              <Td sticky className="text-right">
+                <div className="flex min-w-[11rem] flex-col items-end gap-1.5 sm:flex-row sm:flex-wrap sm:justify-end">
                   {b.status === "pending" && (
                     <Button
                       size="sm"
@@ -358,13 +358,19 @@ function Stat({
   );
 }
 
+const stickyCellClass =
+  "sticky right-0 z-10 bg-white shadow-[-8px_0_12px_-10px_rgba(17,24,39,0.12)] group-hover:bg-ink-50/60";
+
 function Th({
   children,
   className,
-}: Readonly<{ children?: React.ReactNode; className?: string }>) {
+  sticky,
+}: Readonly<{ children?: React.ReactNode; className?: string; sticky?: boolean }>) {
   return (
     <th
-      className={`px-5 py-3 text-left font-medium uppercase tracking-wide ${className ?? ""}`}
+      className={`px-5 py-3 text-left font-medium uppercase tracking-wide ${
+        sticky ? `sticky right-0 z-20 bg-white ${className ?? ""}` : className ?? ""
+      }`}
     >
       {children}
     </th>
@@ -374,9 +380,14 @@ function Th({
 function Td({
   children,
   className,
-}: Readonly<{ children?: React.ReactNode; className?: string }>) {
+  sticky,
+}: Readonly<{ children?: React.ReactNode; className?: string; sticky?: boolean }>) {
   return (
-    <td className={`px-5 py-4 align-middle text-ink-700 ${className ?? ""}`}>
+    <td
+      className={`px-5 py-4 align-middle text-ink-700 ${
+        sticky ? `${stickyCellClass} ${className ?? ""}` : className ?? ""
+      }`}
+    >
       {children}
     </td>
   );

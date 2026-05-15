@@ -7,6 +7,10 @@ import { getSessionFromCookie } from "@/lib/auth/session";
 import { suspendResponseIfNeeded } from "@/lib/auth/account-status";
 import { findUserById } from "@/lib/auth/verification-service";
 import { getRazorpayClient, publicRazorpayKeyId } from "@/lib/payments/razorpay";
+import {
+  acquireCoachingSlotHold,
+  verifyActiveCoachingSlotHold,
+} from "@/lib/server/coaching-slot-holds";
 
 export const runtime = "nodejs";
 
@@ -40,6 +44,47 @@ export async function POST(req: Request) {
     );
   }
   const payload = parsed.data;
+
+  if (payload.productType === "coaching") {
+    const coachId =
+      typeof payload.metadata?.coachId === "string" ? payload.metadata.coachId.trim() : "";
+    const startsAtRaw =
+      typeof payload.metadata?.startsAt === "string" ? payload.metadata.startsAt.trim() : "";
+    if (!coachId || !startsAtRaw || Number.isNaN(Date.parse(startsAtRaw))) {
+      return fail(
+        "validation_error",
+        "Coaching checkout requires coachId and startsAt in metadata.",
+        400,
+      );
+    }
+    const startsAt = new Date(startsAtRaw);
+    if (startsAt.getTime() <= Date.now()) {
+      return fail("validation_error", "Please select a future slot.", 400);
+    }
+    const holdCheck = await verifyActiveCoachingSlotHold(user.id, coachId, startsAt);
+    if (holdCheck === "booked") {
+      return fail("validation_error", "This slot is no longer available.", 409);
+    }
+    if (holdCheck === "held_by_other") {
+      return fail(
+        "validation_error",
+        "Another candidate is reserving this slot. Pick another time.",
+        409,
+      );
+    }
+    if (holdCheck === "missing") {
+      const acquired = await acquireCoachingSlotHold(user.id, coachId, startsAt);
+      if (!acquired.ok) {
+        const message =
+          acquired.reason === "booked"
+            ? "This slot is no longer available."
+            : "Another candidate is reserving this slot. Pick another time.";
+        return fail("validation_error", message, 409);
+      }
+    } else {
+      await acquireCoachingSlotHold(user.id, coachId, startsAt);
+    }
+  }
 
   try {
     const razorpay = getRazorpayClient();

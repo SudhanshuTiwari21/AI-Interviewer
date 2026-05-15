@@ -140,6 +140,33 @@ export const coachingBookings = pgTable(
   }),
 );
 
+/** Short-lived lock to prevent concurrent bookings on the same coach slot. */
+export const coachingSlotHolds = pgTable(
+  "coaching_slot_holds",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    coachId: text("coach_id").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    userId: uuid("user_id").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    coachSlotUniqueIdx: uniqueIndex("coaching_slot_holds_coach_slot_unique_idx").on(
+      t.coachId,
+      t.startsAt,
+    ),
+    coachIdx: index("coaching_slot_holds_coach_id_idx").on(t.coachId),
+    expiresIdx: index("coaching_slot_holds_expires_at_idx").on(t.expiresAt),
+    userIdx: index("coaching_slot_holds_user_id_idx").on(t.userId),
+  }),
+);
+
 export const coachingFeedback = pgTable(
   "coaching_feedback",
   {
@@ -460,6 +487,7 @@ export type AuditLogRow = typeof auditLogs.$inferSelect;
 export type NewAuditLogRow = typeof auditLogs.$inferInsert;
 export type AdminSettingsRow = typeof adminSettings.$inferSelect;
 export type CoachingBookingRow = typeof coachingBookings.$inferSelect;
+export type CoachingSlotHoldRow = typeof coachingSlotHolds.$inferSelect;
 export type CoachRow = typeof coaches.$inferSelect;
 export type InterviewReportRow = typeof interviewReports.$inferSelect;
 export type PaymentTransactionRow = typeof paymentTransactions.$inferSelect;

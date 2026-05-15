@@ -221,7 +221,7 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
           </div>
         )}
 
-        <div className="flex min-h-screen flex-col bg-ink-50/40">
+        <div className="flex min-h-screen min-w-0 flex-col bg-ink-50/40">
           <header className="flex h-14 items-center justify-between gap-2 border-b border-ink-100 bg-white px-3 lg:hidden">
             <button
               onClick={() => setMobileOpen(true)}
@@ -237,7 +237,7 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
               {roleLabel(user.role)}
             </Badge>
           </header>
-          <main className="flex-1 px-4 py-6 lg:px-8 lg:py-10">{children}</main>
+          <main className="min-w-0 flex-1 px-4 py-6 lg:px-8 lg:py-10">{children}</main>
         </div>
       </div>
     </AdminContext.Provider>
