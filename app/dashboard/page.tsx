@@ -14,6 +14,7 @@ import {
 } from "@/lib/plan-access";
 import type { InterviewReport } from "@/lib/question-engine";
 import { formatDate } from "@/lib/utils";
+import { DEFAULT_COACHING_SESSION_MINUTES } from "@/lib/coaching/constants";
 import {
   ArrowRight,
   Mic,
@@ -349,7 +350,7 @@ export default function DashboardPage() {
                   Coaching
                 </p>
                 <p className="mt-2 text-base font-semibold">
-                  Book your 1-hour coaching call
+                  Book a {DEFAULT_COACHING_SESSION_MINUTES}-minute coaching session
                 </p>
                 <p className="mt-1 text-xs text-ink-300">
                   Pair the AI with a human coach. Calendar invite sent

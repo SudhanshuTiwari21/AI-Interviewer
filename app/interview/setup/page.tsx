@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Logo } from "@/components/ui/Logo";
+import { PageHeader } from "@/components/app/AppShell";
 import { Button } from "@/components/ui/Button";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -453,29 +453,28 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-ink-50/40">
-      <header className="sticky top-0 z-30 border-b border-ink-100 bg-white">
-        <div className="container flex h-16 max-w-5xl items-center justify-between">
-          <Logo size={24} />
+    <div className="container max-w-5xl px-4 py-8 sm:py-10">
+      <PageHeader
+        title="Configure your interview"
+        description="Upload your CV. Selectwise uses your experience to brief Hiro and calibrate difficulty."
+        actions={
           <Button
             href="/dashboard"
-            variant="ghost"
+            variant="outline"
             size="sm"
             leftIcon={<ArrowLeft className="size-4" />}
-            className="px-2 sm:px-3"
           >
-            <span className="hidden sm:inline">Back to dashboard</span>
-            <span className="sm:hidden">Back</span>
+            Overview
           </Button>
-        </div>
-      </header>
-      <main className="container max-w-5xl px-4 py-10">
+        }
+      />
+      <div className="mt-8">
         <div className="mx-auto max-w-3xl text-center">
           <Badge tone="accent" dot>
             Configure interview
           </Badge>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-            Drop your resume. We'll tailor every question.
+            Upload your CV. We&apos;ll tailor every question.
           </h1>
           <p className="mt-3 text-sm text-ink-500">
             Selectwise uses your experience, projects and achievements to brief
@@ -497,7 +496,7 @@ export default function SetupPage() {
                   </span>
                   <div>
                     <p className="text-sm font-semibold text-ink-900">
-                      Step 1 · Upload resume
+                      Step 1 · Upload CV
                     </p>
                     <p className="text-xs text-ink-500">
                       Required. We'll drive the whole interview from this.
@@ -894,7 +893,7 @@ export default function SetupPage() {
               <div>
                 <p className="font-medium text-ink-900">Ready to begin?</p>
                 <p className="text-xs text-ink-500">
-                  Resume-driven · {difficulty} difficulty · ~25–45 min · {targetRole} · ₹{INTERVIEW_PRICE_INR} per interview
+                  CV-driven · {difficulty} difficulty · ~25–45 min · {targetRole} · ₹{INTERVIEW_PRICE_INR} per interview
                 </p>
               </div>
             </div>
@@ -929,7 +928,7 @@ export default function SetupPage() {
             </div>
           )}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

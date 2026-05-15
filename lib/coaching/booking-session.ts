@@ -1,12 +1,61 @@
-/** End timestamp of a coaching block (start + duration). */
-export function bookingEndsAtMs(startsAt: string | Date, durationMin: number): number {
-  const t = typeof startsAt === "string" ? new Date(startsAt) : startsAt;
-  return t.getTime() + durationMin * 60_000;
+import {
+  COACHING_JOIN_EARLY_MINUTES,
+  COACHING_JOIN_LATE_MINUTES,
+} from "@/lib/coaching/constants";
+
+function startMs(startsAt: string | Date): number {
+  return (typeof startsAt === "string" ? new Date(startsAt) : startsAt).getTime();
 }
 
-/** True while the scheduled session window has not fully ended (no join after this). */
+/** End timestamp of a coaching block (start + duration). */
+export function bookingEndsAtMs(startsAt: string | Date, durationMin: number): number {
+  return startMs(startsAt) + durationMin * 60_000;
+}
+
+/** When the join window opens (default: 1 hour before start). */
+export function bookingJoinOpensAtMs(
+  startsAt: string | Date,
+  earlyMin: number = COACHING_JOIN_EARLY_MINUTES,
+): number {
+  return startMs(startsAt) - earlyMin * 60_000;
+}
+
+/** When join is closed after session end (includes late grace, aligned with meeting token API). */
+export function bookingJoinClosesAtMs(
+  startsAt: string | Date,
+  durationMin: number,
+  lateMin: number = COACHING_JOIN_LATE_MINUTES,
+): number {
+  return bookingEndsAtMs(startsAt, durationMin) + lateMin * 60_000;
+}
+
+/** True when the user is inside the allowed join window (not too early, not after grace). */
+export function canJoinCoachingSession(
+  startsAt: string | Date,
+  durationMin: number,
+  earlyMin: number = COACHING_JOIN_EARLY_MINUTES,
+  lateMin: number = COACHING_JOIN_LATE_MINUTES,
+): boolean {
+  const now = Date.now();
+  return now >= bookingJoinOpensAtMs(startsAt, earlyMin) && now <= bookingJoinClosesAtMs(startsAt, durationMin, lateMin);
+}
+
+/** @deprecated Use canJoinCoachingSession for Join visibility. */
 export function isBookingSessionActive(startsAt: string | Date, durationMin: number): boolean {
-  return Date.now() <= bookingEndsAtMs(startsAt, durationMin);
+  return canJoinCoachingSession(startsAt, durationMin);
+}
+
+/** Session has fully ended (after late join grace). */
+export function isBookingSessionEnded(startsAt: string | Date, durationMin: number): boolean {
+  return Date.now() > bookingJoinClosesAtMs(startsAt, durationMin);
+}
+
+/** Join window has not opened yet. */
+export function isBeforeCoachingJoinWindow(
+  startsAt: string | Date,
+  earlyMin: number = COACHING_JOIN_EARLY_MINUTES,
+): boolean {
+  return Date.now() < bookingJoinOpensAtMs(startsAt, earlyMin);
 }
 
 /** Upcoming = start in the future. Past = end in the past. Otherwise ongoing (inclusive of live window). */

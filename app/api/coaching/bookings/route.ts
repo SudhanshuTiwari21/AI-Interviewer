@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db/client";
 import { fail, ok } from "@/lib/api/response";
@@ -14,9 +14,10 @@ import {
   coachingRequestEmailToCandidate,
   coachingRequestEmailToCoach,
 } from "@/lib/email/templates/coaching";
+import { DEFAULT_COACHING_SESSION_MINUTES } from "@/lib/coaching/constants";
+import { getCoachById } from "@/lib/server/coaches";
 
 export const runtime = "nodejs";
-const COACHING_DURATION_MIN = 30;
 
 const Body = z.object({
   techArea: z.string().trim().min(2).max(120),
@@ -121,6 +122,36 @@ export async function POST(req: Request) {
     return fail("validation_error", "Please select a future slot.", 400);
   }
 
+  const coachProfile = await getCoachById(body.coachId);
+  if (!coachProfile?.active) {
+    return fail("validation_error", "Coach not found or inactive.", 400);
+  }
+  const coachEmailNorm = coachProfile.email.trim().toLowerCase();
+  if (coachEmailNorm !== body.coachEmail.trim().toLowerCase()) {
+    return fail("validation_error", "Coach details do not match our records. Refresh and try again.", 400);
+  }
+  const durationMin = Math.min(
+    180,
+    Math.max(
+      15,
+      Math.round(coachProfile.availability.slotStepMin ?? DEFAULT_COACHING_SESSION_MINUTES),
+    ),
+  );
+  const conflicting = await db
+    .select({ id: schema.coachingBookings.id })
+    .from(schema.coachingBookings)
+    .where(
+      and(
+        eq(schema.coachingBookings.coachId, body.coachId),
+        eq(schema.coachingBookings.startsAt, startsAt),
+        sql`${schema.coachingBookings.status} NOT IN ('cancelled', 'rejected')`,
+      ),
+    )
+    .limit(1);
+  if (conflicting[0]) {
+    return fail("validation_error", "This slot was just booked. Pick another slot.", 409);
+  }
+
   const rawToken = randomBytes(24).toString("base64url");
   const tokenHash = hashToken(rawToken);
   let created: typeof schema.coachingBookings.$inferSelect;
@@ -137,7 +168,7 @@ export async function POST(req: Request) {
         coachEmail: body.coachEmail,
         coachTimezone,
         startsAt,
-        durationMin: COACHING_DURATION_MIN,
+        durationMin,
         amountInr: body.amountInr,
         paymentStatus: "paid",
         paymentTransactionId: body.paymentTransactionId,

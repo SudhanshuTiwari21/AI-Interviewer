@@ -5,7 +5,13 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { formatDate } from "@/lib/utils";
-import { bookingListCategory, isBookingSessionActive } from "@/lib/coaching/booking-session";
+import {
+  bookingListCategory,
+  canJoinCoachingSession,
+  isBeforeCoachingJoinWindow,
+  isBookingSessionEnded,
+} from "@/lib/coaching/booking-session";
+import { coachingJoinEligible, coachingJoinHref } from "@/lib/coaching/meeting-join";
 
 type CoachBooking = {
   id: string;
@@ -81,18 +87,16 @@ export default function CoachOverviewPage() {
                   <Badge tone="success" dot>
                     {b.status}
                   </Badge>
-                  {b.calendarMeetingUrl || b.meetingProvider === "livekit" ? (
-                    isBookingSessionActive(b.startsAt, b.durationMin ?? 30) ? (
-                      <Button
-                        href={b.meetingProvider === "livekit" ? `/meeting/${b.id}` : (b.calendarMeetingUrl as string)}
-                        size="sm"
-                        variant="outline"
-                      >
+                  {coachingJoinEligible(b) ? (
+                    canJoinCoachingSession(b.startsAt, b.durationMin ?? 30) ? (
+                      <Button href={coachingJoinHref(b)} size="sm" variant="outline">
                         Join
                       </Button>
-                    ) : (
+                    ) : isBeforeCoachingJoinWindow(b.startsAt) ? (
+                      <span className="text-xs text-ink-400">Opens soon</span>
+                    ) : isBookingSessionEnded(b.startsAt, b.durationMin ?? 30) ? (
                       <span className="text-xs text-ink-400">Ended</span>
-                    )
+                    ) : null
                   ) : null}
                 </div>
               </div>

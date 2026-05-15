@@ -6,6 +6,11 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatTicketPriority, formatTicketStatus } from "@/lib/support/ticket-labels";
+import {
+  SUPPORT_TICKET_DESCRIPTION_MIN,
+  SUPPORT_TICKET_SUBJECT_MIN,
+} from "@/lib/support/ticket-form-requirements";
+import { cn } from "@/lib/utils";
 import { ArrowLeft } from "lucide-react";
 
 type Ticket = {
@@ -37,6 +42,10 @@ export default function SupportPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
+  const subjectLen = subject.trim().length;
+  const descriptionLen = description.trim().length;
+  const subjectOk = subjectLen >= SUPPORT_TICKET_SUBJECT_MIN;
+  const descriptionOk = descriptionLen >= SUPPORT_TICKET_DESCRIPTION_MIN;
   async function loadTickets() {
     const res = await fetch("/api/support/tickets", { cache: "no-store" });
     const data = await res.json();
@@ -109,7 +118,17 @@ export default function SupportPage() {
                 onChange={(e) => setSubject(e.target.value)}
                 className="mt-1 h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
                 placeholder="Refund not credited yet"
+                aria-describedby="support-subject-hint"
               />
+              <p
+                id="support-subject-hint"
+                className={cn(
+                  "mt-1 text-[11px]",
+                  subjectLen > 0 && !subjectOk ? "text-danger-600" : "text-ink-500",
+                )}
+              >
+                Minimum {SUPPORT_TICKET_SUBJECT_MIN} characters ({subjectLen}/{SUPPORT_TICKET_SUBJECT_MIN}).
+              </p>
             </label>
             <label className="block text-xs text-ink-600">
               <span>Description</span>
@@ -118,12 +137,23 @@ export default function SupportPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 className="mt-1 h-32 w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm"
                 placeholder="Describe your issue in detail..."
+                aria-describedby="support-description-hint"
               />
+              <p
+                id="support-description-hint"
+                className={cn(
+                  "mt-1 text-[11px]",
+                  descriptionLen > 0 && !descriptionOk ? "text-danger-600" : "text-ink-500",
+                )}
+              >
+                Minimum {SUPPORT_TICKET_DESCRIPTION_MIN} characters ({descriptionLen}/
+                {SUPPORT_TICKET_DESCRIPTION_MIN}).
+              </p>
             </label>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-xs text-ink-500">{message}</span>
               <Button
-                disabled={submitting || subject.trim().length < 5 || description.trim().length < 15}
+                disabled={submitting || !subjectOk || !descriptionOk}
                 onClick={() => void createTicket()}
               >
                 {submitting ? "Submitting..." : "Submit ticket"}

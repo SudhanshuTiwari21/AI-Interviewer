@@ -19,7 +19,7 @@ const STEPS = [
   {
     n: "04",
     title: "Book human coaching",
-    body: "Schedule a 1-hour session with a senior coach. Calendar invites sent automatically.",
+    body: "Book a coaching session with a senior coach. Calendar invites are sent automatically.",
   },
 ];
 

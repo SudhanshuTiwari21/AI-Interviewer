@@ -81,35 +81,60 @@ const CoachSchema = z.object({
       message:
         "Invalid timezone. Use an IANA name such as Asia/Kolkata, America/New_York, or Europe/London.",
     }),
-  availability: z.object({
-    weekdays: z.array(z.number().int()).min(1, "Select at least one weekday."),
-    windows: z
-      .array(
-        z.object({
-          startMinute: z.number().int(),
-          endMinute: z.number().int(),
-        }),
-      )
-      .min(1, "Add at least one availability window.")
-      .superRefine((windows, ctx) => {
+  availability: z
+    .object({
+      weekdays: z.array(z.number().int()).min(1, "Select at least one weekday."),
+      windows: z
+        .array(
+          z.object({
+            startMinute: z.number().int(),
+            endMinute: z.number().int(),
+          }),
+        )
+        .min(1, "Add at least one availability window."),
+      slotStepMin: z.number().int().min(15).max(180).optional(),
+      dayWindows: z
+        .record(
+          z.string().regex(/^[0-6]$/),
+          z
+            .array(
+              z.object({
+                startMinute: z.number().int(),
+                endMinute: z.number().int(),
+              }),
+            )
+            .min(1),
+        )
+        .optional(),
+    })
+    .superRefine((avail, ctx) => {
+      const step = avail.slotStepMin ?? 30;
+      const minSpan = Math.max(30, step);
+      const check = (windows: typeof avail.windows, basePath: (string | number)[]) => {
         windows.forEach((w, i) => {
           if (w.endMinute <= w.startMinute) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
               message: "End time must be greater than start time for every availability window.",
-              path: [i, "endMinute"],
+              path: [...basePath, i, "endMinute"],
             });
           }
-          if (w.endMinute - w.startMinute < 30) {
+          if (w.endMinute - w.startMinute < minSpan) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
-              message: "Each availability window must be at least 30 minutes long.",
-              path: [i, "endMinute"],
+              message: `Each window must span at least ${minSpan} minutes (covers one booking slot).`,
+              path: [...basePath, i, "endMinute"],
             });
           }
         });
-      }),
-  }),
+      };
+      check(avail.windows, ["windows"]);
+      if (avail.dayWindows) {
+        for (const [day, windows] of Object.entries(avail.dayWindows)) {
+          check(windows, ["dayWindows", day]);
+        }
+      }
+    }),
 });
 
 export async function GET() {

@@ -27,7 +27,7 @@ const FEATURES = [
   {
     icon: CalendarClock,
     title: "Book a human coach",
-    body: "Pair interview practice with a 1-hour coaching call. Bookings sync to Google Calendar instantly.",
+    body: "Pair interview practice with expert coaching. Bookings sync to Google Calendar instantly.",
   },
   {
     icon: LineChart,

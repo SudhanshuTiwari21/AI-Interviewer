@@ -5,7 +5,14 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { formatDate } from "@/lib/utils";
-import { bookingListCategory, isBookingSessionActive } from "@/lib/coaching/booking-session";
+import {
+  bookingJoinOpensAtMs,
+  bookingListCategory,
+  canJoinCoachingSession,
+  isBeforeCoachingJoinWindow,
+  isBookingSessionEnded,
+} from "@/lib/coaching/booking-session";
+import { coachingJoinEligible, coachingJoinHref } from "@/lib/coaching/meeting-join";
 import { Search } from "lucide-react";
 
 type CoachBooking = {
@@ -229,21 +236,26 @@ function SessionSection({
                       </Button>
                     </div>
                   ) : row.status === "approved" &&
-                    (row.calendarMeetingUrl || row.meetingProvider === "livekit") &&
-                    isBookingSessionActive(row.startsAt, row.durationMin ?? 30) ? (
-                    <Button
-                      href={
-                        row.meetingProvider === "livekit"
-                          ? `/meeting/${row.id}`
-                          : (row.calendarMeetingUrl as string)
-                      }
-                      size="sm"
-                      variant="outline"
-                    >
+                    coachingJoinEligible(row) &&
+                    canJoinCoachingSession(row.startsAt, row.durationMin ?? 30) ? (
+                    <Button href={coachingJoinHref(row)} size="sm" variant="outline">
                       Join
                     </Button>
                   ) : row.status === "approved" &&
-                    (row.calendarMeetingUrl || row.meetingProvider === "livekit") ? (
+                    coachingJoinEligible(row) &&
+                    isBeforeCoachingJoinWindow(row.startsAt) ? (
+                    <span className="text-xs text-ink-400">
+                      Join opens{" "}
+                      {new Date(bookingJoinOpensAtMs(row.startsAt)).toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  ) : row.status === "approved" &&
+                    coachingJoinEligible(row) &&
+                    isBookingSessionEnded(row.startsAt, row.durationMin ?? 30) ? (
                     <span className="text-xs text-ink-400">Session ended</span>
                   ) : (
                     <span className="text-xs text-ink-400">No action</span>

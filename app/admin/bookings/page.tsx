@@ -6,7 +6,12 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { useAdmin, AdminPageHeader } from "@/components/admin/AdminShell";
 import { formatDate } from "@/lib/utils";
-import { isBookingSessionActive } from "@/lib/coaching/booking-session";
+import {
+  canJoinCoachingSession,
+  isBeforeCoachingJoinWindow,
+  isBookingSessionEnded,
+} from "@/lib/coaching/booking-session";
+import { coachingJoinEligible, coachingJoinHref } from "@/lib/coaching/meeting-join";
 import { CalendarClock, X, ExternalLink, IndianRupee, Search } from "lucide-react";
 
 type CoachingBooking = {
@@ -296,9 +301,10 @@ function BookingsTable({
                     </Button>
                   )}
                   {b.status === "approved" &&
-                    isBookingSessionActive(b.startsAt, b.durationMin) && (
+                    coachingJoinEligible(b) &&
+                    canJoinCoachingSession(b.startsAt, b.durationMin) && (
                     <a
-                      href={b.meetingProvider === "livekit" ? `/meeting/${b.id}` : b.calendarMeetingUrl!}
+                      href={coachingJoinHref(b)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs text-ink-700 hover:bg-ink-50"
@@ -306,7 +312,14 @@ function BookingsTable({
                       Join <ExternalLink className="size-3" />
                     </a>
                   )}
-                  {b.status === "approved" && !isBookingSessionActive(b.startsAt, b.durationMin) && (
+                  {b.status === "approved" &&
+                    coachingJoinEligible(b) &&
+                    isBeforeCoachingJoinWindow(b.startsAt) && (
+                    <span className="text-xs text-ink-400">Join not open yet</span>
+                  )}
+                  {b.status === "approved" &&
+                    coachingJoinEligible(b) &&
+                    isBookingSessionEnded(b.startsAt, b.durationMin) && (
                     <span className="text-xs text-ink-400">Ended</span>
                   )}
                   {canCancel && (

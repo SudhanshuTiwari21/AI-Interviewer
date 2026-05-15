@@ -4,6 +4,10 @@ import { z } from "zod";
 import { fail, ok } from "@/lib/api/response";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { findUserById } from "@/lib/auth/verification-service";
+import {
+  COACHING_JOIN_EARLY_MINUTES,
+  COACHING_JOIN_LATE_MINUTES,
+} from "@/lib/coaching/constants";
 import { resolveMeetingRoleForBooking } from "@/lib/meeting/participant-role";
 import { issueMeetingTokenForBooking, meetingProviderName } from "@/lib/meeting/service";
 
@@ -53,8 +57,8 @@ export async function POST(req: Request) {
     const now = Date.now();
     const startsAt = booking.startsAt.getTime();
     const endsAt = startsAt + booking.durationMin * 60_000;
-    const joinEarlyMin = intEnv("MEETING_JOIN_EARLY_MIN", 30);
-    const joinLateMin = intEnv("MEETING_JOIN_LATE_MIN", 120);
+    const joinEarlyMin = intEnv("MEETING_JOIN_EARLY_MIN", COACHING_JOIN_EARLY_MINUTES);
+    const joinLateMin = intEnv("MEETING_JOIN_LATE_MIN", COACHING_JOIN_LATE_MINUTES);
     const joinOpenAt = startsAt - joinEarlyMin * 60_000;
     const joinCloseAt = endsAt + joinLateMin * 60_000;
     if (now < joinOpenAt || now > joinCloseAt) {

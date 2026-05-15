@@ -258,7 +258,7 @@ function CheckoutInner() {
               </div>
               <ul className="mt-5 space-y-2 border-t border-ink-100 pt-5 text-xs text-ink-700">
                 {[
-                  "Resume-driven interview flow",
+                  "CV-driven interview flow",
                   "Dynamic follow-up questions",
                   "Premium interviewer controls included",
                   "Detailed report with weak-area reasons",

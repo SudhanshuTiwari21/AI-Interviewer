@@ -166,6 +166,7 @@ export function AppShell({
 
   const mobileNav = [
     ...NAV,
+    ...SECONDARY,
     ...(isAdminRole(user.role)
       ? [{ href: "/admin", label: "Admin", icon: ShieldCheck }]
       : []),
@@ -312,8 +313,8 @@ function MobileBottomNav({
 }>) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
-      <ul className="mx-auto grid max-w-lg grid-cols-5 gap-1">
-        {items.slice(0, 5).map((item) => {
+      <ul className="mx-auto flex max-w-lg gap-1 overflow-x-auto pb-0.5">
+        {items.map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
           return (
@@ -321,7 +322,7 @@ function MobileBottomNav({
               <Link
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium",
+                  "flex min-w-[4.5rem] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium",
                   active
                     ? "bg-ink-900 text-white"
                     : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",

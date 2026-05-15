@@ -114,7 +114,7 @@ export function ResumeUpload({ value, onChange }: Props) {
             <Upload className="size-5" />
           </span>
           <p className="mt-3 text-sm font-semibold text-ink-900">
-            Drop your resume here
+            Drop your CV here
           </p>
           <p className="mt-1 text-xs text-ink-500">
             PDF or TXT · up to 5 MB · fully processed in your browser
@@ -142,7 +142,7 @@ export function ResumeUpload({ value, onChange }: Props) {
       ) : (
         <div className="rounded-2xl border border-ink-200 bg-white p-3">
           <div className="flex items-center gap-2 border-b border-ink-100 pb-2 text-xs text-ink-500">
-            <FileText className="size-3.5" /> Paste the text of your resume
+            <FileText className="size-3.5" /> Paste the text of your CV
           </div>
           <textarea
             value={pastedText}

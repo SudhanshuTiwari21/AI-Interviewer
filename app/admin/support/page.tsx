@@ -28,6 +28,7 @@ export default function AdminSupportPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | Ticket["status"]>("all");
   const [noteById, setNoteById] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const loadTickets = useCallback(async () => {
     const query = statusFilter === "all" ? "" : `?status=${statusFilter}`;
@@ -39,6 +40,43 @@ export default function AdminSupportPage() {
   useEffect(() => {
     void loadTickets();
   }, [loadTickets]);
+
+  useEffect(() => {
+    setNoteById((prev) => {
+      const next = { ...prev };
+      for (const t of tickets) {
+        if (next[t.id] === undefined && t.adminNote) {
+          next[t.id] = t.adminNote;
+        }
+      }
+      return next;
+    });
+  }, [tickets]);
+
+  async function saveAdminNoteOnly(ticket: Ticket) {
+    if (!canManage) return;
+    setSavingId(ticket.id);
+    try {
+      const res = await fetch("/api/admin/support/tickets", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ticketId: ticket.id,
+          updateAdminNoteOnly: true,
+          adminNote: (noteById[ticket.id] ?? ticket.adminNote ?? "").trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setSaveMessage("Admin note saved.");
+        await loadTickets();
+      } else {
+        setSaveMessage("Could not save admin note.");
+      }
+    } finally {
+      setSavingId(null);
+    }
+  }
 
   async function updateTicket(ticket: Ticket, status: Ticket["status"]) {
     if (!canManage) return;
@@ -91,6 +129,10 @@ export default function AdminSupportPage() {
         }
       />
 
+      {saveMessage ? (
+        <p className="mb-3 text-sm text-ink-600">{saveMessage}</p>
+      ) : null}
+
       <Card>
         <CardBody className="space-y-3">
           {tickets.length === 0 ? (
@@ -123,6 +165,16 @@ export default function AdminSupportPage() {
                   placeholder="Internal/admin resolution note..."
                   className="mt-3 h-20 w-full rounded-lg border border-ink-200 px-3 py-2 text-xs"
                 />
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!canManage || savingId === t.id}
+                    onClick={() => void saveAdminNoteOnly(t)}
+                  >
+                    Save admin note
+                  </Button>
+                </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     size="sm"

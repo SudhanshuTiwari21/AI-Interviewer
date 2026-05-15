@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { useAdmin, AdminPageHeader } from "@/components/admin/AdminShell";
 import { type Coach } from "@/lib/coaches";
+import { DEFAULT_COACHING_SESSION_MINUTES } from "@/lib/coaching/constants";
 import { TARGET_ROLES } from "@/lib/target-roles";
 import { cn, uid } from "@/lib/utils";
 import { isValidIanaTimeZone } from "@/lib/timezone";
@@ -24,6 +25,9 @@ type CoachForm = {
   timezone: string;
   weekdays: number[];
   windows: Array<{ startMinute: string; endMinute: string }>;
+  slotStepMin: string;
+  useCustomDayWindows: boolean;
+  dayWindowRows: Record<number, Array<{ startMinute: string; endMinute: string }>>;
   active: boolean;
 };
 
@@ -53,6 +57,9 @@ const DEFAULT_FORM: CoachForm = {
     { startMinute: "09:00", endMinute: "10:00" },
     { startMinute: "18:00", endMinute: "19:00" },
   ],
+  slotStepMin: String(DEFAULT_COACHING_SESSION_MINUTES),
+  useCustomDayWindows: false,
+  dayWindowRows: { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] },
   active: true,
 };
 
@@ -161,8 +168,13 @@ export default function AdminCoachesPage() {
                   ))}
                 </div>
                 <p className="mt-2 text-xs text-ink-500">
-                  {coach.techAreas.join(", ")} ·{" "}
-                  {weekdaysLabel(coach.availability.weekdays)} · {windowsLabel(coach.availability.windows)}
+                  {coach.techAreas.join(", ")} · {weekdaysLabel(coach.availability.weekdays)} ·{" "}
+                  {windowsLabel(coach.availability.windows)}
+                  {coach.availability.dayWindows &&
+                  Object.keys(coach.availability.dayWindows).length > 0
+                    ? ` · Per-day overrides: ${dayWindowsShortLabel(coach.availability.dayWindows)}`
+                    : ""}{" "}
+                  · Slot step {coach.availability.slotStepMin ?? DEFAULT_COACHING_SESSION_MINUTES} min
                 </p>
                 {coach.recentFeedbacks && coach.recentFeedbacks.length > 0 ? (
                   <div className="mt-2 space-y-1.5 rounded-lg border border-ink-100 bg-ink-50/50 p-2">
@@ -205,6 +217,35 @@ export default function AdminCoachesPage() {
                               startMinute: toTimeValue(w.startMinute),
                               endMinute: toTimeValue(w.endMinute),
                             })) ?? [{ startMinute: "09:00", endMinute: "10:00" }],
+                          slotStepMin: String(
+                            coach.availability.slotStepMin ?? DEFAULT_COACHING_SESSION_MINUTES,
+                          ),
+                          useCustomDayWindows: Boolean(
+                            coach.availability.dayWindows &&
+                              Object.keys(coach.availability.dayWindows).length > 0,
+                          ),
+                          dayWindowRows: (() => {
+                            const base: CoachForm["dayWindowRows"] = {
+                              0: [],
+                              1: [],
+                              2: [],
+                              3: [],
+                              4: [],
+                              5: [],
+                              6: [],
+                            };
+                            const dw = coach.availability.dayWindows;
+                            if (!dw) return base;
+                            for (const d of [0, 1, 2, 3, 4, 5, 6] as const) {
+                              const list = dw[d];
+                              if (!list?.length) continue;
+                              base[d] = list.map((w) => ({
+                                startMinute: toTimeValue(w.startMinute),
+                                endMinute: toTimeValue(w.endMinute),
+                              }));
+                            }
+                            return base;
+                          })(),
                           active: coach.active,
                         });
                       }}
@@ -560,6 +601,117 @@ export default function AdminCoachesPage() {
                   </Button>
                 </div>
               </Field>
+              <Field label="Booking slot step (minutes)">
+                <p className="mb-1 text-[11px] text-ink-500">
+                  Candidate calendar grid step and session length (15–180 minutes).
+                </p>
+                <select
+                  className="h-10 w-full rounded-lg border border-ink-200 bg-white px-3 text-sm"
+                  value={form.slotStepMin}
+                  onChange={(e) => setForm((f) => ({ ...f, slotStepMin: e.target.value }))}
+                >
+                  {[15, 30, 45, 60, 90, 120].map((m) => (
+                    <option key={m} value={String(m)}>
+                      {m} minutes
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <label className="flex items-start gap-2 text-sm text-ink-700">
+                <input
+                  type="checkbox"
+                  checked={form.useCustomDayWindows}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, useCustomDayWindows: e.target.checked }))
+                  }
+                  className="mt-1"
+                />
+                <span>
+                  Use different availability hours per weekday (optional). Days you leave empty use the default
+                  windows above.
+                </span>
+              </label>
+              {form.useCustomDayWindows ? (
+                <div className="space-y-4 rounded-lg border border-ink-200 bg-white p-3">
+                  {WEEKDAYS.map((d) => (
+                    <div key={d.value}>
+                      <p className="mb-1 text-xs font-medium text-ink-600">{d.label}</p>
+                      <div className="space-y-2">
+                        {(form.dayWindowRows[d.value] ?? []).map((win, idx) => (
+                          <div
+                            key={`${d.value}-${idx}-${win.startMinute}`}
+                            className="grid grid-cols-[1fr,1fr,auto] gap-2"
+                          >
+                            <TimePicker
+                              value={win.startMinute}
+                              onChange={(nextValue) =>
+                                setForm((f) => ({
+                                  ...f,
+                                  dayWindowRows: {
+                                    ...f.dayWindowRows,
+                                    [d.value]: (f.dayWindowRows[d.value] ?? []).map((w, i) =>
+                                      i === idx ? { ...w, startMinute: nextValue } : w,
+                                    ),
+                                  },
+                                }))
+                              }
+                            />
+                            <TimePicker
+                              value={win.endMinute}
+                              onChange={(nextValue) =>
+                                setForm((f) => ({
+                                  ...f,
+                                  dayWindowRows: {
+                                    ...f.dayWindowRows,
+                                    [d.value]: (f.dayWindowRows[d.value] ?? []).map((w, i) =>
+                                      i === idx ? { ...w, endMinute: nextValue } : w,
+                                    ),
+                                  },
+                                }))
+                              }
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                setForm((f) => ({
+                                  ...f,
+                                  dayWindowRows: {
+                                    ...f.dayWindowRows,
+                                    [d.value]: (f.dayWindowRows[d.value] ?? []).filter((_, i) => i !== idx),
+                                  },
+                                }))
+                              }
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setForm((f) => ({
+                              ...f,
+                              dayWindowRows: {
+                                ...f.dayWindowRows,
+                                [d.value]: [
+                                  ...(f.dayWindowRows[d.value] ?? []),
+                                  { startMinute: "09:00", endMinute: "10:00" },
+                                ],
+                              },
+                            }))
+                          }
+                        >
+                          Add window ({d.label})
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <label className="inline-flex items-center gap-2 text-sm text-ink-700">
                 <input
                   type="checkbox"
@@ -714,20 +866,41 @@ function toCoach(form: CoachForm, editingId: string | null): Coach | null {
   if (form.techAreas.length === 0) return null;
   const tz = form.timezone.trim();
   if (!tz || !isValidIanaTimeZone(tz)) return null;
-  const windows = form.windows
-    .map((w) => ({
-      startMinute: parseTimeToMinutes(w.startMinute),
-      endMinute: parseTimeToMinutes(w.endMinute),
-    }))
-    .filter(
-      (w) =>
-        !Number.isNaN(w.startMinute) &&
-        !Number.isNaN(w.endMinute) &&
-        w.startMinute >= 0 &&
-        w.endMinute <= 23 * 60 + 59 &&
-        w.startMinute < w.endMinute,
-    );
+  const slotStepMin = Math.min(
+    180,
+    Math.max(15, Number.parseInt(form.slotStepMin, 10) || DEFAULT_COACHING_SESSION_MINUTES),
+  );
+  const minWindowSpan = Math.max(30, slotStepMin);
+
+  const parseRows = (rows: Array<{ startMinute: string; endMinute: string }>) =>
+    rows
+      .map((w) => ({
+        startMinute: parseTimeToMinutes(w.startMinute),
+        endMinute: parseTimeToMinutes(w.endMinute),
+      }))
+      .filter(
+        (w) =>
+          !Number.isNaN(w.startMinute) &&
+          !Number.isNaN(w.endMinute) &&
+          w.startMinute >= 0 &&
+          w.endMinute <= 23 * 60 + 59 &&
+          w.startMinute < w.endMinute &&
+          w.endMinute - w.startMinute >= minWindowSpan,
+      );
+
+  const windows = parseRows(form.windows);
   if (windows.length === 0) return null;
+
+  let dayWindows: Coach["availability"]["dayWindows"] | undefined;
+  if (form.useCustomDayWindows) {
+    const dw: NonNullable<Coach["availability"]["dayWindows"]> = {};
+    for (let day = 0; day <= 6; day++) {
+      const parsed = parseRows(form.dayWindowRows[day] ?? []);
+      if (parsed.length > 0) dw[day] = parsed;
+    }
+    if (Object.keys(dw).length > 0) dayWindows = dw;
+  }
+
   const focus = form.focus
     .split(",")
     .map((x) => x.trim())
@@ -749,6 +922,8 @@ function toCoach(form: CoachForm, editingId: string | null): Coach | null {
     availability: {
       weekdays: [...form.weekdays].sort((a, b) => a - b),
       windows,
+      slotStepMin,
+      ...(dayWindows ? { dayWindows } : {}),
     },
   };
 }
@@ -758,4 +933,13 @@ function windowsLabel(windows: Array<{ startMinute: number; endMinute: number }>
   return windows
     .map((w) => `${toHourMinuteLabel(w.startMinute)}-${toHourMinuteLabel(w.endMinute)}`)
     .join(", ");
+}
+
+function dayWindowsShortLabel(dayWindows: NonNullable<Coach["availability"]["dayWindows"]>) {
+  return Object.entries(dayWindows)
+    .map(([day, wins]) => {
+      const d = WEEKDAYS.find((x) => x.value === Number(day))?.label ?? day;
+      return `${d}: ${windowsLabel(wins ?? [])}`;
+    })
+    .join(" · ");
 }

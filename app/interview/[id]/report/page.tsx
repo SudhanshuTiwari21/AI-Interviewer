@@ -12,6 +12,7 @@ import { store } from "@/lib/store";
 import type { InterviewReport } from "@/lib/question-engine";
 import { downloadReportPdf } from "@/lib/pdf";
 import { formatDate, formatTime } from "@/lib/utils";
+import { DEFAULT_COACHING_SESSION_MINUTES } from "@/lib/coaching/constants";
 import {
   Download,
   Mail,
@@ -575,7 +576,7 @@ export default function ReportPage() {
                     Coaching
                   </p>
                   <p className="mt-2 text-base font-semibold">
-                    Book a 1-hour deep dive with a coach
+                    Book a {DEFAULT_COACHING_SESSION_MINUTES}-minute deep dive with a coach
                   </p>
                   <p className="mt-1 text-xs text-ink-300">
                     Drill the gaps surfaced in this report. Calendar invite sent

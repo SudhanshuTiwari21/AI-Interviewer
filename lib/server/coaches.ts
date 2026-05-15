@@ -46,6 +46,28 @@ function rowToCoach(row: typeof schema.coaches.$inferSelect): Coach {
     return null;
   }
 
+  const rawSlotStep = (availability as { slotStepMin?: unknown }).slotStepMin;
+  let slotStepMin = 30;
+  if (rawSlotStep !== undefined && Number.isFinite(Number(rawSlotStep))) {
+    slotStepMin = Math.min(180, Math.max(15, Math.round(Number(rawSlotStep))));
+  }
+
+  const rawDayWindows = (availability as { dayWindows?: unknown }).dayWindows;
+  let dayWindows: Coach["availability"]["dayWindows"] | undefined;
+  if (rawDayWindows && typeof rawDayWindows === "object" && !Array.isArray(rawDayWindows)) {
+    const dw: NonNullable<Coach["availability"]["dayWindows"]> = {};
+    for (const [key, val] of Object.entries(rawDayWindows as Record<string, unknown>)) {
+      const day = Number(key);
+      if (!Number.isInteger(day) || day < 0 || day > 6) continue;
+      if (!Array.isArray(val)) continue;
+      const parsed = val
+        .map((w) => normalizeWindow((w ?? {}) as Record<string, unknown>))
+        .filter((w): w is NonNullable<typeof w> => w !== null);
+      if (parsed.length > 0) dw[day] = parsed;
+    }
+    if (Object.keys(dw).length > 0) dayWindows = dw;
+  }
+
   const normalizedWindows =
     rawWindows && rawWindows.length > 0
       ? rawWindows.map((w) => normalizeWindow(w)).filter((w): w is NonNullable<typeof w> => w !== null)
@@ -78,6 +100,8 @@ function rowToCoach(row: typeof schema.coaches.$inferSelect): Coach {
     availability: {
       weekdays: availability.weekdays ?? [1, 2, 3, 4, 5],
       windows: windowsFinal,
+      slotStepMin,
+      ...(dayWindows ? { dayWindows } : {}),
     },
   };
 }
@@ -166,6 +190,13 @@ export async function listCoaches(options?: { activeOnly?: boolean }): Promise<C
       recentFeedbacks: feedbackMap.get(coach.id) ?? [],
     };
   });
+}
+
+export async function getCoachById(id: string): Promise<Coach | null> {
+  const rows = await db.select().from(schema.coaches).where(eq(schema.coaches.id, id)).limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  return rowToCoach(row);
 }
 
 export async function upsertCoach(coach: Coach): Promise<void> {

@@ -13,12 +13,20 @@ const Query = z.object({
   status: z.enum(["open", "in_progress", "resolved", "closed"]).optional(),
 });
 
-const Patch = z.object({
+const PatchNoteOnly = z.object({
+  ticketId: z.string().uuid(),
+  updateAdminNoteOnly: z.literal(true),
+  adminNote: z.string().trim().max(2000),
+});
+
+const PatchStatus = z.object({
   ticketId: z.string().uuid(),
   status: z.enum(["open", "in_progress", "resolved", "closed"]),
   adminNote: z.string().trim().max(2000).optional(),
   priority: z.enum(["low", "medium", "high"]).optional(),
 });
+
+const Patch = z.union([PatchNoteOnly, PatchStatus]);
 
 export async function GET(req: Request) {
   const ctx = await requirePermission("support.view");
@@ -70,24 +78,53 @@ export async function PATCH(req: Request) {
     );
   }
 
+  if ("updateAdminNoteOnly" in parsed.data && parsed.data.updateAdminNoteOnly) {
+    const [ticket] = await db
+      .update(schema.supportTickets)
+      .set({
+        adminNote: parsed.data.adminNote,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.supportTickets.id, parsed.data.ticketId))
+      .returning();
+
+    if (!ticket) {
+      return fail("user_not_found", "Ticket not found", 404);
+    }
+
+    await recordAudit(ctx, {
+      action: "support.ticket.update",
+      targetType: "support_ticket",
+      targetId: ticket.id,
+      metadata: {
+        status: ticket.status,
+        adminNote: parsed.data.adminNote,
+        noteOnly: true,
+      },
+    });
+
+    return ok({ ticket });
+  }
+
+  if (!("status" in parsed.data)) {
+    return fail("validation_error", "Invalid ticket update payload.", 400);
+  }
+
+  const body = parsed.data;
   const now = new Date();
   const [ticket] = await db
     .update(schema.supportTickets)
     .set({
-      status: parsed.data.status,
-      adminNote: parsed.data.adminNote,
-      priority: parsed.data.priority,
+      status: body.status,
+      ...(body.adminNote !== undefined ? { adminNote: body.adminNote } : {}),
+      ...(body.priority !== undefined ? { priority: body.priority } : {}),
       resolvedAt:
-        parsed.data.status === "resolved" || parsed.data.status === "closed"
-          ? now
-          : null,
+        body.status === "resolved" || body.status === "closed" ? now : null,
       resolvedBy:
-        parsed.data.status === "resolved" || parsed.data.status === "closed"
-          ? ctx.user.id
-          : null,
+        body.status === "resolved" || body.status === "closed" ? ctx.user.id : null,
       updatedAt: now,
     })
-    .where(eq(schema.supportTickets.id, parsed.data.ticketId))
+    .where(eq(schema.supportTickets.id, body.ticketId))
     .returning();
 
   if (!ticket) {
@@ -99,9 +136,9 @@ export async function PATCH(req: Request) {
     targetType: "support_ticket",
     targetId: ticket.id,
     metadata: {
-      status: parsed.data.status,
-      priority: parsed.data.priority,
-      adminNote: parsed.data.adminNote ?? null,
+      status: body.status,
+      priority: body.priority ?? ticket.priority,
+      adminNote: body.adminNote ?? null,
     },
   });
 

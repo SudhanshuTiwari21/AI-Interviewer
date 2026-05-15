@@ -1,6 +1,13 @@
 "use client";
 
 import { FOCUS_AREAS } from "@/lib/mock-data";
+import {
+  assertPlausibleResumeContent,
+  RESUME_INVALID_FILE_MESSAGE,
+  RESUME_INVALID_PASTE_MESSAGE,
+} from "@/lib/resume-validation";
+
+export { RESUME_INVALID_FILE_MESSAGE, RESUME_INVALID_PASTE_MESSAGE };
 
 export type ParsedResume = {
   text: string;
@@ -42,7 +49,7 @@ export async function parseResumeFile(file: File): Promise<ParsedResume> {
 }
 
 export function parseResumeText(text: string): ParsedResume {
-  return finalize(text);
+  return finalize(text, undefined, RESUME_INVALID_PASTE_MESSAGE);
 }
 
 async function extractPdfText(file: File): Promise<string> {
@@ -54,6 +61,9 @@ async function extractPdfText(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   const chunks: string[] = [];
+  if (pdf.numPages === 0) {
+    throw new Error(RESUME_INVALID_FILE_MESSAGE);
+  }
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
@@ -64,7 +74,11 @@ async function extractPdfText(file: File): Promise<string> {
       .trim();
     if (pageText) chunks.push(pageText);
   }
-  return chunks.join("\n\n");
+  const text = chunks.join("\n\n").trim();
+  if (text.length < 80) {
+    throw new Error(RESUME_INVALID_FILE_MESSAGE);
+  }
+  return text;
 }
 
 /** Re-run validation before payment / start when resume was set earlier in the session. */
@@ -106,37 +120,14 @@ export function suggestFocusAreasFromResume(skills: string[]): string[] {
   return ["Communication", "Behavioural"];
 }
 
-function assertPlausibleResumeContent(text: string, highlights: ResumeHighlights) {
-  const INVALID =
-    "Invalid resume content. Please upload a valid resume.";
-  const t = text.trim();
-  if (t.length < 120) throw new Error(INVALID);
-  const words = t.split(/\s+/).filter(Boolean);
-  if (words.length < 18) throw new Error(INVALID);
-  const lower = t.toLowerCase();
-  const sectionHint =
-    /\b(experience|employment|work history|professional experience|education|qualifications|skills|projects|summary|objective|profile|achievements)\b/i.test(
-      lower,
-    );
-  const contactHint =
-    /\S+@\S+\.\S+/.test(t) ||
-    /linkedin\.com|github\.com/i.test(t) ||
-    /\b\+?\d[\d\s().-]{8,}\d\b/.test(t);
-  const signalCount =
-    highlights.skills.length +
-    highlights.projects.length +
-    highlights.education.length +
-    highlights.companies.length +
-    highlights.achievements.length;
-  if (!(sectionHint || contactHint) || signalCount < 1) {
-    throw new Error(INVALID);
-  }
-}
-
-function finalize(text: string, fileName?: string): ParsedResume {
+function finalize(
+  text: string,
+  fileName?: string,
+  invalidMessage: string = RESUME_INVALID_FILE_MESSAGE,
+): ParsedResume {
   const cleaned = text.replace(/\u0000/g, "").trim();
   const highlights = extractHighlights(cleaned);
-  assertPlausibleResumeContent(cleaned, highlights);
+  assertPlausibleResumeContent(cleaned, highlights, invalidMessage);
   return {
     text: cleaned.slice(0, 16_000), // safety cap for prompt size
     fileName,
@@ -194,15 +185,9 @@ function extractHighlights(text: string): ResumeHighlights {
   ).slice(0, 15);
 
   const projects = collectSections(text, /projects?|experience/gi).slice(0, 8);
-  const companies = Array.from(
-    new Set(
-      text
-        .split(/\n|\.|,/)
-        .map((s) => s.trim())
-        .filter((s) => /[A-Z][a-zA-Z]+(?: Inc| LLC| Labs| Technologies| Studios| Corp)?/.test(s))
-        .slice(0, 8),
-    ),
-  ).slice(0, 6);
+  const companies = collectSections(text, /experience|employment|work history|professional experience/gi)
+    .filter((line) => line.length > 3 && line.length < 80)
+    .slice(0, 6);
   const education = collectSections(text, /education|degree|university|college/gi).slice(0, 5);
   const achievements = collectSections(text, /achievement|award|hackathon|patent|paper|published/gi).slice(0, 6);
 

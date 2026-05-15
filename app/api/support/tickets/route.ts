@@ -6,13 +6,17 @@ import { db, schema } from "@/lib/db/client";
 import { fail, ok } from "@/lib/api/response";
 import { getSessionFromCookie } from "@/lib/auth/session";
 import { findUserById } from "@/lib/auth/verification-service";
+import {
+  SUPPORT_TICKET_DESCRIPTION_MIN,
+  SUPPORT_TICKET_SUBJECT_MIN,
+} from "@/lib/support/ticket-form-requirements";
 
 export const runtime = "nodejs";
 
 const Body = z.object({
   category: z.enum(["payment", "refund", "account", "coaching", "technical", "custom"]),
-  subject: z.string().trim().min(5).max(140),
-  description: z.string().trim().min(15).max(4000),
+  subject: z.string().trim().min(SUPPORT_TICKET_SUBJECT_MIN).max(140),
+  description: z.string().trim().min(SUPPORT_TICKET_DESCRIPTION_MIN).max(4000),
 });
 
 async function requireSignedInUser() {

@@ -8,6 +8,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { store } from "@/lib/store";
 import { buildSlotsForCoach, type Coach } from "@/lib/coaches";
+import { DEFAULT_COACHING_SESSION_MINUTES } from "@/lib/coaching/constants";
 import { ensureRazorpayScriptLoaded } from "@/lib/payments/client";
 import { TARGET_ROLES } from "@/lib/target-roles";
 import { cn, formatDate, uid } from "@/lib/utils";
@@ -36,6 +37,12 @@ function startOfDay(d: Date) {
   const date = new Date(d);
   date.setHours(0, 0, 0, 0);
   return date;
+}
+
+function formatSessionLengthLabel(min: number) {
+  if (min === 60) return "1 hour";
+  if (min === 1) return "1 minute";
+  return `${min} minutes`;
 }
 
 export default function SchedulePage() {
@@ -70,6 +77,7 @@ function ScheduleInner() {
     techArea: string;
     startsAt: string;
     amountInr: number;
+    durationMin: number;
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -174,17 +182,25 @@ function ScheduleInner() {
   }, [techAreas, techSearch]);
 
   const coach = filteredCoaches.find((c) => c.id === coachId) ?? null;
+  const sessionMins = useMemo(() => {
+    if (!coach) return DEFAULT_COACHING_SESSION_MINUTES;
+    return Math.min(
+      180,
+      Math.max(15, Math.round(coach.availability.slotStepMin ?? DEFAULT_COACHING_SESSION_MINUTES)),
+    );
+  }, [coach]);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   useEffect(() => {
     let cancelled = false;
     async function loadBooked() {
       if (!coach?.id) return;
-      const res = await fetch("/api/coaching/bookings", { cache: "no-store" });
+      const res = await fetch(
+        `/api/coaching/coach-occupancy?coachId=${encodeURIComponent(coach.id)}`,
+        { cache: "no-store" },
+      );
       const data = await res.json();
       if (!cancelled && data.ok) {
-        const taken = (data.bookings as Array<{ coachId: string; startsAt: string; status: string }>)
-          .filter((b) => b.coachId === coach.id && b.status !== "cancelled" && b.status !== "rejected")
-          .map((b) => new Date(b.startsAt).toISOString());
+        const taken = (data.slots as string[]).map((s) => new Date(s).toISOString());
         setBookedSlots(taken);
       }
     }
@@ -312,6 +328,7 @@ function ScheduleInner() {
         techArea: selectedTechArea,
         startsAt: selectedSlot,
         amountInr: coach.perSessionRateInr,
+        durationMin: sessionMins,
       });
       setSelectedSlot(null);
     } catch {
@@ -343,10 +360,11 @@ function ScheduleInner() {
             Coaching
           </Badge>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-            Book your 30-minute coaching session.
+            Book a coaching session
           </h1>
           <p className="mt-3 text-sm text-ink-500">
-            Choose your tech area, pay coaching fees, and request a coach slot.
+            Choose your tech area, pay coaching fees, and request a slot. Session length follows the coach you pick
+            {coach ? ` (${formatSessionLengthLabel(sessionMins)} with ${coach.name}).` : "."}
           </p>
         </div>
 
@@ -377,7 +395,7 @@ function ScheduleInner() {
                       hour: "numeric",
                       minute: "2-digit",
                     })}{" "}
-                    · 30 min
+                    · {formatSessionLengthLabel(confirmed.durationMin)}
                   </Row>
                   <Row icon={<IndianRupee className="size-3.5" />}>
                     ₹{confirmed.amountInr} paid
@@ -513,6 +531,18 @@ function ScheduleInner() {
                     <button
                       aria-label="Next week"
                       onClick={() => {
+                        const today = startOfDay(new Date());
+                        if (selectedDay) {
+                          const nextDay = new Date(selectedDay);
+                          nextDay.setDate(selectedDay.getDate() + 1);
+                          const weekEnd = new Date(weekStart);
+                          weekEnd.setDate(weekStart.getDate() + 6);
+                          if (nextDay >= today && nextDay <= weekEnd) {
+                            setSelectedDay(nextDay);
+                            setSelectedSlot(null);
+                            return;
+                          }
+                        }
                         const d = new Date(weekStart);
                         d.setDate(d.getDate() + 7);
                         setWeekStart(d);
@@ -596,7 +626,7 @@ function ScheduleInner() {
               <div className="flex flex-col items-stretch justify-between gap-3 border-t border-ink-100 bg-ink-50/50 px-5 py-4 sm:flex-row sm:items-center">
                 <p className="text-xs text-ink-500">
                   {selectedSlot
-                    ? `${formatDate(selectedSlot)} at ${new Date(selectedSlot).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} · 30 min · ₹${coach?.perSessionRateInr ?? 0} per session`
+                    ? `${formatDate(selectedSlot)} at ${new Date(selectedSlot).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} · ${formatSessionLengthLabel(sessionMins)} · ₹${coach?.perSessionRateInr ?? 0} per session`
                     : "Pick a slot to continue"}
                 </p>
                 <div className="flex flex-col items-stretch gap-2">

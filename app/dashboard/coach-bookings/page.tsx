@@ -7,7 +7,13 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { CalendarClock, IndianRupee, Search, UserRound } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import { bookingListCategory, isBookingSessionActive } from "@/lib/coaching/booking-session";
+import {
+  bookingListCategory,
+  canJoinCoachingSession,
+  isBeforeCoachingJoinWindow,
+  isBookingSessionEnded,
+} from "@/lib/coaching/booking-session";
+import { coachingJoinEligible, coachingJoinHref } from "@/lib/coaching/meeting-join";
 
 type Booking = {
   id: string;
@@ -79,22 +85,16 @@ function BookingSection({ title, rows }: Readonly<{ title: string; rows: Booking
                     {b.status}
                   </Badge>
                   <Badge tone={b.paymentStatus === "paid" ? "success" : "neutral"}>{b.paymentStatus}</Badge>
-                  {b.status === "approved" && b.paymentStatus === "paid" ? (
-                    isBookingSessionActive(b.startsAt, b.durationMin ?? 30) ? (
-                      <Button
-                        href={
-                          b.meetingProvider === "livekit" || !b.calendarMeetingUrl
-                            ? `/meeting/${b.id}`
-                            : (b.calendarMeetingUrl as string)
-                        }
-                        size="sm"
-                        variant="outline"
-                      >
+                  {b.status === "approved" && b.paymentStatus === "paid" && coachingJoinEligible(b) ? (
+                    canJoinCoachingSession(b.startsAt, b.durationMin ?? 30) ? (
+                      <Button href={coachingJoinHref(b)} size="sm" variant="outline">
                         Join
                       </Button>
-                    ) : (
+                    ) : isBeforeCoachingJoinWindow(b.startsAt) ? (
+                      <span className="text-xs text-ink-400">Join opens closer to session time</span>
+                    ) : isBookingSessionEnded(b.startsAt, b.durationMin ?? 30) ? (
                       <span className="text-xs text-ink-400">Session ended</span>
-                    )
+                    ) : null
                   ) : null}
                 </div>
               </CardBody>
