@@ -7,7 +7,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { store } from "@/lib/store";
-import { buildSlotsForCoach, type Coach } from "@/lib/coaches";
+import { buildSlotsForCoach, isCoachAvailableOnDay, type Coach } from "@/lib/coaches";
 import {
   COACHING_SLOT_HOLD_MINUTES,
   DEFAULT_COACHING_SESSION_MINUTES,
@@ -159,12 +159,6 @@ function ScheduleInner() {
   }, [weekStart]);
 
   useEffect(() => {
-    if (!selectedDay || (days.length > 0 && !days.some((d) => d.toDateString() === selectedDay.toDateString()))) {
-      setSelectedDay(days[0] ?? null);
-    }
-  }, [days, selectedDay]);
-
-  useEffect(() => {
     if (!selectedTechArea && techAreas[0]) {
       setSelectedTechArea(techAreas[0]);
     }
@@ -189,6 +183,22 @@ function ScheduleInner() {
   }, [techAreas, techSearch]);
 
   const coach = filteredCoaches.find((c) => c.id === coachId) ?? null;
+
+  const coachDays = useMemo(() => {
+    if (!coach) return days;
+    return days.filter((d) => isCoachAvailableOnDay(coach, d));
+  }, [coach, days]);
+
+  useEffect(() => {
+    if (
+      !selectedDay ||
+      (coachDays.length > 0 &&
+        !coachDays.some((d) => d.toDateString() === selectedDay.toDateString()))
+    ) {
+      setSelectedDay(coachDays[0] ?? null);
+    }
+  }, [coachDays, selectedDay]);
+
   const sessionMins = useMemo(() => {
     if (!coach) return DEFAULT_COACHING_SESSION_MINUTES;
     return Math.min(
@@ -198,19 +208,26 @@ function ScheduleInner() {
   }, [coach]);
   const [bookedSlots, setBookedSlots] = useState<string[]>([]);
   const refreshOccupancy = useCallback(async (coachId: string) => {
-    const res = await fetch(
-      `/api/coaching/coach-occupancy?coachId=${encodeURIComponent(coachId)}`,
-      { cache: "no-store" },
-    );
-    const data = await res.json();
-    if (data.ok) {
-      const taken = (data.slots as string[]).map((s) => new Date(s).toISOString());
-      setBookedSlots(taken);
+    try {
+      const res = await fetch(
+        `/api/coaching/coach-occupancy?coachId=${encodeURIComponent(coachId)}`,
+        { cache: "no-store" },
+      );
+      const data = await res.json();
+      if (data.ok) {
+        const taken = (data.slots as string[]).map((s) => new Date(s).toISOString());
+        setBookedSlots(taken);
+      } else {
+        setBookedSlots([]);
+      }
+    } catch {
+      setBookedSlots([]);
     }
   }, []);
 
   useEffect(() => {
     const coachId = coach?.id;
+    setBookedSlots([]);
     if (!coachId) return;
     let cancelled = false;
     void refreshOccupancy(coachId);
@@ -313,14 +330,29 @@ function ScheduleInner() {
       });
     };
   }, []);
-  const bookedSet = useMemo(() => new Set(bookedSlots), [bookedSlots]);
-  const slots =
-    selectedDay && coach
-      ? buildSlotsForCoach(coach, selectedDay).filter((s) => {
-          if (bookedSet.has(s)) return false;
-          return new Date(s).getTime() > Date.now();
-        })
-      : [];
+  const bookedMs = useMemo(
+    () => new Set(bookedSlots.map((s) => new Date(s).getTime())),
+    [bookedSlots],
+  );
+  const allSlotsForDay =
+    selectedDay && coach ? buildSlotsForCoach(coach, selectedDay) : [];
+  const slots = allSlotsForDay.filter((s) => {
+    if (bookedMs.has(new Date(s).getTime())) return false;
+    return new Date(s).getTime() > Date.now();
+  });
+  const slotsEmptyReason = useMemo(() => {
+    if (!coach || !selectedDay) return null;
+    if (!isCoachAvailableOnDay(coach, selectedDay)) {
+      return "This coach is not available on this day. Pick another day in the week.";
+    }
+    if (allSlotsForDay.length === 0) {
+      return "No time windows are configured for this day. Ask admin to update coach availability.";
+    }
+    if (slots.length === 0) {
+      return "All slots for this day are in the past or already booked. Try another day or time.";
+    }
+    return null;
+  }, [allSlotsForDay.length, coach, selectedDay, slots.length]);
 
   async function confirm() {
     if (!selectedSlot || !coach || !selectedTechArea) return;
@@ -670,7 +702,7 @@ function ScheduleInner() {
                 {coach ? (
                   <>
                     <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
-                      {days.map((d) => {
+                      {coachDays.map((d) => {
                         const isSelected =
                           selectedDay?.toDateString() === d.toDateString();
                         return (
@@ -697,6 +729,12 @@ function ScheduleInner() {
                         );
                       })}
                     </div>
+                    {coachDays.length === 0 ? (
+                      <p className="mt-4 rounded-lg border border-ink-100 bg-ink-50 px-3 py-2 text-sm text-ink-600">
+                        No available days this week for {coach.name}. Use the arrows to check the next
+                        week.
+                      </p>
+                    ) : null}
                     <div className="mt-6">
                       <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
                         {selectedDay
@@ -727,6 +765,11 @@ function ScheduleInner() {
                           );
                         })}
                       </div>
+                      {slotsEmptyReason ? (
+                        <p className="mt-3 rounded-lg border border-ink-100 bg-ink-50 px-3 py-2 text-sm text-ink-600">
+                          {slotsEmptyReason}
+                        </p>
+                      ) : null}
                     </div>
                   </>
                 ) : (

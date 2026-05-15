@@ -39,10 +39,31 @@ export type Coach = {
   availability: CoachAvailability;
 };
 
+function dayWindowsForDay(
+  dayWindows: Coach["availability"]["dayWindows"],
+  day: number,
+): AvailabilityWindow[] | undefined {
+  if (!dayWindows) return undefined;
+  const direct = dayWindows[day];
+  if (direct && direct.length > 0) return direct;
+  const keyed = dayWindows as Record<string, AvailabilityWindow[] | undefined>;
+  const fromKey = keyed[String(day)];
+  if (fromKey && fromKey.length > 0) return fromKey;
+  return undefined;
+}
+
 function windowsForDay(coach: Coach, day: number): AvailabilityWindow[] {
-  const override = coach.availability.dayWindows?.[day];
-  if (override && override.length > 0) return override;
-  return coach.availability.windows ?? [];
+  const override = dayWindowsForDay(coach.availability.dayWindows, day);
+  if (override) return override;
+  const base = coach.availability.windows ?? [];
+  if (base.length > 0) return base;
+  return [{ startMinute: 9 * 60, endMinute: 18 * 60 }];
+}
+
+/** True when this calendar day has configured availability for the coach. */
+export function isCoachAvailableOnDay(coach: Coach, date: Date): boolean {
+  if (!coach.active) return false;
+  return coach.availability.weekdays.includes(date.getDay());
 }
 
 export function buildSlotsForCoach(coach: Coach, date: Date): string[] {
