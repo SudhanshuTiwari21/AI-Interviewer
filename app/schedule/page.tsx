@@ -24,6 +24,52 @@ import {
 } from "lucide-react";
 
 const SCHEDULE_PICK_KEY = "selectwise.schedule.pick";
+const RECENT_BOOKINGS_KEY = "selectwise.schedule.recentBookings";
+const RECENT_BOOKING_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+type RecentBooking = { coachId: string; startsAt: string; bookedAt: number };
+
+function appendRecentBooking(coachId: string, startsAt: string) {
+  try {
+    const raw = sessionStorage.getItem(RECENT_BOOKINGS_KEY);
+    const list: RecentBooking[] = raw ? JSON.parse(raw) : [];
+    list.push({
+      coachId,
+      startsAt: new Date(startsAt).toISOString(),
+      bookedAt: Date.now(),
+    });
+    const pruned = list
+      .filter((x) => Date.now() - x.bookedAt < RECENT_BOOKING_TTL_MS)
+      .slice(-30);
+    sessionStorage.setItem(RECENT_BOOKINGS_KEY, JSON.stringify(pruned));
+  } catch {
+    /* ignore */
+  }
+}
+
+function recentBookingsForCoach(coachId: string): string[] {
+  try {
+    const raw = sessionStorage.getItem(RECENT_BOOKINGS_KEY);
+    if (!raw) return [];
+    const list = JSON.parse(raw) as RecentBooking[];
+    return list
+      .filter(
+        (x) =>
+          x.coachId === coachId && Date.now() - x.bookedAt < RECENT_BOOKING_TTL_MS,
+      )
+      .map((x) => new Date(x.startsAt).toISOString());
+  } catch {
+    return [];
+  }
+}
+
+function mergeOccupiedSlots(serverSlots: string[], coachId: string): string[] {
+  const merged = new Set([
+    ...serverSlots.map((s) => new Date(s).toISOString()),
+    ...recentBookingsForCoach(coachId),
+  ]);
+  return [...merged];
+}
 
 function startOfWeek(d: Date) {
   const date = new Date(d);
@@ -213,12 +259,12 @@ function ScheduleInner() {
       const data = await res.json();
       if (data.ok) {
         const taken = (data.slots as string[]).map((s) => new Date(s).toISOString());
-        setBookedSlots(taken);
+        setBookedSlots(mergeOccupiedSlots(taken, coachId));
       } else {
-        setBookedSlots([]);
+        setBookedSlots(mergeOccupiedSlots([], coachId));
       }
     } catch {
-      setBookedSlots([]);
+      setBookedSlots(mergeOccupiedSlots([], coachId));
     }
   }, []);
 
@@ -263,6 +309,28 @@ function ScheduleInner() {
       void releaseSlotHold(prevCoach, prevSlot);
     }
   }, [releaseSlotHold]);
+
+  useEffect(() => {
+    function onPageShow(e: PageTransitionEvent) {
+      if (coach?.id) {
+        setBookedSlots((prev) => mergeOccupiedSlots(prev, coach.id));
+        void refreshOccupancy(coach.id);
+      }
+      if (e.persisted) {
+        resetSlotSelection();
+        setConfirmed(null);
+      }
+    }
+    function onFocus() {
+      if (coach?.id) void refreshOccupancy(coach.id);
+    }
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [coach?.id, refreshOccupancy, resetSlotSelection]);
 
   const selectCalendarDay = useCallback(
     (day: Date) => {
@@ -497,6 +565,11 @@ function ScheduleInner() {
         setError(data.message ?? "Could not create coaching booking.");
         return;
       }
+      const bookedIso = new Date(selectedSlot).toISOString();
+      appendRecentBooking(coach.id, bookedIso);
+      setBookedSlots((prev) =>
+        mergeOccupiedSlots([...prev, bookedIso], coach.id),
+      );
       setConfirmed({
         id: data.booking.id ?? uid("cb"),
         coachName: coach.name,
