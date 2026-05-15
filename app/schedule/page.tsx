@@ -8,10 +8,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { store } from "@/lib/store";
 import { buildSlotsForCoach, isCoachAvailableOnDay, type Coach } from "@/lib/coaches";
-import {
-  COACHING_SLOT_HOLD_MINUTES,
-  DEFAULT_COACHING_SESSION_MINUTES,
-} from "@/lib/coaching/constants";
+import { DEFAULT_COACHING_SESSION_MINUTES } from "@/lib/coaching/constants";
 import { ensureRazorpayScriptLoaded } from "@/lib/payments/client";
 import { TARGET_ROLES } from "@/lib/target-roles";
 import { cn, formatDate, uid } from "@/lib/utils";
@@ -84,10 +81,10 @@ function ScheduleInner() {
   } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [holdExpiresAt, setHoldExpiresAt] = useState<string | null>(null);
   const [isHoldingSlot, setIsHoldingSlot] = useState(false);
   const holdCoachIdRef = useRef<string | null>(null);
   const holdStartsAtRef = useRef<string | null>(null);
+  const slotSelectionGenRef = useRef(0);
 
   useEffect(() => {
     if (!store.getUser()) {
@@ -243,9 +240,6 @@ function ScheduleInner() {
   const releaseSlotHold = useCallback(async (coachId?: string | null, startsAt?: string | null) => {
     const cId = coachId ?? holdCoachIdRef.current;
     const slot = startsAt ?? holdStartsAtRef.current;
-    holdCoachIdRef.current = null;
-    holdStartsAtRef.current = null;
-    setHoldExpiresAt(null);
     if (!cId || !slot) return;
     try {
       await fetch("/api/coaching/slot-holds", {
@@ -257,6 +251,26 @@ function ScheduleInner() {
       /* ignore */
     }
   }, []);
+
+  const resetSlotSelection = useCallback(() => {
+    slotSelectionGenRef.current += 1;
+    const prevCoach = holdCoachIdRef.current;
+    const prevSlot = holdStartsAtRef.current;
+    holdCoachIdRef.current = null;
+    holdStartsAtRef.current = null;
+    setSelectedSlot(null);
+    if (prevCoach && prevSlot) {
+      void releaseSlotHold(prevCoach, prevSlot);
+    }
+  }, [releaseSlotHold]);
+
+  const selectCalendarDay = useCallback(
+    (day: Date) => {
+      resetSlotSelection();
+      setSelectedDay(day);
+    },
+    [resetSlotSelection],
+  );
 
   const acquireSlotHold = useCallback(
     async (coachId: string, startsAt: string) => {
@@ -273,7 +287,6 @@ function ScheduleInner() {
           if (res.status >= 500) {
             holdCoachIdRef.current = coachId;
             holdStartsAtRef.current = startsAt;
-            setHoldExpiresAt(null);
             return true;
           }
           setError((data.message as string) ?? "Could not reserve this slot.");
@@ -281,13 +294,11 @@ function ScheduleInner() {
         }
         holdCoachIdRef.current = coachId;
         holdStartsAtRef.current = startsAt;
-        setHoldExpiresAt((data.expiresAt as string) ?? null);
         void refreshOccupancy(coachId);
         return true;
       } catch {
         holdCoachIdRef.current = coachId;
         holdStartsAtRef.current = startsAt;
-        setHoldExpiresAt(null);
         return true;
       } finally {
         setIsHoldingSlot(false);
@@ -300,22 +311,36 @@ function ScheduleInner() {
     async (iso: string) => {
       if (!coach?.id) return;
       if (selectedSlot === iso) return;
-      if (selectedSlot && holdCoachIdRef.current && holdStartsAtRef.current) {
-        await releaseSlotHold(holdCoachIdRef.current, holdStartsAtRef.current);
-      }
+
+      const gen = ++slotSelectionGenRef.current;
+      const prevCoach = holdCoachIdRef.current;
+      const prevSlot = holdStartsAtRef.current;
+
       setSelectedSlot(iso);
+      setError(null);
+
+      if (prevCoach && prevSlot && prevSlot !== iso) {
+        void releaseSlotHold(prevCoach, prevSlot);
+      }
+
       const ok = await acquireSlotHold(coach.id, iso);
-      if (!ok) setSelectedSlot(null);
+      if (slotSelectionGenRef.current !== gen) return;
+
+      if (!ok) {
+        const slotStillFuture = new Date(iso).getTime() > Date.now();
+        setSelectedSlot((current) => {
+          if (current !== iso) return current;
+          return slotStillFuture ? iso : null;
+        });
+        if (slotStillFuture) {
+          setError(
+            "Could not lock this slot on the server. You can still try to pay — if checkout fails, pick another time.",
+          );
+        }
+      }
     },
     [acquireSlotHold, coach?.id, releaseSlotHold, selectedSlot],
   );
-
-  const clearSelectedSlot = useCallback(async () => {
-    if (holdCoachIdRef.current && holdStartsAtRef.current) {
-      await releaseSlotHold(holdCoachIdRef.current, holdStartsAtRef.current);
-    }
-    setSelectedSlot(null);
-  }, [releaseSlotHold]);
 
   useEffect(() => {
     if (!selectedSlot || !coach?.id || isSubmitting) return;
@@ -563,7 +588,7 @@ function ScheduleInner() {
                 <Button
                   onClick={() => {
                     setConfirmed(null);
-                    void clearSelectedSlot();
+                    resetSlotSelection();
                   }}
                 >
                   Book another
@@ -598,7 +623,7 @@ function ScheduleInner() {
                         onClick={() => {
                           setSelectedTechArea(area);
                           setCoachId("");
-                          void clearSelectedSlot();
+                          resetSlotSelection();
                           setCoachPickerOpen(true);
                         }}
                         className={cn(
@@ -672,7 +697,7 @@ function ScheduleInner() {
                         const currentWeekStart = startOfWeek(new Date());
                         if (d.getTime() < currentWeekStart.getTime()) return;
                         setWeekStart(d);
-                        void clearSelectedSlot();
+                        resetSlotSelection();
                       }}
                       disabled={weekStart.getTime() <= startOfWeek(new Date()).getTime()}
                       className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
@@ -682,22 +707,10 @@ function ScheduleInner() {
                     <button
                       aria-label="Next week"
                       onClick={() => {
-                        const today = startOfDay(new Date());
-                        if (selectedDay) {
-                          const nextDay = new Date(selectedDay);
-                          nextDay.setDate(selectedDay.getDate() + 1);
-                          const weekEnd = new Date(weekStart);
-                          weekEnd.setDate(weekStart.getDate() + 6);
-                          if (nextDay >= today && nextDay <= weekEnd) {
-                            setSelectedDay(nextDay);
-                            void clearSelectedSlot();
-                            return;
-                          }
-                        }
                         const d = new Date(weekStart);
                         d.setDate(d.getDate() + 7);
                         setWeekStart(d);
-                        void clearSelectedSlot();
+                        resetSlotSelection();
                       }}
                       className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
                     >
@@ -716,10 +729,7 @@ function ScheduleInner() {
                         return (
                           <button
                             key={d.toISOString()}
-                            onClick={() => {
-                              setSelectedDay(d);
-                              void clearSelectedSlot();
-                            }}
+                            onClick={() => selectCalendarDay(d)}
                             className={cn(
                               "rounded-xl border px-3 py-3 text-center transition-all",
                               isSelected
@@ -791,15 +801,6 @@ function ScheduleInner() {
                   {selectedSlot
                     ? `${formatDate(selectedSlot)} at ${new Date(selectedSlot).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} · ${formatSessionLengthLabel(sessionMins)} · ₹${coach?.perSessionRateInr ?? 0} per session`
                     : "Pick a slot to continue"}
-                  {selectedSlot ? (
-                    <span className="mt-1 block text-ink-400">
-                      Reserved for you for {COACHING_SLOT_HOLD_MINUTES} minutes
-                      {holdExpiresAt
-                        ? ` (until ${new Date(holdExpiresAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })})`
-                        : ""}
-                      .
-                    </span>
-                  ) : null}
                 </p>
                 <div className="flex flex-col items-stretch gap-2">
                   {error && (
@@ -810,7 +811,7 @@ function ScheduleInner() {
                   )}
                   <Button
                     onClick={confirm}
-                    disabled={!selectedSlot || isSubmitting || isHoldingSlot || !coach}
+                    disabled={!selectedSlot || isSubmitting || !coach}
                   >
                     {isSubmitting ? "Processing payment..." : "Pay & request booking"}
                   </Button>
@@ -848,7 +849,7 @@ function ScheduleInner() {
                       key={c.id}
                       onClick={() => {
                         setCoachId(c.id);
-                        void clearSelectedSlot();
+                        resetSlotSelection();
                         setCoachPickerOpen(false);
                       }}
                       className={cn(

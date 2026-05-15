@@ -120,7 +120,8 @@ export async function acquireCoachingSlotHold(
   startsAt: Date,
 ): Promise<AcquireSlotHoldResult> {
   const slot = normalizeCoachingSlotStart(startsAt);
-  if (slot.getTime() <= Date.now()) {
+  // 30s grace for client/server clock skew on future-day slots
+  if (slot.getTime() <= Date.now() - 30_000) {
     return { ok: false, reason: "booked" };
   }
 
