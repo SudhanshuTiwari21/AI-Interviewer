@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Logo } from "@/components/ui/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { Button } from "@/components/ui/Button";
@@ -235,14 +236,14 @@ export function AppShell({
           </div>
         </div>
       </aside>
-      <div className="flex min-h-screen flex-col bg-ink-50/40">
+      <div className="flex min-h-screen min-w-0 flex-col bg-ink-50/40">
         <MobileTopBar
           user={user}
           onLogout={() => {
             void handleLogout();
           }}
         />
-        <main className="flex-1 pb-20 lg:pb-0">{children}</main>
+        <main className="flex-1 min-w-0 pb-24 lg:pb-0">{children}</main>
         <MobileBottomNav pathname={pathname} items={mobileNav} />
       </div>
     </div>
@@ -311,25 +312,34 @@ function MobileBottomNav({
   pathname: string;
   items: Array<{ href: string; label: string; icon: any }>;
 }>) {
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white/95 px-2 py-2 backdrop-blur lg:hidden">
-      <ul className="mx-auto flex max-w-lg gap-1 overflow-x-auto pb-0.5">
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const nav = (
+    <nav
+      className="fixed inset-x-0 bottom-0 z-[100] border-t border-ink-100 bg-white px-2 pt-2 shadow-[0_-4px_24px_rgba(14,18,32,0.08)] pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden"
+      aria-label="Main navigation"
+    >
+      <ul className="mx-auto flex max-w-lg gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [-webkit-overflow-scrolling:touch]">
         {items.map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
           return (
-            <li key={item.href}>
+            <li key={item.href} className="shrink-0">
               <Link
                 href={item.href}
                 className={cn(
-                  "flex min-w-[4.5rem] shrink-0 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium",
+                  "flex min-w-[4.25rem] flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[10px] font-medium leading-tight sm:min-w-[4.5rem] sm:text-[11px]",
                   active
                     ? "bg-ink-900 text-white"
                     : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
                 )}
               >
-                <Icon className="size-4" />
-                <span className="truncate">{item.label}</span>
+                <Icon className="size-4 shrink-0" />
+                <span className="max-w-[4.5rem] truncate text-center">{item.label}</span>
               </Link>
             </li>
           );
@@ -337,6 +347,9 @@ function MobileBottomNav({
       </ul>
     </nav>
   );
+
+  if (!mounted) return null;
+  return createPortal(nav, document.body);
 }
 
 export function PageHeader({

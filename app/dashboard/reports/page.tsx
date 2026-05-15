@@ -27,10 +27,10 @@ export default function ReportsPage() {
   }, []);
 
   return (
-    <div className="container max-w-6xl px-4 py-8 sm:py-10">
+    <div className="container max-w-6xl overflow-x-hidden px-4 py-8 sm:py-10 lg:overflow-x-visible">
       <PageHeader
         title="Reports"
-        description="Every mock you've completed, scored and downloadable."
+        description="Every interview you've completed, scored and downloadable."
         actions={
           <Button
             href="/interview/setup"
@@ -45,88 +45,166 @@ export default function ReportsPage() {
           <Card className="p-14 text-center">
             <p className="text-sm font-medium text-ink-900">No reports yet</p>
             <p className="mt-1 text-sm text-ink-500">
-              Run your first mock interview to generate one.
+              Run your first interview to generate one.
             </p>
             <div className="mt-5">
               <Button href="/interview/setup">Start interview</Button>
             </div>
           </Card>
         ) : (
-          <Card>
-            <table className="w-full text-sm">
-              <thead className="border-b border-ink-100 text-xs text-ink-500">
-                <tr>
-                  <Th>Role</Th>
-                  <Th>Date</Th>
-                  <Th>Duration</Th>
-                  <Th>Questions</Th>
-                  <Th>Score</Th>
-                  <Th>Novelty</Th>
-                  <Th>Challenge</Th>
-                  <Th>Rating</Th>
-                  <Th />
-                </tr>
-              </thead>
-              <tbody>
-                {reports.map((r) => {
-                  const insight = insights.get(r.id);
-                  const ratingTone = toneForRating(r.rating);
-                  const challengeDelta = insight?.challengeDeltaFromPrevious;
-                  const challengeDeltaLabel =
-                    challengeDelta === null || challengeDelta === undefined
-                      ? null
-                      : `${challengeDelta > 0 ? "+" : ""}${challengeDelta}`;
-                  return (
-                  <tr
-                    key={r.id}
-                    className="border-b border-ink-100 last:border-0 hover:bg-ink-50/60"
-                  >
-                    <Td>
-                      <p className="font-medium text-ink-900">{r.role}</p>
-                      <p className="text-xs text-ink-500">{r.level}</p>
-                    </Td>
-                    <Td>{formatDate(r.generatedAt)}</Td>
-                    <Td>{r.durationMin} min</Td>
-                    <Td>{r.perQuestion.length}</Td>
-                    <Td>
-                      <span className="font-semibold text-ink-900">
-                        {r.overall}
-                      </span>
-                    </Td>
-                    <Td>
-                      <span className="font-semibold text-ink-900">
-                        {insight?.noveltyScore ?? "-"}
-                      </span>
-                    </Td>
-                    <Td>
-                      <span className="font-semibold text-ink-900">
-                        {insight?.challengeScore ?? "-"}
-                      </span>
-                      {challengeDeltaLabel !== null && (
-                          <span className="ml-1 text-xs text-ink-500">
-                            ({challengeDeltaLabel})
-                          </span>
-                        )}
-                    </Td>
-                    <Td>
-                      <Badge tone={ratingTone} dot>
-                        {r.rating}
-                      </Badge>
-                    </Td>
-                    <Td>
-                      <Link
-                        href={`/interview/${r.id}/report`}
-                        className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
-                      >
-                        <ArrowRight className="size-4" />
-                      </Link>
-                    </Td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </Card>
+          <>
+            {/* Mobile: card list (avoids wide table breaking the bottom nav) */}
+            <ul className="space-y-3 lg:hidden">
+              {reports.map((r) => {
+                const insight = insights.get(r.id);
+                const challengeDelta = insight?.challengeDeltaFromPrevious;
+                const challengeDeltaLabel =
+                  challengeDelta === null || challengeDelta === undefined
+                    ? null
+                    : `${challengeDelta > 0 ? "+" : ""}${challengeDelta}`;
+                return (
+                  <li key={r.id}>
+                    <Link
+                      href={`/interview/${r.id}/report`}
+                      className="block rounded-2xl border border-ink-200 bg-white p-4 shadow-soft transition-colors hover:border-ink-300 hover:bg-ink-50/50"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium text-ink-900">{r.role}</p>
+                          <p className="text-xs text-ink-500">{r.level}</p>
+                        </div>
+                        <Badge tone={toneForRating(r.rating)} dot>
+                          {r.rating}
+                        </Badge>
+                      </div>
+                      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-ink-600">
+                        <div>
+                          <dt className="text-ink-400">Date</dt>
+                          <dd className="mt-0.5 font-medium text-ink-800">
+                            {formatDate(r.generatedAt)}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-ink-400">Duration</dt>
+                          <dd className="mt-0.5 font-medium text-ink-800">
+                            {r.durationMin} min
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-ink-400">Score</dt>
+                          <dd className="mt-0.5 font-semibold text-ink-900">{r.overall}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-ink-400">Questions</dt>
+                          <dd className="mt-0.5 font-medium text-ink-800">
+                            {r.perQuestion.length}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-ink-400">Novelty</dt>
+                          <dd className="mt-0.5 font-medium text-ink-800">
+                            {insight?.noveltyScore ?? "—"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-ink-400">Challenge</dt>
+                          <dd className="mt-0.5 font-medium text-ink-800">
+                            {insight?.challengeScore ?? "—"}
+                            {challengeDeltaLabel !== null ? (
+                              <span className="text-ink-500"> ({challengeDeltaLabel})</span>
+                            ) : null}
+                          </dd>
+                        </div>
+                      </dl>
+                      <p className="mt-3 flex items-center gap-1 text-xs font-medium text-accent-700">
+                        View report
+                        <ArrowRight className="size-3.5" />
+                      </p>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {/* Desktop: full table (unchanged layout) */}
+            <Card className="hidden lg:block">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-ink-100 text-xs text-ink-500">
+                    <tr>
+                      <Th>Role</Th>
+                      <Th>Date</Th>
+                      <Th>Duration</Th>
+                      <Th>Questions</Th>
+                      <Th>Score</Th>
+                      <Th>Novelty</Th>
+                      <Th>Challenge</Th>
+                      <Th>Rating</Th>
+                      <Th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reports.map((r) => {
+                      const insight = insights.get(r.id);
+                      const ratingTone = toneForRating(r.rating);
+                      const challengeDelta = insight?.challengeDeltaFromPrevious;
+                      const challengeDeltaLabel =
+                        challengeDelta === null || challengeDelta === undefined
+                          ? null
+                          : `${challengeDelta > 0 ? "+" : ""}${challengeDelta}`;
+                      return (
+                        <tr
+                          key={r.id}
+                          className="border-b border-ink-100 last:border-0 hover:bg-ink-50/60"
+                        >
+                          <Td>
+                            <p className="font-medium text-ink-900">{r.role}</p>
+                            <p className="text-xs text-ink-500">{r.level}</p>
+                          </Td>
+                          <Td>{formatDate(r.generatedAt)}</Td>
+                          <Td>{r.durationMin} min</Td>
+                          <Td>{r.perQuestion.length}</Td>
+                          <Td>
+                            <span className="font-semibold text-ink-900">
+                              {r.overall}
+                            </span>
+                          </Td>
+                          <Td>
+                            <span className="font-semibold text-ink-900">
+                              {insight?.noveltyScore ?? "-"}
+                            </span>
+                          </Td>
+                          <Td>
+                            <span className="font-semibold text-ink-900">
+                              {insight?.challengeScore ?? "-"}
+                            </span>
+                            {challengeDeltaLabel !== null && (
+                              <span className="ml-1 text-xs text-ink-500">
+                                ({challengeDeltaLabel})
+                              </span>
+                            )}
+                          </Td>
+                          <Td>
+                            <Badge tone={ratingTone} dot>
+                              {r.rating}
+                            </Badge>
+                          </Td>
+                          <Td>
+                            <Link
+                              href={`/interview/${r.id}/report`}
+                              className="inline-flex size-8 items-center justify-center rounded-lg text-ink-500 hover:bg-ink-100 hover:text-ink-900"
+                            >
+                              <ArrowRight className="size-4" />
+                            </Link>
+                          </Td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </>
         )}
       </div>
     </div>

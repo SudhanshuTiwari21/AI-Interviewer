@@ -1,16 +1,20 @@
 import "server-only";
 
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "@/lib/db/client";
 import { fail, ok } from "@/lib/api/response";
 import { requirePermission } from "@/lib/auth/admin";
 import { recordAudit } from "@/lib/audit";
+import { notifyCandidateSupportTicketClosed } from "@/lib/support/ticket-notifications";
 
 export const runtime = "nodejs";
 
 const Query = z.object({
   status: z.enum(["open", "in_progress", "resolved", "closed"]).optional(),
+  category: z
+    .enum(["payment", "refund", "account", "coaching", "technical", "custom"])
+    .optional(),
 });
 
 const PatchNoteOnly = z.object({
@@ -39,9 +43,14 @@ export async function GET(req: Request) {
     return fail("validation_error", queryParse.error.issues[0]?.message ?? "Invalid filters", 400);
   }
 
-  const where = queryParse.data.status
-    ? eq(schema.supportTickets.status, queryParse.data.status)
-    : undefined;
+  const filters = [];
+  if (queryParse.data.status) {
+    filters.push(eq(schema.supportTickets.status, queryParse.data.status));
+  }
+  if (queryParse.data.category) {
+    filters.push(eq(schema.supportTickets.category, queryParse.data.category));
+  }
+  const where = filters.length > 0 ? and(...filters) : undefined;
 
   const rows = await (where
     ? db
@@ -112,6 +121,13 @@ export async function PATCH(req: Request) {
 
   const body = parsed.data;
   const now = new Date();
+  const existing = await db
+    .select()
+    .from(schema.supportTickets)
+    .where(eq(schema.supportTickets.id, body.ticketId))
+    .limit(1);
+  const before = existing[0];
+
   const [ticket] = await db
     .update(schema.supportTickets)
     .set({
@@ -141,6 +157,14 @@ export async function PATCH(req: Request) {
       adminNote: body.adminNote ?? null,
     },
   });
+
+  if (body.status === "closed" && before?.status !== "closed") {
+    try {
+      await notifyCandidateSupportTicketClosed(ticket);
+    } catch (err) {
+      console.error("[admin/support/tickets] closed notify", err);
+    }
+  }
 
   return ok({ ticket });
 }

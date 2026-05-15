@@ -10,6 +10,7 @@ import {
   SUPPORT_TICKET_DESCRIPTION_MIN,
   SUPPORT_TICKET_SUBJECT_MIN,
 } from "@/lib/support/ticket-form-requirements";
+import { notifyAdminRefundSupportTicket } from "@/lib/support/ticket-notifications";
 
 export const runtime = "nodejs";
 
@@ -73,6 +74,14 @@ export async function POST(req: Request) {
       updatedAt: new Date(),
     })
     .returning();
+
+  if (ticket && parsed.data.category === "refund") {
+    try {
+      await notifyAdminRefundSupportTicket(ticket);
+    } catch (err) {
+      console.error("[support/tickets] admin refund notify", err);
+    }
+  }
 
   return ok({ ticket }, 201);
 }
