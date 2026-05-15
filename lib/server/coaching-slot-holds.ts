@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gt, lt, sql } from "drizzle-orm";
+import { and, eq, gt, lt, ne, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { COACHING_SLOT_HOLD_MINUTES } from "@/lib/coaching/constants";
 
@@ -10,7 +10,17 @@ function holdExpiresAt(from = Date.now()) {
 
 function isMissingSlotHoldsTable(error: unknown) {
   const code = (error as { code?: string })?.code;
-  return code === "42P01";
+  if (code === "42P01") return true;
+  const message = String((error as { message?: string })?.message ?? error).toLowerCase();
+  return (
+    message.includes("coaching_slot_holds") &&
+    (message.includes("does not exist") || message.includes("undefined_table"))
+  );
+}
+
+/** Align client/server slot instants (drop sub-second drift). */
+export function normalizeCoachingSlotStart(date: Date): Date {
+  return new Date(Math.floor(date.getTime() / 1000) * 1000);
 }
 
 export async function purgeExpiredCoachingSlotHolds() {
@@ -32,7 +42,7 @@ async function listActiveHoldStarts(
       ? and(
           eq(schema.coachingSlotHolds.coachId, coachId),
           gt(schema.coachingSlotHolds.expiresAt, new Date()),
-          sql`${schema.coachingSlotHolds.userId} <> ${viewerUserId}`,
+          ne(schema.coachingSlotHolds.userId, viewerUserId),
         )
       : and(
           eq(schema.coachingSlotHolds.coachId, coachId),
@@ -52,13 +62,14 @@ async function listActiveHoldStarts(
 }
 
 async function isCoachSlotBooked(coachId: string, startsAt: Date) {
+  const slot = normalizeCoachingSlotStart(startsAt);
   const rows = await db
     .select({ id: schema.coachingBookings.id })
     .from(schema.coachingBookings)
     .where(
       and(
         eq(schema.coachingBookings.coachId, coachId),
-        eq(schema.coachingBookings.startsAt, startsAt),
+        eq(schema.coachingBookings.startsAt, slot),
         sql`${schema.coachingBookings.status} NOT IN ('cancelled', 'rejected')`,
       ),
     )
@@ -66,13 +77,7 @@ async function isCoachSlotBooked(coachId: string, startsAt: Date) {
   return Boolean(rows[0]);
 }
 
-/** Start times unavailable to `viewerUserId` (bookings + other users' active holds). */
-export async function listCoachOccupiedSlotStarts(
-  coachId: string,
-  viewerUserId?: string,
-): Promise<string[]> {
-  await purgeExpiredCoachingSlotHolds();
-
+async function listBookedCoachSlotStarts(coachId: string): Promise<string[]> {
   const bookingRows = await db
     .select({ startsAt: schema.coachingBookings.startsAt })
     .from(schema.coachingBookings)
@@ -82,11 +87,27 @@ export async function listCoachOccupiedSlotStarts(
         sql`${schema.coachingBookings.status} NOT IN ('cancelled', 'rejected')`,
       ),
     );
+  return bookingRows.map((row) => row.startsAt.toISOString());
+}
 
-  const isoSet = new Set<string>();
-  for (const row of bookingRows) isoSet.add(row.startsAt.toISOString());
-  for (const iso of await listActiveHoldStarts(coachId, viewerUserId)) isoSet.add(iso);
-  return [...isoSet];
+/** Start times unavailable to `viewerUserId` (bookings + other users' active holds). */
+export async function listCoachOccupiedSlotStarts(
+  coachId: string,
+  viewerUserId?: string,
+): Promise<string[]> {
+  try {
+    await purgeExpiredCoachingSlotHolds();
+
+    const isoSet = new Set<string>();
+    for (const iso of await listBookedCoachSlotStarts(coachId)) isoSet.add(iso);
+    for (const iso of await listActiveHoldStarts(coachId, viewerUserId)) isoSet.add(iso);
+    return [...isoSet];
+  } catch (error) {
+    if (isMissingSlotHoldsTable(error)) {
+      return listBookedCoachSlotStarts(coachId);
+    }
+    throw error;
+  }
 }
 
 export type AcquireSlotHoldResult =
@@ -98,13 +119,14 @@ export async function acquireCoachingSlotHold(
   coachId: string,
   startsAt: Date,
 ): Promise<AcquireSlotHoldResult> {
-  if (startsAt.getTime() <= Date.now()) {
+  const slot = normalizeCoachingSlotStart(startsAt);
+  if (slot.getTime() <= Date.now()) {
     return { ok: false, reason: "booked" };
   }
 
   await purgeExpiredCoachingSlotHolds();
 
-  if (await isCoachSlotBooked(coachId, startsAt)) {
+  if (await isCoachSlotBooked(coachId, slot)) {
     return { ok: false, reason: "booked" };
   }
 
@@ -116,7 +138,7 @@ export async function acquireCoachingSlotHold(
       .where(
         and(
           eq(schema.coachingSlotHolds.coachId, coachId),
-          eq(schema.coachingSlotHolds.startsAt, startsAt),
+          eq(schema.coachingSlotHolds.startsAt, slot),
         ),
       )
       .limit(1);
@@ -136,7 +158,7 @@ export async function acquireCoachingSlotHold(
     try {
       await db.insert(schema.coachingSlotHolds).values({
         coachId,
-        startsAt,
+        startsAt: slot,
         userId,
         expiresAt,
       });
@@ -151,7 +173,7 @@ export async function acquireCoachingSlotHold(
         .where(
           and(
             eq(schema.coachingSlotHolds.coachId, coachId),
-            eq(schema.coachingSlotHolds.startsAt, startsAt),
+            eq(schema.coachingSlotHolds.startsAt, slot),
           ),
         )
         .limit(1);
@@ -180,13 +202,14 @@ export async function releaseCoachingSlotHold(
   coachId: string,
   startsAt: Date,
 ) {
+  const slot = normalizeCoachingSlotStart(startsAt);
   try {
     await db
       .delete(schema.coachingSlotHolds)
       .where(
         and(
           eq(schema.coachingSlotHolds.coachId, coachId),
-          eq(schema.coachingSlotHolds.startsAt, startsAt),
+          eq(schema.coachingSlotHolds.startsAt, slot),
           eq(schema.coachingSlotHolds.userId, userId),
         ),
       );
@@ -215,6 +238,7 @@ export async function verifyActiveCoachingSlotHold(
 
   await purgeExpiredCoachingSlotHolds();
 
+  const slot = normalizeCoachingSlotStart(startsAt);
   try {
     const rows = await db
       .select()
@@ -222,7 +246,7 @@ export async function verifyActiveCoachingSlotHold(
       .where(
         and(
           eq(schema.coachingSlotHolds.coachId, coachId),
-          eq(schema.coachingSlotHolds.startsAt, startsAt),
+          eq(schema.coachingSlotHolds.startsAt, slot),
         ),
       )
       .limit(1);
@@ -243,7 +267,8 @@ export async function canFinalizeCoachingSlotBooking(
   coachId: string,
   startsAt: Date,
 ): Promise<"ok" | "booked" | "held_by_other"> {
-  if (await isCoachSlotBooked(coachId, startsAt)) return "booked";
+  const slot = normalizeCoachingSlotStart(startsAt);
+  if (await isCoachSlotBooked(coachId, slot)) return "booked";
 
   await purgeExpiredCoachingSlotHolds();
 
@@ -254,7 +279,7 @@ export async function canFinalizeCoachingSlotBooking(
       .where(
         and(
           eq(schema.coachingSlotHolds.coachId, coachId),
-          eq(schema.coachingSlotHolds.startsAt, startsAt),
+          eq(schema.coachingSlotHolds.startsAt, slot),
           gt(schema.coachingSlotHolds.expiresAt, new Date()),
         ),
       )

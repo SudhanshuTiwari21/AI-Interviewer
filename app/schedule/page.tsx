@@ -270,6 +270,12 @@ function ScheduleInner() {
         });
         const data = await res.json();
         if (!data.ok) {
+          if (res.status >= 500) {
+            holdCoachIdRef.current = coachId;
+            holdStartsAtRef.current = startsAt;
+            setHoldExpiresAt(null);
+            return true;
+          }
           setError((data.message as string) ?? "Could not reserve this slot.");
           return false;
         }
@@ -279,8 +285,10 @@ function ScheduleInner() {
         void refreshOccupancy(coachId);
         return true;
       } catch {
-        setError("Could not reserve this slot. Please try again.");
-        return false;
+        holdCoachIdRef.current = coachId;
+        holdStartsAtRef.current = startsAt;
+        setHoldExpiresAt(null);
+        return true;
       } finally {
         setIsHoldingSlot(false);
       }
