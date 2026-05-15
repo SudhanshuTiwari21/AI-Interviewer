@@ -181,7 +181,7 @@ function extractHighlights(text: string): ResumeHighlights {
   const lower = text.toLowerCase();
 
   const skills = Array.from(
-    new Set(KNOWN_SKILLS.filter((s) => lower.includes(s))),
+    new Set(KNOWN_SKILLS.filter((s) => skillAppearsInText(s, lower))),
   ).slice(0, 15);
 
   const projects = collectSections(text, /projects?|experience/gi).slice(0, 8);
@@ -192,6 +192,31 @@ function extractHighlights(text: string): ResumeHighlights {
   const achievements = collectSections(text, /achievement|award|hackathon|patent|paper|published/gi).slice(0, 6);
 
   return { skills, projects, companies, education, achievements };
+}
+
+function skillAppearsInText(skill: string, lower: string): boolean {
+  switch (skill) {
+    case "node":
+      return /\b(node\.?js|nodejs)\b/i.test(lower);
+    case "go":
+      return (
+        /\bgolang\b/i.test(lower) ||
+        /\bgo\s+lang(uage)?\b/i.test(lower) ||
+        /\b(?:proficient|experienced|skilled|expert)\s+(?:in|with)\s+go\b/i.test(lower)
+      );
+    case "java":
+      return /\bjava\b/i.test(lower) && !/\bjavascript\b/i.test(lower);
+    case "sql":
+      return /\bsql\b/i.test(lower);
+    case "product":
+      return /\bproduct\s+(?:manager|management|owner|design)\b/i.test(lower);
+    case "growth":
+      return /\b(?:growth|marketing)\s+(?:lead|manager|marketing)\b/i.test(lower);
+    default: {
+      const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`\\b${escaped}\\b`, "i").test(lower);
+    }
+  }
 }
 
 function collectSections(text: string, regex: RegExp): string[] {
