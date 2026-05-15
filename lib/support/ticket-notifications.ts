@@ -7,10 +7,11 @@ import {
 } from "@/lib/email/templates/support";
 import { sendMail } from "@/lib/email/transporter";
 
-export function adminSupportInboxEmail() {
+/** Public support inbox — not ADMIN_EMAIL (often a personal super-admin login). */
+export function supportInboxEmail() {
   return (
-    process.env.ADMIN_EMAIL?.trim() ||
     process.env.SUPPORT_EMAIL?.trim() ||
+    process.env.REFUND_SUPPORT_EMAIL?.trim() ||
     "hello@selectwise.in"
   );
 }
@@ -28,7 +29,7 @@ export async function notifyAdminRefundSupportTicket(ticket: SupportTicketRow) {
     createdAt: ticket.createdAt.toISOString(),
   });
   await sendMail({
-    to: adminSupportInboxEmail(),
+    to: supportInboxEmail(),
     subject: mail.subject,
     html: mail.html,
     text: mail.text,
