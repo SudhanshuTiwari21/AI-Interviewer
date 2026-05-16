@@ -33,7 +33,7 @@ export default function AdminSettingsPage() {
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   // form state
-  const [price, setPrice] = useState("299");
+  const [price, setPrice] = useState("199");
   const [bannerEnabled, setBannerEnabled] = useState(false);
   const [bannerMessage, setBannerMessage] = useState("");
   const [bannerTone, setBannerTone] = useState<"info" | "warn" | "success">("info");

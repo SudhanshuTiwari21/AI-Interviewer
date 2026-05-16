@@ -6,6 +6,7 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import type { InterviewReport } from "@/lib/question-engine";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
 
 type CoachingBooking = {
   id: string;
@@ -17,7 +18,7 @@ type CoachingBooking = {
   createdAt: string;
 };
 
-const INTERVIEW_PRICE = 299;
+const INTERVIEW_PRICE = INTERVIEW_PRICE_INR;
 
 export default function AdminPaymentsPage() {
   const [reports, setReports] = useState<InterviewReport[]>([]);

@@ -85,7 +85,7 @@ export default function SupportPage() {
     <div className="container max-w-6xl px-4 py-8 sm:py-10">
       <PageHeader
         title="Support"
-        description="Raise payment/refund/custom issues. Admin team resolves tickets from dashboard."
+        description="Raise payment/refund/custom issues."
         actions={
           <Button href="/dashboard" variant="outline" size="sm" leftIcon={<ArrowLeft className="size-4" />}>
             Overview

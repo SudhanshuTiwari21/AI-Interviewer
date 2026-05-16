@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/Button";
+import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
 import { ArrowRight, Sparkles, ShieldCheck, Mic } from "lucide-react";
 
 export function Hero() {
@@ -20,9 +21,10 @@ export function Hero() {
             <span className="gradient-text">Land the offer.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-xl text-sm leading-6 text-ink-500 sm:mt-6 sm:text-lg sm:leading-7">
-            Selectwise helps you prepare with Hiro, your AI interviewer. Run a
-            voice-enabled mock tailored to your role, get a scored report, and
-            book follow-up coaching in one flow.
+            Selectwise helps freshers and experienced professionals prepare with
+            Hiro, your AI interviewer. Run a voice-enabled mock tailored to your
+            role, get a scored report, and book follow-up coaching in one seamless
+            flow.
           </p>
           <div className="mt-7 flex w-full flex-col items-stretch justify-center gap-3 sm:mt-8 sm:w-auto sm:flex-row sm:items-center">
             <Button href="/interview/setup" size="lg" rightIcon={<ArrowRight className="size-4" />}>
@@ -39,7 +41,7 @@ export function Hero() {
             <span className="inline-flex items-center gap-1.5">
               <Mic className="size-3.5 text-accent-500" /> Real-time speech-to-text
             </span>
-            <span>Flat ₹299 per interview</span>
+            <span>Flat ₹{INTERVIEW_PRICE_INR} per interview</span>
           </div>
         </div>
 

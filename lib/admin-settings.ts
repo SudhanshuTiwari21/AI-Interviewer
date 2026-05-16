@@ -2,6 +2,7 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
+import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
 import { TARGET_ROLES } from "@/lib/target-roles";
 
 export type AdminSettings = {
@@ -26,7 +27,7 @@ export type AdminSettings = {
 };
 
 export const DEFAULT_SETTINGS: AdminSettings = {
-  pricePerInterviewInr: 299,
+  pricePerInterviewInr: INTERVIEW_PRICE_INR,
   banner: { enabled: false, message: "", tone: "info" },
   maintenanceMode: false,
   supportEmail: "hi@selectwise.app",

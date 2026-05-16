@@ -135,7 +135,7 @@ npm run lint
 1. **Landing** (`/`) - show the hero, scroll through Features, How-it-works,
    Pricing, FAQ.
 2. Click **Continue to checkout** → sign up with the demo account.
-3. Land on **Checkout** (`/checkout`) → click **Pay ₹299**. Watch the
+3. Land on **Checkout** (`/checkout`) → click **Pay ₹199**. Watch the
    success state.
 4. Auto-redirected to **Interview setup** (`/interview/setup`) →
    pick *Frontend Engineer*, *Senior*, focus areas, and *Test microphone*.

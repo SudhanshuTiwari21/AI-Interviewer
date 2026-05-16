@@ -54,8 +54,11 @@ const INTERVIEW_TYPES = [
   "Leadership Round",
   "HR Round",
   "Behavioural Round",
+  "Aptitude Round",
   "Scenario Based Round",
 ] as const;
+
+type InterviewType = (typeof INTERVIEW_TYPES)[number];
 
 const COMPANY_TYPES = [
   "Startup",
@@ -173,9 +176,7 @@ export default function SetupPage() {
   const router = useRouter();
   const [targetRole, setTargetRole] = useState<string>("");
   const [experienceBand, setExperienceBand] = useState<string>("3-5 Years");
-  const [interviewType, setInterviewType] = useState<
-    "Technical Round" | "Managerial Round" | "Leadership Round" | "HR Round" | "Behavioural Round" | "Scenario Based Round"
-  >("Technical Round");
+  const [interviewType, setInterviewType] = useState<InterviewType>("Technical Round");
   const [companyType, setCompanyType] = useState<
     "Startup" | "Product Company" | "Service Company" | "MNC" | "Leadership/Internal Promotion"
   >("Product Company");
@@ -752,15 +753,7 @@ export default function SetupPage() {
                 <select
                   value={interviewType}
                   onChange={(e) =>
-                    setInterviewType(
-                      e.target.value as
-                        | "Technical Round"
-                        | "Managerial Round"
-                        | "Leadership Round"
-                        | "HR Round"
-                        | "Behavioural Round"
-                        | "Scenario Based Round",
-                    )
+                    setInterviewType(e.target.value as InterviewType)
                   }
                   className="h-11 w-full rounded-xl border border-ink-200 bg-white px-3 text-sm text-ink-800 outline-none ring-accent-500 focus:ring-2"
                 >

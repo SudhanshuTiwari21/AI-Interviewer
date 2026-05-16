@@ -1,4 +1,4 @@
-export const INTERVIEW_PRICE_INR = 299;
+export const INTERVIEW_PRICE_INR = 199;
 
 export function canUsePremiumControls() {
   return true;

@@ -24,7 +24,9 @@ import {
   Search,
 } from "lucide-react";
 
-const PRICE = 299;
+import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
+
+const PRICE = INTERVIEW_PRICE_INR;
 type TimeRange = "today" | "week" | "month" | "custom";
 
 type CoachingBooking = {

@@ -7,6 +7,8 @@ import { getSessionFromCookie } from "@/lib/auth/session";
 import { suspendResponseIfNeeded } from "@/lib/auth/account-status";
 import { findUserById } from "@/lib/auth/verification-service";
 import { getRazorpayClient, publicRazorpayKeyId } from "@/lib/payments/razorpay";
+import { getAdminSettings } from "@/lib/admin-settings";
+import { INTERVIEW_PRICE_INR } from "@/lib/plan-access";
 import {
   acquireCoachingSlotHold,
   verifyActiveCoachingSlotHold,
@@ -86,10 +88,26 @@ export async function POST(req: Request) {
     }
   }
 
+  const amountInr =
+    payload.productType === "interview"
+      ? (await getAdminSettings()).pricePerInterviewInr ?? INTERVIEW_PRICE_INR
+      : payload.amountInr;
+
+  if (
+    payload.productType === "interview" &&
+    payload.amountInr !== amountInr
+  ) {
+    return fail(
+      "validation_error",
+      `Interview price is ₹${amountInr}. Refresh the page and try again.`,
+      400,
+    );
+  }
+
   try {
     const razorpay = getRazorpayClient();
     const order = await razorpay.orders.create({
-      amount: payload.amountInr * 100,
+      amount: amountInr * 100,
       currency: "INR",
       receipt: `sw-${Date.now()}`,
       notes: {
@@ -106,7 +124,7 @@ export async function POST(req: Request) {
         userId: user.id,
         productType: payload.productType,
         referenceId: payload.referenceId ?? null,
-        amountInr: payload.amountInr,
+        amountInr,
         status: "created",
         razorpayOrderId: order.id,
         metadata: (payload.metadata ?? {}) as Record<string, unknown>,
