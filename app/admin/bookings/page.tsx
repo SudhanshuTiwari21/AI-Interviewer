@@ -11,8 +11,8 @@ import {
   isBeforeCoachingJoinWindow,
   isBookingSessionEnded,
 } from "@/lib/coaching/booking-session";
-import { coachingJoinEligible, coachingJoinHref } from "@/lib/coaching/meeting-join";
-import { CalendarClock, X, ExternalLink, IndianRupee, Search } from "lucide-react";
+import { coachingJoinEligible } from "@/lib/coaching/meeting-join";
+import { CalendarClock, X, IndianRupee, Search } from "lucide-react";
 
 type CoachingBooking = {
   id: string;
@@ -302,18 +302,6 @@ function BookingsTable({
                   )}
                   {b.status === "approved" &&
                     coachingJoinEligible(b) &&
-                    canJoinCoachingSession(b.startsAt, b.durationMin) && (
-                    <a
-                      href={coachingJoinHref(b)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-xs text-ink-700 hover:bg-ink-50"
-                    >
-                      Join <ExternalLink className="size-3" />
-                    </a>
-                  )}
-                  {b.status === "approved" &&
-                    coachingJoinEligible(b) &&
                     isBeforeCoachingJoinWindow(b.startsAt) && (
                     <span className="text-xs text-ink-400">Join not open yet</span>
                   )}
@@ -321,6 +309,11 @@ function BookingsTable({
                     coachingJoinEligible(b) &&
                     isBookingSessionEnded(b.startsAt, b.durationMin) && (
                     <span className="text-xs text-ink-400">Ended</span>
+                  )}
+                  {b.status === "approved" &&
+                    coachingJoinEligible(b) &&
+                    canJoinCoachingSession(b.startsAt, b.durationMin) && (
+                    <span className="text-xs text-ink-500">Coach/candidate join only</span>
                   )}
                   {canCancel && (
                     <Button

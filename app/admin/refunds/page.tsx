@@ -64,6 +64,7 @@ export default function AdminRefundsPage() {
   const [noteByTicket, setNoteByTicket] = useState<Record<string, string>>({});
   const [amountByBooking, setAmountByBooking] = useState<Record<string, string>>({});
   const [savingTicketId, setSavingTicketId] = useState<string | null>(null);
+  const [savingBookingNoteId, setSavingBookingNoteId] = useState<string | null>(null);
 
   async function load() {
     const [bookingsRes, supportRes] = await Promise.all([
@@ -139,6 +140,22 @@ export default function AdminRefundsPage() {
     await load();
   }
 
+  async function saveRefundNote(id: string) {
+    setSavingBookingNoteId(id);
+    try {
+      await fetch(`/api/coaching/bookings/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          refundAdminNote: noteByBooking[id] ?? "",
+        }),
+      });
+      await load();
+    } finally {
+      setSavingBookingNoteId(null);
+    }
+  }
+
   async function rejectRefund(id: string) {
     await fetch(`/api/coaching/bookings/${id}`, {
       method: "PATCH",
@@ -149,6 +166,25 @@ export default function AdminRefundsPage() {
       }),
     });
     await load();
+  }
+
+  async function saveSupportTicketNote(ticket: SupportTicket) {
+    if (!canManageSupport) return;
+    setSavingTicketId(ticket.id);
+    try {
+      await fetch("/api/admin/support/tickets", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ticketId: ticket.id,
+          updateAdminNoteOnly: true,
+          adminNote: (noteByTicket[ticket.id] ?? ticket.adminNote ?? "").trim(),
+        }),
+      });
+      await load();
+    } finally {
+      setSavingTicketId(null);
+    }
   }
 
   async function updateSupportTicket(ticket: SupportTicket, status: SupportTicket["status"]) {
@@ -172,7 +208,7 @@ export default function AdminRefundsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-6">
       <AdminPageHeader
         title="Refund requests"
         description="Support refund tickets from candidates and Razorpay refunds for paid coaching bookings."
@@ -231,6 +267,14 @@ export default function AdminRefundsPage() {
                           setNoteByTicket((prev) => ({ ...prev, [t.id]: e.target.value }))
                         }
                       />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={savingTicketId === t.id}
+                        onClick={() => void saveSupportTicketNote(t)}
+                      >
+                        Save note
+                      </Button>
                       {t.status !== "closed" && (
                         <>
                           <Button
@@ -276,7 +320,8 @@ export default function AdminRefundsPage() {
               No coaching payment refund requests yet.
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
               <thead className="text-xs text-ink-500">
                 <tr className="border-b border-ink-100">
                   <th className="px-5 py-3 text-left">Candidate</th>
@@ -333,7 +378,15 @@ export default function AdminRefundsPage() {
                             }
                           />
                         </div>
-                        <div className="inline-flex gap-2">
+                        <div className="inline-flex flex-wrap justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={savingBookingNoteId === r.id}
+                            onClick={() => void saveRefundNote(r.id)}
+                          >
+                            Save note
+                          </Button>
                           {r.status === "refund_requested" && (
                             <Button
                               size="sm"
@@ -372,6 +425,7 @@ export default function AdminRefundsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardBody>
       </Card>

@@ -199,6 +199,26 @@ export default function MeetingExperience({ bookingId }: { bookingId: string }) 
     el.srcObject = null;
   }, []);
 
+  const reattachActiveScreenShare = useCallback(
+    (r: Room) => {
+      const localPub = r.localParticipant.getTrackPublication(Track.Source.ScreenShare);
+      const localTrack = localPub?.track;
+      if (localTrack && localTrack.kind === Track.Kind.Video && !localTrack.isMuted) {
+        attachScreenToMain(localTrack as LocalVideoTrack);
+        return;
+      }
+      for (const p of r.remoteParticipants.values()) {
+        const pub = screenPublicationOn(p);
+        const track = pub?.track;
+        if (track && track.kind === Track.Kind.Video && !track.isMuted) {
+          attachScreenToMain(track as RemoteTrack);
+          return;
+        }
+      }
+    },
+    [attachScreenToMain],
+  );
+
   const attachRemoteAudio = useCallback(async (track: RemoteAudioTrack) => {
     const el = remoteAudioRef.current;
     if (!el) return;
@@ -481,6 +501,11 @@ export default function MeetingExperience({ bookingId }: { bookingId: string }) 
   const canEndSession = role === "coach";
   const anyScreenShare = localScreenOn || remoteScreenOn;
 
+  useEffect(() => {
+    if (!anyScreenShare || !roomRef.current) return;
+    reattachActiveScreenShare(roomRef.current);
+  }, [anyScreenShare, reattachActiveScreenShare]);
+
   async function toggleMute() {
     const r = roomRef.current;
     if (!r) return;
@@ -562,14 +587,14 @@ export default function MeetingExperience({ bookingId }: { bookingId: string }) 
 
       <div className="flex min-h-0 flex-1">
         <div className="relative min-w-0 flex-1 bg-black">
-          {anyScreenShare ? (
-            <video
-              ref={screenShareRef}
-              autoPlay
-              playsInline
-              className="absolute inset-0 z-0 size-full bg-black object-contain"
-            />
-          ) : null}
+          <video
+            ref={screenShareRef}
+            autoPlay
+            playsInline
+            className={`absolute inset-0 z-0 size-full bg-black object-contain ${
+              anyScreenShare ? "" : "pointer-events-none opacity-0"
+            }`}
+          />
 
           <video
             ref={remoteCameraRef}

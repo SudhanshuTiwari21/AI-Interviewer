@@ -178,8 +178,8 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
 
   return (
     <AdminContext.Provider value={ctxValue}>
-      <div className="grid min-h-screen lg:grid-cols-[260px,1fr]">
-        <aside className="hidden flex-col border-r border-ink-100 bg-white lg:flex">
+      <div className="flex min-h-screen w-full">
+        <aside className="hidden w-[260px] shrink-0 flex-col border-r border-ink-100 bg-white lg:flex">
           <SidebarBody
             user={user}
             pathname={pathname}
@@ -221,7 +221,7 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
           </div>
         )}
 
-        <div className="flex min-h-screen min-w-0 flex-col bg-ink-50/40">
+        <div className="flex min-h-screen w-full min-w-0 flex-1 flex-col bg-ink-50/40">
           <header className="flex h-14 items-center justify-between gap-2 border-b border-ink-100 bg-white px-3 lg:hidden">
             <button
               onClick={() => setMobileOpen(true)}
@@ -237,7 +237,9 @@ export function AdminShell({ children }: Readonly<{ children: React.ReactNode }>
               {roleLabel(user.role)}
             </Badge>
           </header>
-          <main className="min-w-0 flex-1 px-4 py-6 lg:px-8 lg:py-10">{children}</main>
+          <main className="min-w-0 w-full flex-1 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+            {children}
+          </main>
         </div>
       </div>
     </AdminContext.Provider>

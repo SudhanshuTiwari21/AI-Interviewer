@@ -213,6 +213,15 @@ export async function upsertCoach(coach: Coach): Promise<void> {
 }
 
 export async function deleteCoach(id: string): Promise<void> {
+  await db
+    .delete(schema.coachingSlotHolds)
+    .where(eq(schema.coachingSlotHolds.coachId, id));
+  await db
+    .delete(schema.coachingFeedback)
+    .where(eq(schema.coachingFeedback.coachId, id));
+  await db
+    .delete(schema.coachingBookings)
+    .where(eq(schema.coachingBookings.coachId, id));
   await db.delete(schema.coaches).where(eq(schema.coaches.id, id));
 }
 

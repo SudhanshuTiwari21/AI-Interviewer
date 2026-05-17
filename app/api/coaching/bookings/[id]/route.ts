@@ -101,6 +101,26 @@ export async function PATCH(
   const booking = rows[0];
   if (!booking) return fail("user_not_found", "Booking not found.", 404);
 
+  const noteOnly =
+    (parsed.data.refundAdminNote !== undefined || parsed.data.notes !== undefined) &&
+    !parsed.data.action &&
+    !parsed.data.status;
+  if (noteOnly) {
+    const nextNote = (
+      parsed.data.refundAdminNote ??
+      parsed.data.notes ??
+      ""
+    ).trim();
+    await db
+      .update(schema.coachingBookings)
+      .set({
+        notes: nextNote || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.coachingBookings.id, params.id));
+    return ok({ updated: true, notes: nextNote || null });
+  }
+
   if (parsed.data.action === "regenerate_meeting_link") {
     if (booking.status !== "approved") {
       return fail(

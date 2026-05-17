@@ -52,7 +52,7 @@ export default function AdminPaymentsPage() {
   }, [coachBookings, reports.length]);
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto w-full max-w-6xl">
       <AdminPageHeader
         title="Payment dashboard"
         description="Revenue and transaction stream across interview and coaching products."
@@ -77,7 +77,8 @@ export default function AdminPaymentsPage() {
               No coaching payments yet.
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
               <thead className="text-xs text-ink-500">
                 <tr className="border-b border-ink-100">
                   <th className="px-5 py-3 text-left">Candidate</th>
@@ -108,6 +109,7 @@ export default function AdminPaymentsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </CardBody>
       </Card>

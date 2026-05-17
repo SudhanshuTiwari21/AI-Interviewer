@@ -263,7 +263,7 @@ export default function AdminOverviewPage() {
   const revenueDelta = formatPercentDelta(currentWeekRevenue, previousWeekRevenue);
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto w-full max-w-6xl">
       <AdminPageHeader
         title={`Welcome back, ${user.name.split(" ")[0]}`}
         description="Snapshot of platform activity with operational and founder signals."

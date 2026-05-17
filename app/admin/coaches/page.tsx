@@ -104,7 +104,7 @@ export default function AdminCoachesPage() {
   }, [saveError, saveMessage]);
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto w-full max-w-6xl">
       <AdminPageHeader
         title="Coaches"
         description="Manage coach profiles and availability windows shown to candidates."
@@ -127,16 +127,16 @@ export default function AdminCoachesPage() {
       />
 
       <Card>
-        <CardBody className="grid gap-6 lg:grid-cols-[1.2fr,1fr]">
-          <div className="space-y-3">
+        <CardBody className="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr,1fr]">
+          <div className="min-w-0 space-y-3">
             {coaches.length === 0 && (
               <div className="rounded-xl border border-dashed border-ink-200 p-6 text-center text-sm text-ink-500">
                 No coaches yet. Create one to make them available for booking.
               </div>
             )}
             {coaches.map((coach) => (
-              <div key={coach.id} className="rounded-xl border border-ink-200 p-4">
-                <div className="flex items-start justify-between gap-3">
+              <div key={coach.id} className="min-w-0 rounded-xl border border-ink-200 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex items-center gap-3">
                     <Avatar name={coach.name} />
                     <div>
@@ -260,14 +260,26 @@ export default function AdminCoachesPage() {
                         className="text-danger-600 hover:bg-danger-50 hover:text-danger-700"
                         onClick={() => {
                           if (!confirm(`Delete ${coach.name}?`)) return;
-                          void fetch(`/api/admin/coaches?id=${encodeURIComponent(coach.id)}`, {
-                            method: "DELETE",
-                          });
-                          setCoaches((prev) => prev.filter((x) => x.id !== coach.id));
-                          if (editingId === coach.id) {
-                            setEditingId(null);
-                            setForm(DEFAULT_FORM);
-                          }
+                          void (async () => {
+                            const res = await fetch(
+                              `/api/admin/coaches?id=${encodeURIComponent(coach.id)}`,
+                              { method: "DELETE" },
+                            );
+                            const data = await res.json();
+                            if (!data.ok) {
+                              setSaveError(
+                                (data.message as string) ??
+                                  "Could not delete coach. Try again.",
+                              );
+                              return;
+                            }
+                            setSaveError(null);
+                            setCoaches((prev) => prev.filter((x) => x.id !== coach.id));
+                            if (editingId === coach.id) {
+                              setEditingId(null);
+                              setForm(DEFAULT_FORM);
+                            }
+                          })();
                         }}
                       >
                         Delete

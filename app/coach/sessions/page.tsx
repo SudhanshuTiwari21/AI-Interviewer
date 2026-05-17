@@ -184,8 +184,66 @@ function SessionSection({
         <p className="text-sm font-semibold text-ink-900">{title}</p>
         <p className="text-xs text-ink-500">{rows.length} session{rows.length === 1 ? "" : "s"}</p>
       </div>
-      <CardBody className="p-0">
-        <table className="w-full text-sm">
+      <CardBody className="space-y-3 p-4 md:hidden">
+        {rows.length === 0 ? (
+          <p className="py-4 text-center text-sm text-ink-500">No sessions in this category.</p>
+        ) : (
+          rows.map((row) => (
+            <div key={row.id} className="rounded-xl border border-ink-100 bg-ink-50/40 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="font-medium text-ink-900">{row.candidateName}</p>
+                  <p className="text-xs text-ink-500">{row.candidateEmail}</p>
+                </div>
+                <Badge
+                  tone={
+                    row.status === "approved"
+                      ? "success"
+                      : row.status === "rejected" || row.status === "cancelled"
+                        ? "danger"
+                        : "warn"
+                  }
+                  dot
+                >
+                  {row.status}
+                </Badge>
+              </div>
+              <p className="mt-2 text-sm text-ink-700">{row.techArea}</p>
+              <p className="mt-1 text-xs text-ink-500">
+                {formatDate(row.startsAt)} · {formatSessionTime(row.startsAt)}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {row.status === "pending" ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={loading}
+                      onClick={() => onRejectOpen(row.id)}
+                    >
+                      Reject
+                    </Button>
+                    <Button size="sm" disabled={loading} onClick={() => void onApprove(row.id, "approve")}>
+                      Approve
+                    </Button>
+                  </>
+                ) : row.status === "approved" &&
+                  coachingJoinEligible(row) &&
+                  canJoinCoachingSession(row.startsAt, row.durationMin ?? 30) ? (
+                  <Button href={coachingJoinHref(row)} size="sm" variant="outline">
+                    Join
+                  </Button>
+                ) : (
+                  <span className="text-xs text-ink-400">No action</span>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </CardBody>
+      <CardBody className="hidden p-0 md:block">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead className="text-xs text-ink-500">
             <tr className="border-b border-ink-100">
               <th className="px-5 py-3 text-left">Candidate</th>
@@ -272,6 +330,7 @@ function SessionSection({
             )}
           </tbody>
         </table>
+        </div>
       </CardBody>
     </Card>
   );

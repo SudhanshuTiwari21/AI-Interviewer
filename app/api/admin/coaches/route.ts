@@ -233,8 +233,18 @@ export async function DELETE(req: Request) {
   if (!id) return fail("validation_error", "Coach id is required.", 400);
   const coaches = await listCoaches();
   const coach = coaches.find((x) => x.id === id);
-  await deleteCoach(id);
-  if (coach?.email) {
+  if (!coach) return fail("user_not_found", "Coach not found.", 404);
+  try {
+    await deleteCoach(id);
+  } catch (err) {
+    console.error("[admin/coaches:delete]", err);
+    return fail(
+      "internal_error",
+      "Could not delete this coach. Remove or reassign active bookings and try again.",
+      500,
+    );
+  }
+  if (coach.email) {
     const existing = await findUserByEmail(coach.email);
     if (existing?.role === "coach") {
       await db
