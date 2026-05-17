@@ -212,9 +212,28 @@ export async function upsertCoach(coach: Coach): Promise<void> {
     });
 }
 
-export async function deleteCoach(id: string): Promise<void> {
+export async function findCoachRowsByIdOrEmail(opts: {
+  id?: string;
+  email?: string;
+}): Promise<Array<typeof schema.coaches.$inferSelect>> {
+  const coachId = opts.id?.trim();
+  const email = opts.email?.trim().toLowerCase();
+  if (!coachId && !email) return [];
+
+  const conditions = [];
+  if (coachId) conditions.push(eq(schema.coaches.id, coachId));
+  if (email) conditions.push(sql`LOWER(${schema.coaches.email}) = ${email}`);
+
+  return db
+    .select()
+    .from(schema.coaches)
+    .where(conditions.length === 1 ? conditions[0]! : or(...conditions));
+}
+
+/** @returns true when the coach profile row was removed */
+export async function deleteCoach(id: string): Promise<boolean> {
   const coachId = id.trim();
-  if (!coachId) return;
+  if (!coachId) return false;
   await db
     .delete(schema.coachingSlotHolds)
     .where(eq(schema.coachingSlotHolds.coachId, coachId));
@@ -224,7 +243,11 @@ export async function deleteCoach(id: string): Promise<void> {
   await db
     .delete(schema.coachingBookings)
     .where(eq(schema.coachingBookings.coachId, coachId));
-  await db.delete(schema.coaches).where(eq(schema.coaches.id, coachId));
+  const deleted = await db
+    .delete(schema.coaches)
+    .where(eq(schema.coaches.id, coachId))
+    .returning({ id: schema.coaches.id });
+  return deleted.length > 0;
 }
 
 /** Removes coach row(s) by id and/or email (handles legacy Postman rows with missing ids). */
@@ -238,22 +261,37 @@ export async function removeCoachByIdOrEmail(opts: {
     throw new Error("Coach id or email is required.");
   }
 
-  if (coachId) {
-    await deleteCoach(coachId);
+  const existing = await findCoachRowsByIdOrEmail({ id: coachId, email });
+  if (existing.length === 0) {
+    const err = new Error("Coach not found.");
+    (err as Error & { code?: string }).code = "not_found";
+    throw err;
   }
 
-  if (email) {
-    const rows = await db
-      .select({ id: schema.coaches.id })
-      .from(schema.coaches)
-      .where(sql`LOWER(${schema.coaches.email}) = ${email}`);
-    for (const row of rows) {
-      const id = row.id?.trim();
-      if (id && id !== coachId) {
-        await deleteCoach(id);
-      }
-    }
-    await deleteCoachArtifactsForUserEmail(db, email);
+  const idsToDelete = new Set<string>();
+  for (const row of existing) {
+    const rowId = row.id?.trim();
+    if (rowId) idsToDelete.add(rowId);
+  }
+
+  for (const rowId of idsToDelete) {
+    await deleteCoach(rowId);
+  }
+
+  const normalizedEmail =
+    email ?? existing[0]?.email?.trim().toLowerCase() ?? undefined;
+  if (normalizedEmail) {
+    await deleteCoachArtifactsForUserEmail(db, normalizedEmail);
+  }
+
+  const remaining = await findCoachRowsByIdOrEmail({
+    id: coachId,
+    email: normalizedEmail ?? email,
+  });
+  if (remaining.length > 0) {
+    throw new Error(
+      "Coach could not be fully removed. Remove or reassign active bookings and try again.",
+    );
   }
 }
 
@@ -274,7 +312,15 @@ export async function deleteCoachArtifactsForUserEmail(
     .from(schema.coaches)
     .where(sql`LOWER(${schema.coaches.email}) = ${normalized}`);
 
-  const coachIds = coachRows.map((r) => r.id);
+  const coachIds = coachRows.map((r) => r.id).filter((id): id is string => Boolean(id?.trim()));
+  if (coachIds.length > 0) {
+    await dbOrTx
+      .delete(schema.coachingSlotHolds)
+      .where(inArray(schema.coachingSlotHolds.coachId, coachIds));
+    await dbOrTx
+      .delete(schema.coachingFeedback)
+      .where(inArray(schema.coachingFeedback.coachId, coachIds));
+  }
   const bookingPredicate =
     coachIds.length > 0
       ? or(

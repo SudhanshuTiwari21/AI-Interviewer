@@ -5,7 +5,12 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requirePermission } from "@/lib/auth/admin";
 import { fail, ok } from "@/lib/api/response";
-import { listCoaches, removeCoachByIdOrEmail, upsertCoach } from "@/lib/server/coaches";
+import {
+  findCoachRowsByIdOrEmail,
+  listCoaches,
+  removeCoachByIdOrEmail,
+  upsertCoach,
+} from "@/lib/server/coaches";
 import type { Coach } from "@/lib/coaches";
 import { db, schema } from "@/lib/db/client";
 import { findUserByEmail } from "@/lib/auth/verification-service";
@@ -234,27 +239,34 @@ export async function DELETE(req: Request) {
   if (!id && !email) {
     return fail("validation_error", "Coach id or email is required.", 400);
   }
-  const coaches = await listCoaches();
-  const coach =
-    (id ? coaches.find((x) => x.id === id) : undefined) ??
-    (email ? coaches.find((x) => x.email.toLowerCase() === email) : undefined);
-  if (!coach && !email) {
+
+  const existingRows = await findCoachRowsByIdOrEmail({ id, email });
+  if (existingRows.length === 0) {
     return fail("user_not_found", "Coach not found.", 404);
   }
+
+  const resolvedId = existingRows[0]?.id?.trim() || id;
+  const resolvedEmail =
+    existingRows[0]?.email?.trim().toLowerCase() ?? email ?? undefined;
+
   try {
     await removeCoachByIdOrEmail({
-      id: coach?.id?.trim() || id,
-      email: coach?.email?.toLowerCase() ?? email,
+      id: resolvedId,
+      email: resolvedEmail,
     });
   } catch (err) {
     console.error("[admin/coaches:delete]", err);
-    return fail(
-      "internal_error",
-      "Could not delete this coach. Remove or reassign active bookings and try again.",
-      500,
-    );
+    if (err instanceof Error && (err as Error & { code?: string }).code === "not_found") {
+      return fail("user_not_found", "Coach not found.", 404);
+    }
+    const message =
+      err instanceof Error && err.message.includes("could not be fully removed")
+        ? err.message
+        : "Could not delete this coach. Remove or reassign active bookings and try again.";
+    return fail("internal_error", message, 500);
   }
-  const coachEmail = coach?.email ?? email;
+
+  const coachEmail = resolvedEmail;
   if (coachEmail) {
     const existing = await findUserByEmail(coachEmail);
     if (existing?.role === "coach") {

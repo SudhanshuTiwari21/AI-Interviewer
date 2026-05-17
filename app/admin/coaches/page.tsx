@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Card, CardBody } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -74,17 +74,25 @@ export default function AdminCoachesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
+  const [deletingCoachKey, setDeletingCoachKey] = useState<string | null>(null);
   const [availableRoles, setAvailableRoles] = useState<string[]>([...TARGET_ROLES]);
   const formAlertRef = useRef<HTMLDivElement | null>(null);
 
+  const coachRowKey = (coach: Coach) => coach.id?.trim() || coach.email;
+
+  const loadCoaches = useCallback(async () => {
+    const res = await fetch("/api/admin/coaches", { cache: "no-store" });
+    const data = await res.json().catch(() => ({}));
+    if (data.ok && Array.isArray(data.coaches)) {
+      setCoaches(data.coaches);
+    } else {
+      setCoaches([]);
+    }
+  }, []);
+
   useEffect(() => {
-    void fetch("/api/admin/coaches", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.ok) setCoaches(d.coaches);
-        else setCoaches([]);
-      })
-      .catch(() => setCoaches([]));
+    void loadCoaches();
     void fetch("/api/settings/public", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
@@ -96,7 +104,7 @@ export default function AdminCoachesPage() {
       .catch(() => {
         setAvailableRoles([...TARGET_ROLES]);
       });
-  }, []);
+  }, [loadCoaches]);
 
   useEffect(() => {
     if (!saveMessage && !saveError) return;
@@ -134,8 +142,11 @@ export default function AdminCoachesPage() {
                 No coaches yet. Create one to make them available for booking.
               </div>
             )}
-            {coaches.map((coach) => (
-              <div key={coach.id} className="min-w-0 rounded-xl border border-ink-200 p-4">
+            {coaches.map((coach) => {
+              const rowKey = coachRowKey(coach);
+              const deleteError = deleteErrors[rowKey];
+              return (
+              <div key={rowKey} className="min-w-0 rounded-xl border border-ink-200 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="flex items-center gap-3">
                     <Avatar name={coach.name} />
@@ -190,6 +201,11 @@ export default function AdminCoachesPage() {
                       </p>
                     ))}
                   </div>
+                ) : null}
+                {deleteError ? (
+                  <p className="mt-2 rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-xs text-danger-700">
+                    {deleteError}
+                  </p>
                 ) : null}
                 {canMutate && (
                   <div className="mt-3 flex gap-2">
@@ -256,51 +272,64 @@ export default function AdminCoachesPage() {
                       <Button
                         size="sm"
                         variant="ghost"
+                        disabled={deletingCoachKey === rowKey}
                         leftIcon={<Trash2 className="size-3.5" />}
                         className="text-danger-600 hover:bg-danger-50 hover:text-danger-700"
                         onClick={() => {
                           if (!confirm(`Delete ${coach.name}?`)) return;
                           void (async () => {
-                            const coachId = coach.id?.trim();
-                            const qs = coachId
-                              ? `id=${encodeURIComponent(coachId)}`
-                              : `email=${encodeURIComponent(coach.email)}`;
-                            const res = await fetch(`/api/admin/coaches?${qs}`, {
-                              method: "DELETE",
+                            setDeletingCoachKey(rowKey);
+                            setDeleteErrors((prev) => {
+                              const next = { ...prev };
+                              delete next[rowKey];
+                              return next;
                             });
-                            const data = await res.json();
-                            if (!data.ok) {
-                              setSaveError(
-                                (data.message as string) ??
-                                  "Could not delete coach. Try again.",
+                            const params = new URLSearchParams();
+                            const coachId = coach.id?.trim();
+                            if (coachId) params.set("id", coachId);
+                            params.set("email", coach.email);
+                            try {
+                              const res = await fetch(
+                                `/api/admin/coaches?${params.toString()}`,
+                                { method: "DELETE" },
                               );
-                              return;
-                            }
-                            setSaveError(null);
-                            setCoaches((prev) =>
-                              prev.filter(
-                                (x) =>
-                                  (x.id?.trim() || x.email) !==
-                                  (coach.id?.trim() || coach.email),
-                              ),
-                            );
-                            if (
-                              editingId === coach.id ||
-                              (!coach.id?.trim() && editingId === coach.email)
-                            ) {
-                              setEditingId(null);
-                              setForm(DEFAULT_FORM);
+                              const data = await res.json().catch(() => ({}));
+                              if (!res.ok || !data.ok) {
+                                setDeleteErrors((prev) => ({
+                                  ...prev,
+                                  [rowKey]:
+                                    (data.message as string) ??
+                                    "Could not delete coach. Try again.",
+                                }));
+                                return;
+                              }
+                              await loadCoaches();
+                              if (
+                                editingId === coach.id?.trim() ||
+                                editingId === coach.email
+                              ) {
+                                setEditingId(null);
+                                setForm(DEFAULT_FORM);
+                              }
+                            } catch {
+                              setDeleteErrors((prev) => ({
+                                ...prev,
+                                [rowKey]: "Could not delete coach. Try again.",
+                              }));
+                            } finally {
+                              setDeletingCoachKey(null);
                             }
                           })();
                         }}
                       >
-                        Delete
+                        {deletingCoachKey === rowKey ? "Deleting..." : "Delete"}
                       </Button>
                     )}
                   </div>
                 )}
               </div>
-            ))}
+            );
+            })}
           </div>
 
           {canMutate ? (
