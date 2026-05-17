@@ -20,7 +20,6 @@ const NON_RESUME_DOCUMENT_PATTERNS = [
   /\binternal\s+reference\b/i,
   /\breference\s+draft\b/i,
   /\bextracted\s+draft\b/i,
-  /\bversion\s*:\s*[\d.A-Za-z-]+/i,
   /\bnode\s+id\s*:/i,
   /\bsync\s+window\b/i,
   /\bregion\s+cluster\b/i,
@@ -53,15 +52,25 @@ const RESUME_SECTION_PATTERNS = [
   /\btechnical\s+skills\b/i,
   /\b(core\s+competencies|key\s+skills)\b/i,
   /\b(professional\s+summary|executive\s+summary|summary\s+of\s+qualifications)\b/i,
+  /\b(career\s+summary|profile\s+summary)\b/i,
   /\bskills\s*:/i,
   /\bprojects\s*:/i,
+  /(?:^|\n)\s*(?:work\s+)?experience\s*:?\s*(?:\n|$)/im,
+  /(?:^|\n)\s*skills\s*:?\s*(?:\n|$)/im,
+  /(?:^|\n)\s*education\s*:?\s*(?:\n|$)/im,
 ];
 
 /** Job titles as whole roles, not words like "Engine" in product names. */
 const ROLE_TITLE_PATTERN =
-  /\b(software|data|systems|platform|backend|frontend|full[- ]?stack|devops|cloud|security|mobile|qa|test|product|project|engineering|marketing|sales|hr|finance|business)\s+(engineer|developer|manager|analyst|designer|consultant|architect|director|lead|intern)\b/i;
+  /\b(software|data|systems|platform|backend|frontend|full[- ]?stack|devops|cloud|security|mobile|qa|product|project|engineering|marketing|sales|hr|finance|business)\s+(engineer|developer|manager|analyst|designer|consultant|architect|director|lead|intern)\b/i;
 
-const UNAMBIGUOUS_SKILL_MIN_LENGTH = 5;
+const JOB_TITLE_LINE_PATTERN =
+  /\b(senior|junior|lead|principal|staff|associate)?\s*(software|full[- ]?stack|frontend|backend|data|devops|mobile|qa|product|business|hr|marketing|sales|finance)?\s*(engineer|developer|manager|analyst|designer|consultant|architect|intern)\b/i;
+
+const WORK_HISTORY_DATE_PATTERN =
+  /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*\d{2,4}\b/i;
+const WORK_HISTORY_YEAR_RANGE_PATTERN =
+  /\b(?:19|20)\d{2}\s*(?:-|to)\s*(?:present|current|(?:19|20)\d{2})\b/i;
 
 type HighlightLike = {
   skills: string[];
@@ -83,8 +92,10 @@ function hasResumeSectionHeading(lower: string): boolean {
   return RESUME_SECTION_PATTERNS.some((pattern) => pattern.test(lower));
 }
 
-function unambiguousSkillCount(skills: string[]): number {
-  return skills.filter((s) => s.length >= UNAMBIGUOUS_SKILL_MIN_LENGTH).length;
+function hasWorkHistoryDates(text: string): boolean {
+  return (
+    WORK_HISTORY_DATE_PATTERN.test(text) || WORK_HISTORY_YEAR_RANGE_PATTERN.test(text)
+  );
 }
 
 export function assertPlausibleResumeContent(
@@ -103,12 +114,12 @@ export function assertPlausibleResumeContent(
     if (pattern.test(lower)) throw new Error(message);
   }
 
-  if (countNonResumeSignals(lower) >= 2) {
+  if (countNonResumeSignals(lower) >= 3) {
     throw new Error(message);
   }
 
   const unique = new Set(words.map((w) => w.toLowerCase()));
-  if (unique.size < Math.min(12, Math.floor(words.length * 0.35))) {
+  if (unique.size < Math.min(10, Math.floor(words.length * 0.3))) {
     throw new Error(message);
   }
 
@@ -118,7 +129,8 @@ export function assertPlausibleResumeContent(
     /linkedin\.com|github\.com/i.test(t) ||
     /\b\+?\d[\d\s().-]{8,}\d\b/.test(t);
 
-  const roleHint = ROLE_TITLE_PATTERN.test(t);
+  const roleHint = ROLE_TITLE_PATTERN.test(t) || JOB_TITLE_LINE_PATTERN.test(t);
+  const workDates = hasWorkHistoryDates(t);
 
   const signalCount =
     highlights.skills.length +
@@ -127,25 +139,26 @@ export function assertPlausibleResumeContent(
     highlights.companies.length +
     highlights.achievements.length;
 
-  const strongSkills = unambiguousSkillCount(highlights.skills);
-
   const hasStructuredSignals =
     highlights.education.length >= 1 ||
     highlights.companies.length >= 1 ||
-    highlights.projects.length >= 2 ||
-    (highlights.companies.length >= 1 && highlights.projects.length >= 1) ||
-    (contactHint && strongSkills >= 2) ||
-    (sectionHint && strongSkills >= 2) ||
-    (sectionHint &&
-      (highlights.education.length >= 1 ||
-        highlights.companies.length >= 1 ||
-        highlights.projects.length >= 1));
+    highlights.projects.length >= 1 ||
+    highlights.achievements.length >= 1 ||
+    highlights.skills.length >= 2 ||
+    (contactHint && highlights.skills.length >= 1) ||
+    (contactHint && (roleHint || workDates)) ||
+    (sectionHint && (contactHint || highlights.skills.length >= 1 || roleHint)) ||
+    (sectionHint && (highlights.companies.length >= 1 || highlights.education.length >= 1));
 
-  if (!(sectionHint || contactHint) || !hasStructuredSignals) {
+  if (!(sectionHint || contactHint)) {
     throw new Error(message);
   }
 
-  if (!roleHint && !contactHint && signalCount < 3) {
+  if (!hasStructuredSignals) {
+    throw new Error(message);
+  }
+
+  if (!contactHint && !roleHint && !sectionHint && signalCount < 1) {
     throw new Error(message);
   }
 }

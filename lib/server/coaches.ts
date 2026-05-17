@@ -213,16 +213,48 @@ export async function upsertCoach(coach: Coach): Promise<void> {
 }
 
 export async function deleteCoach(id: string): Promise<void> {
+  const coachId = id.trim();
+  if (!coachId) return;
   await db
     .delete(schema.coachingSlotHolds)
-    .where(eq(schema.coachingSlotHolds.coachId, id));
+    .where(eq(schema.coachingSlotHolds.coachId, coachId));
   await db
     .delete(schema.coachingFeedback)
-    .where(eq(schema.coachingFeedback.coachId, id));
+    .where(eq(schema.coachingFeedback.coachId, coachId));
   await db
     .delete(schema.coachingBookings)
-    .where(eq(schema.coachingBookings.coachId, id));
-  await db.delete(schema.coaches).where(eq(schema.coaches.id, id));
+    .where(eq(schema.coachingBookings.coachId, coachId));
+  await db.delete(schema.coaches).where(eq(schema.coaches.id, coachId));
+}
+
+/** Removes coach row(s) by id and/or email (handles legacy Postman rows with missing ids). */
+export async function removeCoachByIdOrEmail(opts: {
+  id?: string;
+  email?: string;
+}): Promise<void> {
+  const coachId = opts.id?.trim();
+  const email = opts.email?.trim().toLowerCase();
+  if (!coachId && !email) {
+    throw new Error("Coach id or email is required.");
+  }
+
+  if (coachId) {
+    await deleteCoach(coachId);
+  }
+
+  if (email) {
+    const rows = await db
+      .select({ id: schema.coaches.id })
+      .from(schema.coaches)
+      .where(sql`LOWER(${schema.coaches.email}) = ${email}`);
+    for (const row of rows) {
+      const id = row.id?.trim();
+      if (id && id !== coachId) {
+        await deleteCoach(id);
+      }
+    }
+    await deleteCoachArtifactsForUserEmail(db, email);
+  }
 }
 
 type DbLike = Pick<NodePgDatabase<typeof schema>, "delete" | "select">;

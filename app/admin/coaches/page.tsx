@@ -198,7 +198,7 @@ export default function AdminCoachesPage() {
                       variant="outline"
                       leftIcon={<Pencil className="size-3.5" />}
                       onClick={() => {
-                        setEditingId(coach.id);
+                        setEditingId(coach.id?.trim() || coach.email);
                         setSaveMessage(null);
                         setSaveError(null);
                         setForm({
@@ -261,10 +261,13 @@ export default function AdminCoachesPage() {
                         onClick={() => {
                           if (!confirm(`Delete ${coach.name}?`)) return;
                           void (async () => {
-                            const res = await fetch(
-                              `/api/admin/coaches?id=${encodeURIComponent(coach.id)}`,
-                              { method: "DELETE" },
-                            );
+                            const coachId = coach.id?.trim();
+                            const qs = coachId
+                              ? `id=${encodeURIComponent(coachId)}`
+                              : `email=${encodeURIComponent(coach.email)}`;
+                            const res = await fetch(`/api/admin/coaches?${qs}`, {
+                              method: "DELETE",
+                            });
                             const data = await res.json();
                             if (!data.ok) {
                               setSaveError(
@@ -274,8 +277,17 @@ export default function AdminCoachesPage() {
                               return;
                             }
                             setSaveError(null);
-                            setCoaches((prev) => prev.filter((x) => x.id !== coach.id));
-                            if (editingId === coach.id) {
+                            setCoaches((prev) =>
+                              prev.filter(
+                                (x) =>
+                                  (x.id?.trim() || x.email) !==
+                                  (coach.id?.trim() || coach.email),
+                              ),
+                            );
+                            if (
+                              editingId === coach.id ||
+                              (!coach.id?.trim() && editingId === coach.email)
+                            ) {
                               setEditingId(null);
                               setForm(DEFAULT_FORM);
                             }
@@ -330,11 +342,15 @@ export default function AdminCoachesPage() {
                   }
                 }
                 const emailLower = form.email.trim().toLowerCase();
-                const duplicateCoachEmail = coaches.some(
-                  (c) =>
+                const editingKey = editingId?.trim() || null;
+                const duplicateCoachEmail = coaches.some((c) => {
+                  const rowKey = c.id?.trim() || c.email;
+                  return (
                     c.email.trim().toLowerCase() === emailLower &&
-                    (editingId == null || c.id !== editingId),
-                );
+                    editingKey != null &&
+                    rowKey !== editingKey
+                  );
+                });
                 if (duplicateCoachEmail) {
                   setSaveError("Coach already exists with this email/User ID.");
                   return;
@@ -368,10 +384,21 @@ export default function AdminCoachesPage() {
                     return;
                   }
                   setCoaches((prev) => {
-                    const idx = prev.findIndex((c) => c.id === next.id);
-                    if (idx === -1) return [next, ...prev];
-                    const copy = [...prev];
-                    copy[idx] = next;
+                    const prevKey = editingKey ?? "";
+                    const idx = prev.findIndex(
+                      (c) => (c.id?.trim() || c.email) === prevKey || c.id === next.id,
+                    );
+                    const withoutLegacy =
+                      editingKey && editingKey.includes("@")
+                        ? prev.filter((c) => c.email.toLowerCase() !== emailLower)
+                        : prev;
+                    if (idx === -1) return [next, ...withoutLegacy];
+                    const copy = [...withoutLegacy];
+                    const at = copy.findIndex(
+                      (c) => (c.id?.trim() || c.email) === prevKey || c.id === next.id,
+                    );
+                    if (at === -1) return [next, ...copy];
+                    copy[at] = next;
                     return copy;
                   });
                   setEditingId(null);
@@ -919,7 +946,10 @@ function toCoach(form: CoachForm, editingId: string | null): Coach | null {
     .filter(Boolean);
   const techAreas = form.techAreas;
   return {
-    id: editingId ?? uid("coach"),
+    id:
+      editingId?.trim() && !editingId.includes("@")
+        ? editingId.trim()
+        : uid("coach"),
     name: form.name.trim(),
     email: form.email.trim().toLowerCase(),
     title: form.title.trim(),

@@ -5,7 +5,7 @@ import { and, eq, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { requirePermission } from "@/lib/auth/admin";
 import { fail, ok } from "@/lib/api/response";
-import { deleteCoach, listCoaches, upsertCoach } from "@/lib/server/coaches";
+import { listCoaches, removeCoachByIdOrEmail, upsertCoach } from "@/lib/server/coaches";
 import type { Coach } from "@/lib/coaches";
 import { db, schema } from "@/lib/db/client";
 import { findUserByEmail } from "@/lib/auth/verification-service";
@@ -229,13 +229,23 @@ export async function DELETE(req: Request) {
   const ctx = await requirePermission("coaches.delete");
   if (ctx instanceof NextResponse) return ctx;
   const { searchParams } = new URL(req.url);
-  const id = searchParams.get("id");
-  if (!id) return fail("validation_error", "Coach id is required.", 400);
+  const id = searchParams.get("id")?.trim() || undefined;
+  const email = searchParams.get("email")?.trim().toLowerCase() || undefined;
+  if (!id && !email) {
+    return fail("validation_error", "Coach id or email is required.", 400);
+  }
   const coaches = await listCoaches();
-  const coach = coaches.find((x) => x.id === id);
-  if (!coach) return fail("user_not_found", "Coach not found.", 404);
+  const coach =
+    (id ? coaches.find((x) => x.id === id) : undefined) ??
+    (email ? coaches.find((x) => x.email.toLowerCase() === email) : undefined);
+  if (!coach && !email) {
+    return fail("user_not_found", "Coach not found.", 404);
+  }
   try {
-    await deleteCoach(id);
+    await removeCoachByIdOrEmail({
+      id: coach?.id?.trim() || id,
+      email: coach?.email?.toLowerCase() ?? email,
+    });
   } catch (err) {
     console.error("[admin/coaches:delete]", err);
     return fail(
@@ -244,8 +254,9 @@ export async function DELETE(req: Request) {
       500,
     );
   }
-  if (coach.email) {
-    const existing = await findUserByEmail(coach.email);
+  const coachEmail = coach?.email ?? email;
+  if (coachEmail) {
+    const existing = await findUserByEmail(coachEmail);
     if (existing?.role === "coach") {
       await db
         .update(schema.users)

@@ -48,6 +48,11 @@ export default function ReportPage() {
   const router = useRouter();
   const [report, setReport] = useState<InterviewReport | null>(null);
   const [emailSent, setEmailSent] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailMeta, setEmailMeta] = useState<{ sentTo: string; adminCopySent: boolean } | null>(
+    null,
+  );
   const [downloading, setDownloading] = useState(false);
   const [progress, setProgress] = useState<ReportProgress | null>(null);
   const [shareText, setShareText] = useState("");
@@ -148,14 +153,42 @@ export default function ReportPage() {
             <Button
               variant="outline"
               size="sm"
-              loading={false}
+              loading={emailSending}
+              disabled={emailSending}
               onClick={() => {
-                setEmailSent(true);
-                setTimeout(() => setEmailSent(false), 4000);
+                void (async () => {
+                  setEmailError(null);
+                  setEmailSending(true);
+                  try {
+                    const res = await fetch(`/api/reports/${params.id}/email`, {
+                      method: "POST",
+                    });
+                    const data = await res.json();
+                    if (!data.ok) {
+                      setEmailError(
+                        (data.message as string) ?? "Could not email report. Try again.",
+                      );
+                      return;
+                    }
+                    setEmailMeta({
+                      sentTo: data.sentTo as string,
+                      adminCopySent: Boolean(data.adminCopySent),
+                    });
+                    setEmailSent(true);
+                    setTimeout(() => {
+                      setEmailSent(false);
+                      setEmailMeta(null);
+                    }, 6000);
+                  } catch {
+                    setEmailError("Network error while sending email.");
+                  } finally {
+                    setEmailSending(false);
+                  }
+                })();
               }}
               leftIcon={<Mail className="size-4" />}
             >
-              {emailSent ? "Emails sent" : "Email a copy"}
+              {emailSent ? "Email sent" : "Email a copy"}
             </Button>
             <Button
               size="sm"
@@ -177,11 +210,18 @@ export default function ReportPage() {
       </header>
 
       <main className="container max-w-6xl px-4 py-8 sm:py-10">
-        {emailSent && (
+        {emailSent && emailMeta && (
           <div className="mb-6 flex items-center gap-2 rounded-xl border border-success-500/30 bg-success-50 px-4 py-3 text-sm text-success-600 animate-fade-in">
-            <CheckCircle2 className="size-4" />
-            Report emailed to <strong>{report.email}</strong> and to the Selectwise
-            admin.
+            <CheckCircle2 className="size-4 shrink-0" />
+            <span>
+              Report emailed to <strong>{emailMeta.sentTo}</strong>
+              {emailMeta.adminCopySent ? " and to the SelectWise admin inbox." : "."}
+            </span>
+          </div>
+        )}
+        {emailError && (
+          <div className="mb-6 rounded-xl border border-danger-500/30 bg-danger-50 px-4 py-3 text-sm text-danger-600">
+            {emailError}
           </div>
         )}
 

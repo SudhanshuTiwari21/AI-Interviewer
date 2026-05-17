@@ -184,8 +184,14 @@ function extractHighlights(text: string): ResumeHighlights {
     new Set(KNOWN_SKILLS.filter((s) => skillAppearsInText(s, lower))),
   ).slice(0, 15);
 
-  const projects = collectSections(text, /projects?|experience/gi).slice(0, 8);
-  const companies = collectSections(text, /experience|employment|work history|professional experience/gi)
+  const projects = collectSections(
+    text,
+    /projects?|experience|work experience|professional experience/gi,
+  ).slice(0, 8);
+  const companies = collectSections(
+    text,
+    /experience|employment|work history|professional experience|work experience/gi,
+  )
     .filter((line) => line.length > 3 && line.length < 80)
     .slice(0, 6);
   const education = collectSections(text, /education|degree|university|college/gi).slice(0, 5);
