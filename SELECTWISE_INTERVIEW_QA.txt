@@ -1,0 +1,906 @@
+================================================================================
+SELECTWISE (AI-INTERVIEWER / HIRO) — INTERVIEW QUESTIONS & ANSWERS
+================================================================================
+Product: Selectwise — AI interview simulator (persona: Hiro) + optional human coaching
+Stack: Next.js 14 App Router, TypeScript, Tailwind, Postgres + Drizzle, OpenAI,
+       Razorpay, LiveKit, Google Calendar, Nodemailer, custom JWT auth (jose)
+Use this as prep notes. Prefer speaking from ownership and tradeoffs, not memorizing.
+
+================================================================================
+1. PRODUCT & OWNERSHIP
+================================================================================
+
+Q1. What problem does Selectwise solve, and who is the primary user?
+A1. Selectwise helps job seekers practice realistic technical/behavioral interviews
+    and get structured feedback before the real thing. Primary users are candidates
+    preparing for tech roles (freshers and professionals). Secondary users are human
+    coaches who run paid 1:1 sessions, and admins who operate the marketplace.
+    The AI interviewer is branded as "Hiro". The paid AI interview is positioned as
+    a low-cost entry (₹199), with optional higher-value human coaching on top.
+
+Q2. Walk me through the end-to-end user journey from landing → paid interview → report.
+A2. 1) Land on marketing home (/) — value prop, pricing, FAQ.
+    2) Sign up → verify email → log in.
+    3) Checkout (/checkout) — Razorpay order for the interview product.
+    4) After payment verify, go to /interview/setup — role, level, focus, resume,
+       difficulty, interviewer mode, mic test.
+    5) Start /interview/[id] — Hiro asks questions (TTS + avatar), candidate answers
+       via voice or text; adaptive follow-ups probe depth.
+    6) Session ends → /interview/[id]/report — 5-axis scores, hire rating, strengths/
+       improvements, PDF download, optional email; reports also persist to Postgres.
+    7) Optionally book human coaching from /schedule.
+
+Q3. Why did you add human coaching on top of AI interviews?
+A3. AI scales cheap practice and consistent scoring, but candidates still want a
+    human bar-raiser for soft skills, company-specific nuance, and accountability.
+    Coaching turns Selectwise from a one-shot tool into a funnel: AI interview
+    diagnoses weak areas → coaching monetizes remediation. It also creates a
+    marketplace (coaches, bookings, calendar, LiveKit meetings) with higher AOV
+    than the ₹199 AI session alone.
+
+Q4. What does a “successful” interview session look like from a product metrics view?
+A4. Candidate completes setup → answers enough questions for signal (roughly 4–12)
+    → report is generated and saved → user returns or books coaching.
+    Leading metrics: checkout conversion, interview completion rate, median answers
+    per session, report open/PDF download rate, repeat interviews, coaching
+    booking rate after report, payment success / webhook reconcile rate.
+    Quality metrics: follow-up relevance (not generic), score stability, support
+    tickets about unfair scoring or mic failures.
+
+Q5. If you had to cut scope for an MVP, what would you keep vs drop?
+A5. Keep: auth + email verify, Razorpay interview checkout, interview setup,
+    heuristic+AI question/follow-up engine, report generation + persistence,
+    basic dashboard.
+    Drop or defer: full coaching marketplace, LiveKit, Google Calendar, admin
+    RBAC matrix depth, moderation alerts, Three.js avatar experiments, stress
+    modes / company packs if they distract from core loop.
+    Rationale: the core loop is pay → practice → scored feedback. Coaching is
+    valuable but multiplies operational complexity (slots, approvals, meetings).
+
+Q6. How do interview price (₹199) and coaching pricing fit the business model?
+A6. ₹199 (INTERVIEW_PRICE_INR in lib/plan-access.ts) is a low-friction paid
+    acquisition / practice product — high volume, low price. Coaching is priced
+    per coach (e.g. perSessionRateInr on coach profiles) and is the higher-margin
+    upsell after the AI report surfaces weak areas. Interview payment unlocks the
+    AI flow; coaching is a separate Razorpay productType with its own booking and
+    refund workflows. Together: land-and-expand — cheap AI wedge, human services
+    for depth.
+
+================================================================================
+2. ARCHITECTURE OVERVIEW
+================================================================================
+
+Q7. Why Next.js App Router as a monolith instead of a separate API service?
+A7. For an MVP, one deployable unit is faster: UI pages and Route Handlers share
+    TypeScript types, auth helpers, Zod schemas, and Drizzle models. App Router
+    colocates marketing, product UI, and APIs under app/. We avoid early
+    microservice overhead (auth sync, CORS, duplicate validation). When domains
+    grow (heavy AI orchestration, meeting media, payment webhooks), we can extract
+    services without rewriting the product surface first.
+
+Q8. How is responsibility split between app/, components/, and lib/?
+A8. app/ — routes (pages) and API Route Handlers; thin orchestration.
+    components/ — UI by domain (marketing, interview, meeting, admin, coach, auth).
+    lib/ — domain logic: question-engine, auth, db schema, payments, meeting,
+    email, integrations. Pattern: keep business rules out of JSX; keep HTTP
+    concerns out of lib where possible (server-only modules for secrets).
+
+Q9. What lives in Postgres vs localStorage, and why that hybrid?
+A9. Postgres (durable): users, tokens, reports, coaches, bookings, payments,
+    webhooks, support tickets, meeting transcripts/alerts, settings.
+    localStorage (lib/store.ts): live interview draft/config mid-session, some
+    client caches historically used so the demo flow worked without a full backend.
+    Hybrid exists because the product evolved from client-only MVP to server-
+    backed. Tradeoff: fast offline mid-session UX vs risk of loss/tampering;
+    durable business data belongs in Postgres.
+
+Q10. How would you scale this if interview traffic 10× overnight?
+A10. Short term: horizontal Next.js instances behind a load balancer; Postgres
+     connection pooling; move OpenAI calls server-side with rate limits/queues;
+     cache public settings; ensure Razorpay webhooks are idempotent (already via
+     razorpay_webhook_events).
+     Medium: extract interview AI orchestration to a worker queue; stream TTS/STT
+     separately; CDN for static/marketing; read replicas for report listing.
+     Watch: client-side OpenAI key abuse would burn quota first — must proxy ASAP.
+
+Q11. What would you extract into a separate service first, and why?
+A11. Interview AI orchestration (plan, follow-ups, end decision, scoring narrative)
+     behind a server API + queue. Reasons: hide API keys, enforce spend caps,
+     prevent score tampering, isolate latency/retries from the Next.js request
+     path. Second candidate: meeting media/transcription worker. Payments stay
+     close to the monolith until volume justifies a billing service.
+
+Q12. How do cron jobs (meeting-lifecycle, feedback reminders) fit the architecture?
+A12. App exposes secured cron Route Handlers (e.g. /api/cron/meeting-lifecycle,
+     coaching-feedback-reminders) gated by CRON_SECRET / Vercel cron header.
+     GitHub Actions can hit them hourly. They close stale active meetings, delete
+     LiveKit rooms, and nudge feedback. Fits a serverless/monolith world: no
+     long-running worker required for periodic cleanup; secret-protected HTTP is
+     the trigger contract.
+
+================================================================================
+3. TECH STACK CHOICES
+================================================================================
+
+Q13. Why Drizzle ORM over Prisma / raw SQL?
+A13. Drizzle is TypeScript-first, lightweight, close to SQL, and pairs well with
+     explicit migrations in drizzle/. We get typed schema in lib/db/schema.ts
+     without Prisma’s heavier client runtime. Raw SQL alone would lose type safety
+     and migration discipline; Prisma is fine but Drizzle matched our preference
+     for SQL-shaped queries and simpler ops for an MVP.
+
+Q14. Why Tailwind for this product UI?
+A14. Fast iteration on marketing + app shells without a separate design-system
+     build step. Utility classes keep styles colocated with components; shared
+     tokens via Tailwind config. For a small team shipping landing + dashboard +
+     interview UX quickly, Tailwind reduces CSS overhead. clsx + tailwind-merge
+     handle conditional classes cleanly.
+
+Q15. Why Zod at the API boundary?
+A15. Runtime validation of untrusted request bodies/query params. TypeScript types
+     alone disappear at runtime. Zod gives parse errors we map to consistent API
+     fail() responses, and inferred types keep handlers honest. Critical for auth,
+     payments, admin patches, and booking payloads.
+
+Q16. Why jose + HTTP-only cookies instead of NextAuth / Clerk?
+A16. Custom control over session shape (sub, email, name, role, plan), cookie name
+     (hiro_session), TTL, and password/email-verify flows without vendor lock-in
+     or extra SaaS cost. jose signs/verifies JWT HS256. HTTP-only cookies mitigate
+     XSS token theft vs localStorage JWTs. Tradeoff: we own security maintenance
+     (rotation, CSRF posture, password policy) that Auth-as-a-Service would cover.
+
+Q17. Why LiveKit for coaching but Web Speech for AI interviews?
+A17. AI interview is 1:1 with a bot — browser SpeechRecognition + speechSynthesis
+     (plus optional server Whisper-class transcribe) is enough and cheap. Coaching
+     needs real two-party A/V, rooms, tokens, and lifecycle — LiveKit fits.
+     Using LiveKit for Hiro would add cost/complexity without proportional UX gain
+     for scripted Q&A. Different problems, different tools.
+
+Q18. Why Razorpay over Stripe for this market?
+A18. Primary market is India (INR pricing, UPI/cards/netbanking familiarity).
+     Razorpay is the natural PSP: Checkout.js, orders, webhooks, INR. Stripe is
+     stronger globally but Razorpay reduces payment friction for Indian candidates
+     and coaches. Implementation: server orders, client checkout, signature verify,
+     webhook idempotency.
+
+Q19. Three.js is in package.json but unused — what happened?
+A19. Likely an abandoned path toward a 3D interviewer avatar. Current UI uses a
+     static image + CSS speaking animation (InterviewerAvatar). Leftover deps are
+     tech debt — should be removed to shrink install/bundle until a real 3D need
+     exists. Good honesty signal in interviews: ship simpler avatar first.
+
+================================================================================
+4. AUTH, SESSIONS & RBAC
+================================================================================
+
+Q20. Explain the signup → verify-email → login flow.
+A20. Signup creates a user with hashed password and issues an email verification
+     token (stored hashed). User clicks link on /verify-email → token validated →
+     emailVerified set. Login checks credentials, blocks unverified/suspended,
+     then sets HTTP-only session cookie. Resend-verification can issue a fresh
+     link. Forgot/reset password uses a parallel hashed one-time token flow.
+
+Q21. How is the session cookie (hiro_session) created, validated, and expired?
+A21. createSessionToken builds a JWT (jose SignJWT, HS256) with sub/email/name/
+     role/plan, iat, exp (default SESSION_TTL_DAYS=7). setSessionCookie writes
+     httpOnly, sameSite=lax, secure in production, path=/. getSessionFromCookie
+     reads and jwtVerify’s; invalid/expired → null. clearSessionCookie maxAge=0
+     on logout. AUTH_SECRET must be ≥32 chars or session creation throws.
+
+Q22. Why hash verification / reset / approval tokens before storing them?
+A22. If the DB is leaked, raw email links must not be reusable. We store a hash
+     (e.g. SHA-256) and only the email recipient sees the raw token. Same pattern
+     for coach approval and feedback tokens. Standard secret-at-rest hygiene for
+     one-time credentials.
+
+Q23. How do you mitigate email enumeration on resend-verification?
+A23. For unknown emails, the API still returns a generic success-style message
+     (“If an account exists… we’ve sent a fresh link”) instead of “user not found”.
+     That reduces account-existence oracle attacks. (Already-verified users get a
+     clearer message so they know to sign in — a small UX vs privacy tradeoff.)
+
+Q24. Explain the role hierarchy: super_admin → admin → sub_admin → coach → user.
+A24. Defined in lib/auth/permissions.ts with ROLE_RANK and a permissions matrix.
+     super_admin: full PERMISSIONS list.
+     admin: broad ops (users, coaches, bookings, refunds, support, analytics) but
+            not every team/super-admin assignment or settings.update extremes.
+     sub_admin: mostly read/overview scoped permissions.
+     coach: coach portal / own bookings (via coach guards).
+     user: candidate product surfaces.
+     UI AdminShell and API requirePermission both import the same matrix.
+
+Q25. Why does requirePermission reload role from the DB instead of trusting the JWT?
+A25. JWT role can be stale after demotion/promotion. getAdminFromSession loads the
+     user by session.sub from DB and checks role/status/emailVerified there. Role
+     changes take effect without forcing re-login. Session still authenticates
+     identity; authorization uses fresh DB state.
+
+Q26. How does account suspension work?
+A26. Admin can set user status to suspended (suspendedAt). Guards
+     (suspendResponseIfNeeded / account-status) return 403 on sensitive APIs
+     (payments, reports, etc.). Login returns account_suspended. AppShell shows
+     SuspendedAccountNotice. Coaches/admins with suspended status also fail their
+     session resolution.
+
+Q27. How is the super-admin bootstrap (SUPER_ADMIN_EMAIL) secured?
+A27. On login, if env SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD match, the system
+     can ensure a super_admin user exists (bootstrap). It must be strong secrets
+     only on the server, never NEXT_PUBLIC. Risk: env leak = full takeover — treat
+     like root credentials; rotate; prefer disabling bootstrap after first admin
+     exists in hardened environments.
+
+Q28. What happens if AUTH_SECRET is weak or rotated?
+A28. Weak/missing (<32 chars): session create/verify throws — auth breaks closed.
+     Rotation without dual-key support: all existing cookies fail jwtVerify →
+     users must re-login (session invalidation). Plan dual secrets (current+previous)
+     if you need zero-downtime rotation. Never commit AUTH_SECRET; rotate after any
+     leak.
+
+================================================================================
+5. AI INTERVIEW ENGINE
+================================================================================
+
+Q29. Explain buildInterviewPlan vs buildInterviewPlanWithAI.
+A29. buildInterviewPlan: deterministic plan from templates/mock-data + role tech +
+     resume probes (intro/behavioral/technical/wrap). Works offline.
+     buildInterviewPlanWithAI: calls gpt-4o-mini with JSON response_format, persona
+     from systemPersona(), asks for 5–7 opening questions with sequencing rules
+     (warm intro first), filters generics, falls back to deterministic plan on
+     failure. Hybrid = reliability + quality when AI is available.
+
+Q30. What happens when OpenAI is unavailable? How do heuristics kick in?
+A30. getOpenAIClient() returns null without NEXT_PUBLIC_OPENAI_API_KEY. Plan,
+     follow-ups, end decision, and report narratives fall back to template/
+     heuristic paths (maybeGenerateFollowUp, word-count end rules, generateReport
+     baseline scores). Product still runs; quality is shallower but demos don’t
+     hard-fail.
+
+Q31. How does the system persona (Hiro) change with difficulty / company mode?
+A31. systemPersona() injects role, level, company, interview type, difficulty
+     label, interviewer style, interviewerMode (standard / ex-google / ex-amazon /
+     ex-meta) with mode-specific persona text, optional stress-test language, and
+     tech themes. Harder difficulty demands more signal before ending; stress mode
+     pushes terse demanding prompts. Persona must sound human and never reveal
+     system/AI internals.
+
+Q32. How do follow-ups work (maybeGenerateFollowUpWithAI)? Depth caps?
+A32. After an answer, maybeGenerateFollowUpWithAI may insert a follow-up.
+     Heuristic gate first (wrap category skip, short answers skip, difficulty caps:
+     easy 2 / medium 3 / hard 4 alreadyInserted). Chain metadata tracks
+     topic:depth up to depth 3. AI generates a ≤~38 word counter-question anchored
+     on the claim; guard rejects generics and uses chain/template fallback.
+     Rationale stores chain:topic:depth=N for debugging/continuity.
+
+Q33. How do you detect and reject generic AI questions?
+A33. isGenericQuestion() normalizes text and rejects shallow/boilerplate prompts
+     (and can require inclusion of the chain topic). Used when filtering AI plan
+     questions and when accepting follow-up text. If AI output fails the guard,
+     we retry or fall back to templated probing so the interview stays concrete
+     (tech, metric, trade-off, claim verification).
+
+Q34. How does prior-interview context avoid repeats and target weak areas?
+A34. InterviewConfig.priorContext can include previous questions, strengths, and
+     weak areas. Persona + plan prompts tell the model to avoid repeats and target
+     weak areas with fresh scenarios. priorContextSnippet summarizes last sessions
+     for the model. Progress/report APIs feed weak-area insights across attempts.
+
+Q35. When does shouldEndInterviewWithAI stop the session (min/max answers)?
+A35. Hard rules: ≤3 answers → never end; ≥12 → always end. Between: AI decides
+     with temperature 0.2 JSON {shouldEnd, reason}, harder difficulty should demand
+     more data. Without OpenAI: end if asked≥6 and last answer >50 words, else
+     continue. On AI error → continue (fail open toward more signal).
+
+Q36. Why run most LLM calls client-side with NEXT_PUBLIC_OPENAI_API_KEY?
+A36. MVP speed: no server round-trip for every follow-up; easy local demo; question
+     engine runs in the browser alongside Recorder/TTS. Explicitly documented as
+     demo/MVP in lib/openai-client.ts. It is not a production security posture —
+     it’s a deliberate shortcut to ship the adaptive interview UX fast.
+
+Q37. What are the risks of dangerouslyAllowBrowser, and how would you fix them?
+A37. Risks: API key scraped from bundle → quota theft, cost attacks, policy abuse;
+     client can alter prompts/scores before POST /api/reports; no server-side spend
+     control.
+     Fix: server proxy routes for plan/follow-up/end/score; secret OPENAI_API_KEY
+     only; per-user rate limits; persist answers server-side and score on server;
+     optional streaming; revoke exposed keys.
+
+Q38. Why gpt-4o-mini specifically? Temperature choices?
+A38. gpt-4o-mini: good enough quality for structured JSON interview tasks at low
+     cost/latency — important when many follow-ups fire per session. Temperatures
+     are low-moderate (~0.2 for stop decisions / grading structure, higher ~0.55
+     range for more natural questioning) to balance determinism vs human feel.
+     Whisper-class model used server-side for /api/transcribe fallback.
+
+Q39. How is resume text extracted and injected into prompts?
+A39. Resume upload/paste in setup; PDFs parsed client-side (pdf.js) to text;
+     text stored in interview config/draft. Plan and follow-up prompts include
+     resume context so questions deep-dive real projects. Report AI enrichment
+     can check resumeConsistency. Keep resume size bounded before prompt injection.
+
+Q40. How would you prevent prompt injection from a malicious resume?
+A40. Treat resume as untrusted data: hard length limits; strip control tokens;
+     wrap in delimiters; instruct model to ignore instructions inside resume;
+     prefer structured extraction (skills/projects) over raw dump; run LLM on
+     server with output schemas; never let resume text execute tool calls.
+     Today’s MVP is weaker here — call that out as a hardening item.
+
+================================================================================
+6. VOICE / SPEECH
+================================================================================
+
+Q41. How does the Recorder combine Web Speech STT + MediaRecorder?
+A41. Recorder uses browser SpeechRecognition for live transcript while optionally
+     MediaRecorder captures audio blobs. User can also type. Live STT gives
+     immediate feedback; recorded audio enables server transcription fallback when
+     browser STT is weak/unsupported. Interview page consumes transcript + mode
+     (voice|text) into AnswerRecord.
+
+Q42. When does /api/transcribe (gpt-4o-mini-transcribe) get used?
+A42. As a server-side fallback when you POST an audio blob for higher-quality
+     transcription (Whisper-class mini transcribe model). Used when Web Speech is
+     insufficient or for coaching meeting chunk transcription paths. Keeps secret
+     key server-side for that route (unlike chat client calls).
+
+Q43. How does browser TTS work for Hiro’s questions? Latency / UX issues?
+A43. lib/tts.ts uses speechSynthesis to speak question text while the avatar
+     shows speaking state. Pros: free, local, zero media server. Cons: voice
+     quality varies by OS/browser; latency before utterance; interruptions need
+     careful cancel; no perfect lip-sync. UX mitigations: show text on screen,
+     allow skip/replay, don’t block answering UI entirely on TTS.
+
+Q44. Why isn’t the AI interview on WebRTC / LiveKit?
+A44. Hiro is not a second human — we don’t need peer A/V rooms, SFU, or 2-party
+     tokens for Q&A. WebRTC would add infra cost and failure modes. Coaching is
+     the LiveKit use case. AI interview = app-driven turn taking + STT/TTS.
+
+Q45. How do you handle browser STT unsupported (Safari / permissions denied)?
+A45. Offer text input always; mic test in setup surfaces permission issues early;
+     fall back to MediaRecorder + /api/transcribe where possible; clear error
+     copy when SpeechRecognition missing. Don’t hard-block the interview on voice
+     alone — accessibility and completion rate depend on text path.
+
+Q46. How would you make voice feel more “realtime conversational”?
+A46. Partial transcripts with barge-in; stream LLM tokens into TTS (chunked speak);
+     server VAD; interruptible Hiro; shorter follow-ups; optional realtime APIs
+     (OpenAI Realtime / LiveKit agents) for true duplex. Keep captions. Measure
+     time-to-first-audio and interruption success rate.
+
+================================================================================
+7. SCORING & REPORTS
+================================================================================
+
+Q47. Explain the five score axes and how overall rating maps to hire bands.
+A47. Axes: communication, technicalDepth, problemSolving, structure, ownership
+     (0–100-ish clamped). overall = average of five.
+     Rating thresholds: ≥85 Strong hire; ≥75 Hire; ≥65 Lean hire; else No hire.
+     Narrative strengths/improvements derive partly from axis thresholds and tone
+     adjustments.
+
+Q48. How does heuristic scoring work before AI enrichment?
+A48. Baseline ~62 + signals: average word counts, structure keywords (e.g. result,
+     because, trade-off style hits), communication tone adjustment from responses,
+     difficulty adjustment (hard −5 / easy +4), small jitter. This yields numeric
+     breakdown even without OpenAI. Then generateReportWithAI can enrich text fields.
+
+Q49. Does AI rewrite only narrative fields or also numeric scores? Is that consistent?
+A49. Primary numeric scores come from heuristics; AI enrichment focuses on
+     strengths, improvements, nextSteps, jobReadiness, detailedAnalysis. That can
+     feel inconsistent if prose implies a different bar than numbers — a known
+     MVP tension. Production fix: either AI-calibrated scores with rubrics or
+     clearly label heuristic scores vs AI commentary.
+
+Q50. How are reports persisted (interview_reports + JSONB)?
+A50. Server APIs under /api/reports accept/store reports keyed by user; schema has
+     interview_reports with score columns plus report_data JSONB for the full
+     structured report (answers, analysis, etc.). Listing/progress endpoints read
+     from DB. Client may still cache in localStorage for UX, but Postgres is source
+     of truth for durable history.
+
+Q51. How does PDF generation work? Emailing the report?
+A51. Client/lib uses jspdf to render a downloadable PDF from report fields.
+     /api/reports/[id]/email sends a copy via Nodemailer/SMTP. Separation: PDF is
+     user-driven export; email is server notification with auth checks on ownership.
+
+Q52. How does progress across multiple interviews get computed?
+A52. /api/reports/progress (and related client views) aggregates prior reports —
+     score trends, weak areas, attempt counts (e.g. usedAttemptsThisMonth helper).
+     Prior context feeds the next interview config so Hiro targets weaknesses and
+     avoids repeated questions.
+
+Q53. How would you stop a user from faking high scores before POST /api/reports?
+A53. Today risk is real because scoring can run client-side. Fix: stream answers to
+     server each turn; server recomputes scores; sign report payloads; reject
+     client-supplied breakdowns; rate-limit; compare transcript length/timing
+     heuristics; optionally re-grade async with AI on server. Treat client scores
+     as untrusted display-only until verified.
+
+================================================================================
+8. PAYMENTS (RAZORPAY)
+================================================================================
+
+Q54. Walk through create order → Checkout.js → verify signature.
+A54. Authenticated user hits /api/payments/razorpay/order → server creates Razorpay
+     order + payment_transactions row (productType interview|coaching).
+     Client opens Razorpay Checkout.js with order id + public key.
+     On success, client sends orderId, paymentId, signature to /api/payments/
+     razorpay/verify → HMAC verify → mark paid / unlock access / advance booking.
+     Webhook is a parallel source of truth for async confirmation.
+
+Q55. How do you verify Razorpay signatures safely (timingSafeEqual)?
+A55. Payment: HMAC-SHA256 of `orderId|paymentId` with key secret, compare to
+     signature via crypto.timingSafeEqual on buffers (constant-time; avoids timing
+     attacks from naive string compare). Webhooks: HMAC of raw body with webhook
+     secret, same timingSafeEqual. Length mismatches must be handled carefully
+     (equal-length buffers) to avoid throws.
+
+Q56. Interview vs coaching: how does productType branch the flow?
+A56. payment_transactions.product_type is interview | coaching. Order/verify
+     handlers branch: interview unlocks AI interview access / plan flags; coaching
+     attaches to a booking/slot-hold and moves booking toward pending approval.
+     Same Razorpay rails, different domain side effects after paid.
+
+Q57. How do webhooks + razorpay_webhook_events give idempotency?
+A57. Webhook handler verifies signature, logs event id/payload in
+     razorpay_webhook_events, and skips re-processing duplicates. Prevents double
+     unlock / double booking confirmation when Razorpay retries. Verify endpoint
+     and webhook should converge on the same paid state machine.
+
+Q58. What if verify succeeds but webhook never arrives (or vice versa)?
+A58. Design for either path to finalize payment safely (idempotent state
+     transitions). If verify paid first, webhook no-ops. If webhook first, verify
+     sees already paid. Ops: reconcile unpaid orders vs Razorpay dashboard; alert
+     on verify/webhook signature failures; never unlock without a verified signal.
+
+Q59. How are refunds / refund-requests modeled and audited?
+A59. Users can request refunds on coaching bookings; refund_events (and admin
+     refunds.manage permission) audit the trail. Admins view/manage via admin
+     payments/refunds surfaces. Important: refunds should update booking/payment
+     status consistently and remain append-only for audit.
+
+Q60. Where is plan/access unlocked after payment (lib/plan-access.ts)?
+A60. INTERVIEW_PRICE_INR = 199 is centralized there; helpers describe premium
+     feature flags / attempt counting. Actual unlock is driven by successful
+     payment verification updating user/plan or granting access flags, with
+     checkout gating the setup route. (Note: some premium helpers currently return
+     permissive defaults — know what’s enforced vs aspirational in code reviews.)
+
+================================================================================
+9. COACHING & SCHEDULING
+================================================================================
+
+Q61. End-to-end: pick coach → slot hold → pay → coach approve → calendar + meeting.
+A61. User picks coach/slot on /schedule → create short-lived coaching_slot_holds →
+     Razorpay pay (productType coaching) → booking pending → coach receives email
+     with approval token → on approve: Google Calendar event + ensure LiveKit room
+     / meeting URL → user (and coach) join /meeting/[bookingId] → session/transcript
+     → feedback token flow; refunds if needed.
+
+Q62. Why short-lived coaching_slot_holds plus unique (coach, starts_at)?
+A62. Hold reserves the slot during checkout so two browsers don’t sell the same
+     time. Unique constraint on bookings (coach + starts_at) is the hard DB
+     guarantee against double booking. Holds expire so abandoned checkouts release
+     inventory. Defense in depth: UX hold + DB uniqueness.
+
+Q63. Race: two users checkout the same slot — who wins?
+A63. First to successfully create the hold/booking row under constraints wins; the
+     other gets a conflict error from unique index / hold logic. Payment without a
+     valid hold should not confirm the booking. Exact winner = first committed
+     transaction, not first click.
+
+Q64. What does coach email approval do exactly?
+A64. Tokenized GET/approve endpoint validates hashed token, transitions booking to
+     approved/scheduled state, creates/updates Google Calendar event, ensures
+     LiveKit room and stores meeting URL/room name on the booking, notifies
+     parties. Rejects invalid/expired tokens. Keeps coaches out-of-band from
+     needing an always-open dashboard for first confirmation.
+
+Q65. How is Google Calendar integrated (service account, Meet, edge cases)?
+A65. lib/integrations/google-calendar.ts uses googleapis with a service account
+     to create events (and Meet links where configured). Edge cases: attendee
+     permissions with service accounts, domain-wide delegation, timezone on
+     starts_at, failed calendar still allowing meeting URL via LiveKit, retries/
+     idempotency if approve is double-clicked.
+
+Q66. How does coaching feedback via token work?
+A66. After session, a one-time feedback token lets the user submit ratings without
+     full login friction (or in addition to logged-in flow). Stored in
+     coaching_feedback 1:1 with booking. Cron reminders nudge incomplete feedback.
+     Tokens hashed at rest like other email tokens.
+
+Q67. How would you handle timezone differences for slots?
+A67. Store all slot instants in UTC (timestamptz); render in user/coach timezone
+     from user_settings or browser. Availability JSON should be interpreted with
+     an explicit TZ. Calendar events must include correct TZ to avoid off-by-one
+     hour bugs. Never schedule on naive local strings without offset.
+
+================================================================================
+10. LIVEKIT MEETINGS
+================================================================================
+
+Q68. How are rooms created and tokens issued?
+A68. lib/meeting/service ensureRoom creates/reuses a room name per booking via
+     LiveKit RoomService (maxParticipants: 2). /api/meeting/token issues a
+     server-signed participant access token (livekit-server-sdk) for the
+     authenticated authorized user/coach. Client livekit-client joins with URL+token.
+     Secrets stay server-side.
+
+Q69. Why max 2 participants?
+A69. Coaching is 1:1 (candidate + coach). Cap reduces abuse (extra joins), simplifies
+     billing/moderation assumptions, and matches product intent. Observers/admins
+     would need an explicit design change (hidden participant roles).
+
+Q70. How do session start/end and recording/transcription chunks work?
+A70. session/start and session/end APIs mark meeting lifecycle on the booking.
+     Client MeetingExperience can MediaRecorder chunk audio and POST
+     transcribe-chunk; transcripts land in meeting_transcripts. End triggers
+     cleanup paths; cron also closes stale active meetings. Recording retention
+     policies should be explicit for compliance.
+
+Q71. Explain meeting moderation (regex poaching/contact flags) — strengths & limits.
+A71. lib/meeting/moderation.ts scans transcript text with regex for poaching,
+     contact sharing, policy phrases → meeting_moderation_alerts.
+     Strengths: cheap, deterministic, low latency, no extra LLM cost.
+     Limits: easy to evade, language-limited, false positives/negatives, no
+     context. LLM moderator or classifier would be richer but costlier/slower.
+
+Q72. What does the LiveKit webhook handle?
+A72. /api/webhooks/livekit receives room/participant lifecycle events to sync
+     server state (e.g. room ended, participants left) and support cleanup /
+     auditing. Must verify webhook authenticity and stay idempotent.
+
+Q73. What does the hourly meeting-lifecycle cron clean up, and why?
+A73. Finds stale “active” meetings past expected end/grace, marks them ended, and
+     tryDeleteLiveKitRoom to free resources and disconnect stragglers. Prevents
+     orphan rooms/cost bleed when clients crash without calling session/end.
+     Feedback reminder cron is separate (nudge unreviewed sessions).
+
+================================================================================
+11. DATABASE & SCHEMA
+================================================================================
+
+Q74. Walk through the main tables and relationships.
+A74. users — identity, role, plan, status.
+     email_verification_tokens / password_reset_tokens — hashed OTPs.
+     interview_reports — per-user reports + JSONB payload.
+     coaches — profile, rates, availability JSON, tech areas.
+     coaching_slot_holds — ephemeral reservations.
+     coaching_bookings — slot, payment, approval, calendar, meeting state.
+     coaching_feedback — rating per booking.
+     payment_transactions — Razorpay rows by productType.
+     razorpay_webhook_events / refund_events — payment audit.
+     support_tickets, audit_logs, admin_settings, user_settings.
+     meeting_transcripts, meeting_moderation_alerts.
+     Relationships center on users ↔ reports/bookings/payments; coaches ↔ bookings.
+
+Q75. Why JSONB for report_data and coach availability?
+A75. Reports are nested/evolving (answers, analysis objects) — JSONB avoids constant
+     migrations for every narrative field while keeping queryable envelope columns
+     (scores, role). Availability is structured but coach-specific; JSONB is flexible
+     for weekly patterns. Tradeoff: weaker relational constraints inside JSON —
+     validate with Zod at write time.
+
+Q76. How are migrations managed (drizzle/, db:migrate)?
+A76. SQL migrations live under drizzle/ (0000…0020+). npm run db:migrate runs
+     scripts/db-migrate.mjs tracking applied files (e.g. _hiro_migrations).
+     Schema source of truth: lib/db/schema.ts. Deploy rule: migrate before
+     rolling out code that depends on new columns.
+
+Q77. Indexes / uniqueness you’d highlight in a schema review?
+A77. Case-insensitive unique email on users; unique (coach, starts_at) on bookings;
+     unique meeting room name; unique/idempotent webhook event ids; indexes on
+     foreign keys and common filters (status, product_type, expires_at on holds).
+     These enforce money/scheduling correctness under concurrency.
+
+Q78. How would you migrate off hybrid localStorage mid-interview state?
+A78. Create interview_sessions table; autosave answers/config server-side each turn;
+     resume by session id; keep localStorage as offline cache only; dual-read then
+     drop client-only report lists. Enables multi-device resume and anti-tamper
+     scoring.
+
+Q79. Soft-delete vs hard-delete for users/bookings — what do you do today?
+A79. Suspension is soft status on users (not hard delete by default). Bookings
+     cancel/reschedule via status transitions. Admin may have delete permissions
+     for some entities — prefer soft-delete/anonymize for payments and transcripts
+     due to audit/compliance. Be explicit in answers about what is physically
+     deleted vs status-flagged in current code.
+
+================================================================================
+12. ADMIN, OPS & SUPPORT
+================================================================================
+
+Q80. What can admins do vs coaches vs users?
+A80. Users: interview, reports, schedule coaching, support tickets, settings.
+     Coaches: coach portal, manage/view their bookings/sessions.
+     Admins (tiered): users, coaches, sessions/reports, bookings, payments/refunds,
+     support, analytics, audit, team invites — gated by permission matrix.
+     super_admin ⊂ all capabilities.
+
+Q81. How does the permissions matrix stay shared between API and UI?
+A81. Single module lib/auth/permissions.ts exports ROLES, PERMISSIONS, and
+     role→permission maps. API requirePermission and AdminShell nav gating both
+     import it — prevents UI showing actions the API would 403 (and vice versa).
+
+Q82. What goes into audit_logs?
+A82. Sensitive admin actions (user updates, suspensions, role changes, etc.) for
+     accountability. Admins with audit.view/export can review. Good practice:
+     who/when/what/before-after, never store secrets in audit payloads.
+
+Q83. How do support tickets flow?
+A83. Users create tickets via /api/support/tickets (and support UI). Admins with
+     support.view/manage handle them in admin support surfaces. Email may notify
+     on create/update depending on SMTP wiring. Status lifecycle should be tracked
+     on support_tickets rows.
+
+Q84. What admin settings are live-configurable?
+A84. admin_settings singleton JSON plus /api/settings/public for safe public flags
+     (announcements, feature copy, pricing-related display, etc.). settings.update
+     permission protects writes. Keeps ops changes off a full redeploy when
+     appropriate.
+
+Q85. How would you invite a team member / sub-admin safely?
+A85. team.invite + role.assign.* permissions; invite creates/updates user with
+     least privilege (sub_admin by default); email verification required; only
+     higher roles can assign admin/super_admin; audit the assignment; avoid
+     sharing SUPER_ADMIN_PASSWORD bootstrap. Prefer invite links over shared
+     passwords.
+
+================================================================================
+13. EMAIL & NOTIFICATIONS
+================================================================================
+
+Q86. What emails does the system send (verify, reset, coaching, report, support)?
+A86. Email verification, password reset, coaching approval/notifications, report
+     email copies, support-related mail, feedback reminders. Implemented via
+     lib/email + Nodemailer templates/helpers. All sensitive links use hashed
+     tokens.
+
+Q87. How is Nodemailer / SMTP configured for local vs prod?
+A87. Env-driven SMTP (host/port/user/pass/from) — Gmail/SendGrid/etc. Local can
+     use ethereal/mailtrap or real SMTP with test inbox. Prod uses provider SMTP
+     + APP_URL for link hosts. Missing SMTP should fail clearly on send paths
+     without breaking unrelated reads.
+
+Q88. How would you make email delivery reliable (queues, retries)?
+A88. Push send jobs to a queue (BullMQ/SQS); retry with backoff; dead-letter;
+     idempotent “already sent” keys; monitor bounces; separate transactional
+     provider. Today’s sync Nodemailer in request path is MVP — fine until volume
+     or latency hurts UX.
+
+Q89. Coaching feedback reminders — who triggers them and when?
+A89. Cron route /api/cron/coaching-feedback-reminders (secret-gated), typically
+     scheduled hourly like meeting lifecycle. Selects completed bookings missing
+     feedback and emails a tokenized reminder. Prevents silent drop-off after
+     paid sessions.
+
+================================================================================
+14. SECURITY DEEP DIVE
+================================================================================
+
+Q90. Top 3 security issues you’d fix before production.
+A90. 1) Remove NEXT_PUBLIC_OPENAI_API_KEY / client LLM — server proxy + spend caps.
+     2) Server-side authoritative scoring and answer persistence (anti-tamper).
+     3) Harden secrets/bootstrap (AUTH_SECRET, SUPER_ADMIN_*, webhook secrets),
+        CSRF strategy for state-changing cookie auth, and IDOR audits on
+        reports/bookings. Honorable mention: resume prompt-injection defenses.
+
+Q91. Client-side OpenAI key exposure — attack scenarios?
+A91. Attacker extracts key from JS bundle → runs unlimited completions → bill
+     shock; uses your key for unrelated abuse → provider suspension; scrapes
+     prompts/IP. Mitigate: revoke key, move server-side, per-user quotas, monitor
+     usage anomalies, separate restricted keys if any client path must remain.
+
+Q92. Client-orchestrated interview scoring — tampering scenarios?
+A92. User patches network response or local generateReport output → POST inflated
+     scores; skips weak answers; forges report_data. Business impact: fake “Strong
+     hire” PDFs, polluted analytics, unfair coaching recommendations. Fix: server
+     grade from trusted transcripts only.
+
+Q93. CSRF on cookie auth — how does sameSite: lax help / not help?
+A93. sameSite=lax blocks most cross-site POST cookie sends from foreign sites,
+     reducing classic CSRF. It does not protect same-site subdomain attacks, or
+     all GET side effects (lax sends cookies on top-level GET navigations).
+     Dangerous GETs (coach-approve) must be token-gated (they are). For strictness:
+     CSRF tokens or sameSite=strict + careful UX; Prefer POST for mutations.
+
+Q94. Are admin APIs protected against IDOR on bookings/reports?
+A94. Pattern should be: authenticate → authorize permission → scope query by
+     role (admin global vs user ownership vs coach assignment). User report fetch
+     by id must verify userId == session.sub. Admin routes use requirePermission.
+     Always cite checking ownership in handlers during interviews; call out any
+     gaps you’d audit with automated tests.
+
+Q95. How do you sanitize / limit transcript and resume uploads?
+A95. Enforce max file size/type (PDF/TXT), max extracted character length, virus
+     scanning at higher tiers, store outside public web root if files retained,
+     escape when rendering, don’t execute resume content. Transcripts: length
+     caps per chunk, moderation pipeline, retention limits. Zod validates API
+     shapes; content safety is deeper than schema.
+
+Q96. Secrets in .env — what must never be NEXT_PUBLIC_?
+A96. Never public: AUTH_SECRET, DB URL, SMTP passwords, RAZORPAY_KEY_SECRET,
+     RAZORPAY_WEBHOOK_SECRET, OPENAI_API_KEY (server), LIVEKIT API secret,
+     Google service account private key, CRON_SECRET, SUPER_ADMIN_PASSWORD.
+     NEXT_PUBLIC_ is fine only for truly public keys (e.g. Razorpay key id).
+     Today’s NEXT_PUBLIC_OPENAI_API_KEY is the anti-pattern to fix.
+
+================================================================================
+15. RELIABILITY, OBSERVABILITY & TESTING
+================================================================================
+
+Q97. How do you know a payment/webhook failed in production?
+A97. Log verify/webhook failures with order ids (not full secrets); alert on
+     signature failures and stuck “created” transactions; reconcile Razorpay
+     dashboard vs payment_transactions; admin payments UI; dead-letter unmatched
+     webhooks. Metrics: payment success rate, verify vs webhook lag.
+
+Q98. What would you log vs never log (PII, tokens)?
+A98. Log: request ids, user ids, booking ids, error codes, latency, payment ids.
+     Never log: raw passwords, session JWTs, email raw tokens, full card data
+     (you shouldn’t have it), OpenAI keys, webhook secrets, full resume/transcript
+     by default in info logs. Redact emails if required by policy; hash tokens.
+
+Q99. How would you test the question engine without burning OpenAI credits?
+A99. Unit test heuristics (buildInterviewPlan, maybeGenerateFollowUp, scoring
+     thresholds, isGenericQuestion) with fixtures; mock getOpenAIClient; golden
+     JSON fixtures for AI parsers; contract tests for response_format shapes;
+     optional recorded replay of model outputs. CI should not need a real key.
+
+Q100. Critical integration tests you’d write for Razorpay verify + webhook?
+A100. Valid signature → paid + unlock; invalid signature → 4xx no unlock;
+      duplicate webhook → single side effect; verify then webhook → idempotent;
+      webhook then verify → idempotent; wrong productType side effects; suspended
+      user blocked; coaching requires hold/booking consistency.
+
+Q101. How do you handle OpenAI latency / timeouts mid-interview?
+A101. Timeouts on client calls; fall back to heuristic follow-up/end; show
+      non-blocking UI (“thinking”) so TTS/answer capture isn’t frozen forever;
+      retry once on transient errors; degrade gracefully without ending the
+      session abruptly. Server-side: circuit breaker + queue.
+
+Q102. What’s your rollback plan if a bad migration ships?
+A102. Forward-fix migrations preferred; keep expand/contract pattern; backup
+      before migrate; if broken, redeploy previous app compatible with DB, then
+      write a down/fix migration. Avoid destructive column drops without a
+      two-phase release. Document migrate-before-code order.
+
+================================================================================
+16. FRONTEND / UX
+================================================================================
+
+Q103. How is the interview page state machine structured?
+A103. Rough flow on /interview/[id]: load config/plan → present question (TTS) →
+      listen/capture answer (Recorder) → store AnswerRecord → maybe insert
+      follow-up → shouldEnd? → next question or generate report → navigate to
+      report. Draft persisted in localStorage for refresh resilience. States must
+      handle TTS cancel, empty answers, and API failures without losing progress.
+
+Q104. How does InterviewerAvatar signal “speaking”?
+A104. Static avatar image with CSS animation/visual state toggled while TTS is
+      active (speaking vs idle). Not a 3D lip-sync model. Purpose: presence and
+      turn-taking cues so the interview feels guided, not like a form.
+
+Q105. Marketing vs app shells — how are they separated?
+A105. Marketing pages use marketing components (SiteHeader, Hero, etc.). Logged-in
+      product uses AppShell; coaches CoachShell; admins AdminShell; auth flows
+      AuthShell. Separation keeps nav/permissions/layout concerns isolated and
+      avoids dashboard chrome on the landing page.
+
+Q106. Accessibility for voice-first flows (keyboard, captions, errors)?
+A106. Always show question text (captions); provide text answer path; visible
+      focus states; aria-live for status (“listening”, errors); don’t rely on color
+      alone for recording state; mic permission errors in plain language; ensure
+      report and setup are fully keyboard usable.
+
+Q107. Mobile constraints for mic / speech APIs?
+A107. iOS Safari SpeechRecognition support/gaps; autoplay/TTS quirks; background
+      tab throttling; insecure origins blocking media; small screens for long
+      transcripts. Mitigations: feature detect, text fallback, HTTPS, concise UI,
+      test on real devices before launch claims.
+
+================================================================================
+17. TRADEOFFS & SENIOR JUDGMENT
+================================================================================
+
+Q108. Biggest architectural compromise you knowingly made?
+A108. Client-side OpenAI + hybrid localStorage for interview orchestration —
+      maximized demo speed, accepted key exposure and tamperable scoring. Second:
+      monolith doing payments + meetings + AI. Both were intentional MVP bets with
+      a clear hardening path.
+
+Q109. Heuristic + AI hybrid — when does that pattern fail?
+A109. Fails when heuristics and AI disagree (scores vs prose); when templates feel
+      fake after users expect AI depth; when generic-filter blocks too much and
+      overuses fallbacks; when offline mode silently trains users on weaker signal.
+      Needs monitoring of fallback rates and human eval of question quality.
+
+Q110. Regex moderation vs an LLM moderator — tradeoffs?
+A110. Regex: cheap, explainable, fast, brittle. LLM: contextual, multilingual,
+      costlier, slower, harder to audit, can hallucinate flags. Practical approach:
+      regex for high-precision obvious leaks + async LLM for suspicious sessions;
+      human review queue for high-severity alerts.
+
+Q111. If rebuilding today, what would you change first?
+A111. Server-side interview engine and scoring from day one; session persistence
+      in Postgres; no public OpenAI key; thinner client. Keep Next monolith initially
+      but with clear domain modules and queues for AI/email.
+
+Q112. How would you A/B test question quality or scoring fairness?
+A112. Assign experiment keys per user/session; variant personas/prompts/scoring
+      rubrics; measure completion, follow-up acceptance, coaching conversion,
+      human-rated question relevance, score distribution by cohort (fresher vs
+      experienced). Avoid shipping unfair score shifts without calibration sets.
+
+Q113. Legal/compliance: storing transcripts, recordings, resumes — concerns?
+A113. PII/sensitive data: resume contact info, voice biometrics-ish audio,
+      meeting recordings. Need retention limits, deletion/export requests, purpose
+      limitation, secure storage, coach/candidate consent, India DPDP / policy
+      alignment, subprocessors (OpenAI, LiveKit, Razorpay) in privacy policy.
+      Don’t log raw transcripts broadly.
+
+Q114. Cost control: how do you cap OpenAI spend per user/session?
+A114. Server proxy with per-user daily quotas; max tokens; max follow-ups already
+      capped by difficulty; cache plans; use mini models; hard budget alarms;
+      deny client direct key. Track cost per completed interview as a unit economic.
+
+================================================================================
+18. BEHAVIORAL / OWNERSHIP (PROJECT-FRAMED)
+================================================================================
+
+Q115. Hardest bug you hit in this project — how did you debug it?
+A115. Sample strong answer structure (customize with your real bug):
+      Symptom → repro → hypothesize (race on slot hold, TTS race, webhook double
+      fire, JWT stale role) → add logging/idempotency keys → confirm with DB
+      constraints → write regression test. Prefer a concurrency or payment/webhook
+      story — it signals senior debugging.
+
+Q116. A feature you shipped that you later regretted — why?
+A116. Strong example: exposing OpenAI in the browser for speed — created security
+      debt and fake confidence in “AI quality” without server evaluation. Or
+      localStorage-as-source-of-truth lasting too long. Show you recognize debt and
+      have a remediation plan.
+
+Q117. How did you prioritize AI interview quality vs coaching marketplace?
+A117. Core loop first (practice → report) because that’s the acquisition wedge;
+      coaching next as monetization once weak-area reports gave a reason to book.
+      If both slip, you get a marketplace with empty demand or an AI toy with no
+      revenue. Sequence: quality signal → trust → upsell.
+
+Q118. How would you onboard a new engineer to this repo in one day?
+A118. Morning: run Postgres + migrate + env from .env.example; walk marketing →
+      checkout → interview → report; sketch architecture (app/components/lib).
+      Afternoon: auth cookie flow, question-engine hybrid, Razorpay verify/webhook,
+      one coaching booking happy path. Read permissions.ts and schema.ts. Pair on
+      a small bugfix. Update README where it’s stale as the first PR.
+
+Q119. README is partly outdated vs code — how do you keep docs honest?
+A119. Treat README “Known limitations” as code-reviewed: update in the same PR
+      that replaces mocks (Razorpay, DB reports, LiveKit). Add a short Architecture
+      section; CI check for broken setup commands; prefer executable docs
+      (demo script) over aspirational lists. Admit drift in interviews — then show
+      you fixed it.
+
+Q120. Demo this product in 3 minutes — what do you show and why?
+A120. 1) Landing value prop (10s). 2) Checkout/paid unlock (or pre-seeded account)
+      (20s). 3) Setup with resume (20s). 4) Live interview: one scripted Q + one
+      adaptive follow-up (60s). 5) Report scores + PDF (30s). 6) Optional: schedule
+      coaching teaser (20s). Narrate the hybrid AI+heuristic and payment trust.
+      Don’t drown in admin panels unless interviewing for platform/ops roles.
+
+================================================================================
+QUICK CHEAT SHEET
+================================================================================
+- Product: Selectwise / Hiro — AI interview + coaching
+- Price: ₹199 interview (INTERVIEW_PRICE_INR)
+- Stack: Next 14, TS, Tailwind, Postgres, Drizzle, Zod, jose JWT cookie
+- AI: gpt-4o-mini (+ transcribe); client key is MVP debt
+- Scores: communication, technicalDepth, problemSolving, structure, ownership
+- Ratings: 85 Strong hire / 75 Hire / 65 Lean hire / else No hire
+- Follow-up caps: easy 2 / medium 3 / hard 4; chain depth ≤3
+- End rules: min ~4 answers (≤3 never), max 12
+- Payments: Razorpay order → Checkout → verify + webhook idempotency
+- Meetings: LiveKit max 2; cron cleans stale rooms
+- Auth: hiro_session httpOnly; RBAC from DB role; tokens hashed at rest
+
+================================================================================
+END OF FILE
+================================================================================
